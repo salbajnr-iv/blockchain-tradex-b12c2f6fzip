@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Bell, Plus, X, RefreshCw, CheckCircle2, AlertCircle, TrendingUp, TrendingDown, Zap } from "lucide-react";
-import { base44 } from "@/api/base44Client";
+import { createAlert, updateAlert, deleteAlert } from "@/lib/api/alerts";
 import { motion } from "framer-motion";
 
 const CRYPTO_SYMBOLS = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "AVAX"];
@@ -23,7 +23,7 @@ export default function AlertManager({ alerts, onAlertsUpdate, cryptoPrices, cry
     if (!formData.threshold_value) return;
     setLoading(true);
     try {
-      await base44.entities.Alert.create({
+      await createAlert({
         ...formData,
         threshold_value: parseFloat(formData.threshold_value),
         is_active: true,
@@ -38,21 +38,20 @@ export default function AlertManager({ alerts, onAlertsUpdate, cryptoPrices, cry
   };
 
   const handleDelete = async (alertId) => {
-    await base44.entities.Alert.delete(alertId);
+    await deleteAlert(alertId);
     onAlertsUpdate();
   };
 
   const handleToggle = async (alert) => {
-    await base44.entities.Alert.update(alert.id, { is_active: !alert.is_active });
+    await updateAlert(alert.id, { is_active: !alert.is_active });
     onAlertsUpdate();
   };
 
   const handleRearm = async (alert) => {
-    await base44.entities.Alert.update(alert.id, { is_triggered: false, is_active: true, triggered_at: null });
+    await updateAlert(alert.id, { is_triggered: false, is_active: true, triggered_at: null });
     onAlertsUpdate();
   };
 
-  // Calculate how close current price is to threshold (for progress bar)
   const getProgress = (alert) => {
     const currentPrice = cryptoPrices?.[alert.crypto_symbol];
     if (!currentPrice || alert.alert_type === "volatility") return null;
@@ -60,7 +59,7 @@ export default function AlertManager({ alerts, onAlertsUpdate, cryptoPrices, cry
     return Math.min(100, Math.max(0, ratio * 100));
   };
 
-  const activeAlerts   = alerts.filter((a) => a.is_active && !a.is_triggered);
+  const activeAlerts    = alerts.filter((a) => a.is_active && !a.is_triggered);
   const triggeredAlerts = alerts.filter((a) => a.is_triggered);
   const disabledAlerts  = alerts.filter((a) => !a.is_active && !a.is_triggered);
 
@@ -80,7 +79,7 @@ export default function AlertManager({ alerts, onAlertsUpdate, cryptoPrices, cry
       }`}>
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            <div className={`w-7 h-7 rounded-lg bg-secondary/50 flex items-center justify-center shrink-0`}>
+            <div className="w-7 h-7 rounded-lg bg-secondary/50 flex items-center justify-center shrink-0">
               <Icon className={`w-3.5 h-3.5 ${meta.color}`} />
             </div>
             <div className="min-w-0">
@@ -133,7 +132,6 @@ export default function AlertManager({ alerts, onAlertsUpdate, cryptoPrices, cry
           </div>
         </div>
 
-        {/* Progress bar for price alerts */}
         {progress !== null && !alert.is_triggered && alert.is_active && (
           <div className="mt-2">
             <div className="w-full h-1 bg-secondary/50 rounded-full overflow-hidden">
@@ -162,7 +160,6 @@ export default function AlertManager({ alerts, onAlertsUpdate, cryptoPrices, cry
       transition={{ delay: 0.5 }}
       className="bg-card rounded-xl border border-border/50 p-5"
     >
-      {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Bell className="w-4 h-4 text-primary" />
@@ -184,7 +181,6 @@ export default function AlertManager({ alerts, onAlertsUpdate, cryptoPrices, cry
         </Button>
       </div>
 
-      {/* Create Form */}
       {showForm && (
         <motion.div
           initial={{ opacity: 0, height: 0 }}
@@ -238,7 +234,6 @@ export default function AlertManager({ alerts, onAlertsUpdate, cryptoPrices, cry
         </motion.div>
       )}
 
-      {/* Alert Lists */}
       <div className="space-y-2 max-h-72 overflow-y-auto pr-0.5">
         {alerts.length === 0 ? (
           <div className="text-center py-8 space-y-2">

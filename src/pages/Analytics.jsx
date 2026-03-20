@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { listTransactions } from "@/lib/api/transactions";
 import { format, parseISO, startOfMonth } from "date-fns";
 import { groupBy, sumBy } from "lodash";
 import {
@@ -57,11 +57,10 @@ const PieTooltip = ({ active, payload }) => {
 export default function Analytics() {
   const { data: transactions = [], isLoading } = useQuery({
     queryKey: ["transactions-analytics"],
-    queryFn: () => base44.entities.Transaction.list("-transaction_date", 200),
+    queryFn: () => listTransactions(200),
     initialData: [],
   });
 
-  // Monthly breakdown: withdrawals vs trades
   const monthlyData = useMemo(() => {
     const byMonth = groupBy(transactions, (tx) =>
       format(startOfMonth(parseISO(tx.transaction_date)), "MMM yyyy")
@@ -76,7 +75,6 @@ export default function Analytics() {
       .slice(-12);
   }, [transactions]);
 
-  // Pie chart: withdrawal method distribution
   const pieData = useMemo(() => {
     const withdrawals = transactions.filter((t) => t.type === "withdrawal");
     const methodGroups = groupBy(withdrawals, (tx) => {
@@ -96,7 +94,6 @@ export default function Analytics() {
       .filter((d) => d.value > 0);
   }, [transactions]);
 
-  // Cumulative withdrawal area chart
   const cumulativeData = useMemo(() => {
     let running = 0;
     return transactions
@@ -111,7 +108,6 @@ export default function Analytics() {
       });
   }, [transactions]);
 
-  // Summary stats
   const totalWithdrawals = sumBy(transactions.filter((t) => t.type === "withdrawal"), "total_value") || 0;
   const totalTrading = sumBy(transactions.filter((t) => t.type === "trade"), "total_value") || 0;
   const totalTxCount = transactions.length;
@@ -127,8 +123,6 @@ export default function Analytics() {
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-6xl mx-auto space-y-8">
-
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground">Transaction Analytics</h1>
@@ -139,7 +133,6 @@ export default function Analytics() {
           </Link>
         </div>
 
-        {/* Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
             { label: "Total Withdrawals", value: `$${totalWithdrawals.toLocaleString()}`, icon: ArrowUpRight, color: "text-primary" },
@@ -164,7 +157,6 @@ export default function Analytics() {
           ))}
         </div>
 
-        {/* Monthly Bar Chart */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -190,10 +182,7 @@ export default function Analytics() {
           )}
         </motion.div>
 
-        {/* Bottom row: Pie + Area */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-          {/* Pie Chart */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -208,8 +197,7 @@ export default function Analytics() {
               <div className="flex flex-col items-center gap-4">
                 <ResponsiveContainer width="100%" height={220}>
                   <PieChart>
-                    <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={95}
-                      paddingAngle={3} dataKey="value">
+                    <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={95} paddingAngle={3} dataKey="value">
                       {pieData.map((entry, i) => (
                         <Cell key={i} fill={entry.color} stroke="transparent" />
                       ))}
@@ -229,7 +217,6 @@ export default function Analytics() {
             )}
           </motion.div>
 
-          {/* Cumulative Withdrawals Area Chart */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -258,7 +245,6 @@ export default function Analytics() {
               </ResponsiveContainer>
             )}
           </motion.div>
-
         </div>
       </div>
     </div>

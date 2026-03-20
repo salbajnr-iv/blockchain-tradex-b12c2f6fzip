@@ -3,9 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { motion } from "framer-motion";
-import { ArrowUpDown, CheckCircle2, Loader2 } from "lucide-react";
+import { ArrowUpDown, Loader2 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { createTransaction } from "@/lib/api/transactions";
 import { toast } from "sonner";
 
 export default function TradePanel({ cryptoList = [] }) {
@@ -20,7 +20,7 @@ export default function TradePanel({ cryptoList = [] }) {
 
   const tradeMutation = useMutation({
     mutationFn: async () => {
-      await base44.entities.Transaction.create({
+      await createTransaction({
         type: "trade",
         crypto_symbol: selectedCoin,
         side,

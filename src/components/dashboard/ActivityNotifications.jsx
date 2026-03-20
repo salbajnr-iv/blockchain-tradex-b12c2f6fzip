@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from "react";
-import { base44 } from "@/api/base44Client";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowDownLeft, ArrowUpRight, X } from "lucide-react";
 
@@ -8,26 +7,28 @@ export default function ActivityNotifications() {
   const seenIds = useRef(new Set());
 
   useEffect(() => {
-    const unsubscribe = base44.entities.Transaction.subscribe((event) => {
-      if (event.type === "create" && !seenIds.current.has(event.id)) {
-        seenIds.current.add(event.id);
-        const tx = event.data;
-        const notif = {
-          id: event.id,
-          label: tx.type === "withdrawal"
-            ? `Withdrawal of $${tx.amount?.toLocaleString()} submitted`
-            : `${tx.side === "buy" ? "Bought" : "Sold"} ${tx.amount} ${tx.crypto_symbol}`,
-          isBuy: tx.side === "buy",
-          isWithdrawal: tx.type === "withdrawal",
-        };
-        setNotifications((prev) => [notif, ...prev].slice(0, 5));
-        // Auto-dismiss after 6 seconds
-        setTimeout(() => {
-          setNotifications((prev) => prev.filter((n) => n.id !== event.id));
-        }, 6000);
-      }
-    });
-    return () => unsubscribe();
+    const handleTransaction = (event) => {
+      const tx = event.detail;
+      if (!tx || seenIds.current.has(tx.id)) return;
+      seenIds.current.add(tx.id);
+
+      const notif = {
+        id: tx.id || `notif-${Date.now()}`,
+        label: tx.type === "withdrawal"
+          ? `Withdrawal of $${tx.amount?.toLocaleString()} submitted`
+          : `${tx.side === "buy" ? "Bought" : "Sold"} ${tx.amount} ${tx.crypto_symbol}`,
+        isBuy: tx.side === "buy",
+        isWithdrawal: tx.type === "withdrawal",
+      };
+
+      setNotifications((prev) => [notif, ...prev].slice(0, 5));
+      setTimeout(() => {
+        setNotifications((prev) => prev.filter((n) => n.id !== notif.id));
+      }, 6000);
+    };
+
+    window.addEventListener("transaction:created", handleTransaction);
+    return () => window.removeEventListener("transaction:created", handleTransaction);
   }, []);
 
   const dismiss = (id) => setNotifications((prev) => prev.filter((n) => n.id !== id));
@@ -51,10 +52,7 @@ export default function ActivityNotifications() {
                 : <ArrowUpRight className="w-4 h-4 text-destructive" />}
             </div>
             <p className="text-sm font-medium flex-1">{n.label}</p>
-            <button
-              onClick={() => dismiss(n.id)}
-              className="text-muted-foreground hover:text-foreground transition-colors"
-            >
+            <button onClick={() => dismiss(n.id)} className="text-muted-foreground hover:text-foreground transition-colors">
               <X className="w-4 h-4" />
             </button>
           </motion.div>

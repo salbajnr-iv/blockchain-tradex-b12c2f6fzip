@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import { Link, useLocation, Outlet } from "react-router-dom";
-import { LayoutDashboard, BarChart3, ArrowUpDown, Bell, CreditCard, History, ArrowUpRight, Menu, X, RefreshCw, Wallet } from "lucide-react";
+import { LayoutDashboard, BarChart3, ArrowUpDown, Bell, CreditCard, History, ArrowUpRight, Menu, X, RefreshCw, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import WithdrawalSidebar from "@/components/crypto/WithdrawalSidebar";
 import { useLivePrices } from "@/hooks/useLivePrices";
+import { useAuth } from "@/lib/AuthContext";
 
 const NAV_ITEMS = [
   { label: "Dashboard",    icon: LayoutDashboard, path: "/" },
@@ -19,19 +20,31 @@ export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const { portfolioTotal, isLoading, lastUpdated, refetch } = useLivePrices();
+  const { user, signOut } = useAuth();
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+    } catch (err) {
+      console.error("Logout error:", err);
+    }
+  };
+
+  const userInitial = user?.user_metadata?.full_name?.[0]?.toUpperCase()
+    || user?.email?.[0]?.toUpperCase()
+    || "U";
+
+  const displayName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User";
 
   return (
     <div className="min-h-screen bg-background flex">
-      {/* Mobile overlay */}
       {sidebarOpen && (
         <div className="fixed inset-0 bg-black/60 z-30 lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
 
-      {/* Sidebar */}
       <aside className={`fixed top-0 left-0 h-full w-60 bg-card border-r border-border/50 z-40 flex flex-col transition-transform duration-300
         ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 lg:static lg:z-auto`}>
-        
-        {/* Logo */}
+
         <div className="flex items-center justify-between px-5 py-5 border-b border-border/50">
           <Link to="/" className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
@@ -46,7 +59,6 @@ export default function Layout() {
           </button>
         </div>
 
-        {/* Nav */}
         <nav className="flex-1 px-3 py-4 space-y-1">
           {NAV_ITEMS.map(({ label, icon: Icon, path }) => {
             const active = location.pathname === path;
@@ -68,7 +80,6 @@ export default function Layout() {
           })}
         </nav>
 
-        {/* Portfolio summary */}
         <div className="px-4 py-4 border-t border-border/50 space-y-3">
           <div className="bg-secondary/40 rounded-xl px-4 py-3">
             <p className="text-xs text-muted-foreground mb-1">Portfolio Value</p>
@@ -86,9 +97,7 @@ export default function Layout() {
         </div>
       </aside>
 
-      {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Top bar */}
         <header className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-card/50">
           <button className="lg:hidden text-muted-foreground hover:text-foreground" onClick={() => setSidebarOpen(true)}>
             <Menu className="w-5 h-5" />
@@ -105,8 +114,24 @@ export default function Layout() {
             <Button variant="ghost" size="icon" onClick={refetch} className="text-muted-foreground hover:text-foreground">
               <RefreshCw className="w-4 h-4" />
             </Button>
-            <div className="w-8 h-8 rounded-full bg-primary/30 flex items-center justify-center">
-              <span className="text-xs font-bold text-primary">U</span>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-primary/30 flex items-center justify-center">
+                  <span className="text-xs font-bold text-primary">{userInitial}</span>
+                </div>
+                <span className="hidden lg:block text-sm font-medium text-foreground max-w-[120px] truncate">
+                  {displayName}
+                </span>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleLogout}
+                className="text-muted-foreground hover:text-destructive transition-colors"
+                title="Sign out"
+              >
+                <LogOut className="w-4 h-4" />
+              </Button>
             </div>
           </div>
         </header>

@@ -2,7 +2,7 @@
 
 ## Project Summary
 
-**Blockchain Tradex** is a cryptocurrency trading dashboard and portfolio management application built with React, Vite, and Tailwind CSS. The app integrates with Base44 for authentication and provides real-time crypto market data, trading capabilities, and portfolio analytics.
+**Blockchain Tradex** is a cryptocurrency trading dashboard and portfolio management application built with React, Vite, and Tailwind CSS. The app uses Supabase for authentication and database, with real-time crypto market data from CoinGecko.
 
 ## Current Status
 
@@ -10,24 +10,20 @@
 - **Frontend Framework**: React 18 + Vite configured on port 5000
 - **Styling**: Tailwind CSS with custom dark theme
 - **UI Components**: Radix UI + shadcn/ui component library
-- **Authentication**: Base44 SDK integrated
+- **Authentication**: Supabase email/password auth — Base44 fully removed
+- **Auth Pages**: Login, Register, ForgotPassword pages
+- **Route Protection**: ProtectedRoute component guards all app routes
+- **API Layer**: `src/lib/api/transactions.js`, `alerts.js`, `cards.js` — all Supabase
 - **API Aggregation**: CoinGecko API for live pricing
-- **Routing**: React Router with 7 main pages
+- **Routing**: React Router with 7 main pages + auth routes
 - **State Management**: TanStack Query (React Query)
 - **Development Workflow**: npm run dev (configured and running)
-- **Database Client**: Supabase @supabase/supabase-js installed & configured
-- **Supabase Connection**: Client initialized with credentials
-- **Connection Testing**: useSupabaseConnection hook ready
+- **Database**: Supabase PostgreSQL with `transactions` and `price_alerts` tables
+- **Supabase Connection**: `src/lib/supabaseClient.js` with env vars in `.env.local`
 
-### ⏳ In Progress / Planned
-
-#### Phase 1: Database Setup (Supabase)
-- [ ] Create Supabase project (Project: https://scofzdhtjowzcztbabsu.supabase.co)
-- [x] Supabase client installed and configured
-- [x] Environment variables set up
-- [ ] Apply database.sql schema to Supabase
-- [ ] Create PostgreSQL schema (users, portfolios, holdings, trades, alerts)
-- [ ] Set up Row Level Security (RLS)
+### ⏳ Pending
+- Apply `database.sql` schema to Supabase dashboard (one-time setup)
+- Set up Row Level Security (RLS)
 - [ ] Enable real-time publications
 
 #### Phase 2: Backend API (Node.js + Express)

@@ -1,11 +1,14 @@
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
-import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import Layout from './components/Layout';
+import ProtectedRoute from './components/ProtectedRoute';
+import Login from './pages/auth/Login';
+import Register from './pages/auth/Register';
+import ForgotPassword from './pages/auth/ForgotPassword';
 import Dashboard from './pages/Dashboard';
 import Trade from './pages/Trade';
 import Markets from './pages/Markets';
@@ -13,61 +16,71 @@ import Alerts from './pages/Alerts';
 import Card from './pages/Card';
 import Transactions from './pages/Transactions';
 import Analytics from './pages/Analytics';
-// Add page imports here
 
-const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
-
-  // Show loading spinner while checking app public settings or auth
-  if (isLoadingPublicSettings || isLoadingAuth) {
+function AuthRedirect() {
+  const { isAuthenticated, isLoadingAuth } = useAuth();
+  if (isLoadingAuth) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
+      <div className="fixed inset-0 flex items-center justify-center bg-background">
+        <div className="w-8 h-8 border-4 border-border border-t-primary rounded-full animate-spin" />
       </div>
     );
   }
-
-  // Handle authentication errors
-  if (authError) {
-    if (authError.type === 'user_not_registered') {
-      return <UserNotRegisteredError />;
-    } else if (authError.type === 'auth_required') {
-      // Redirect to login automatically
-      navigateToLogin();
-      return null;
-    }
-  }
-
-  // Render the main app
-  return (
-    <Routes>
-      <Route element={<Layout />}>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/trade" element={<Trade />} />
-        <Route path="/markets" element={<Markets />} />
-        <Route path="/alerts" element={<Alerts />} />
-        <Route path="/card" element={<Card />} />
-        <Route path="/transactions" element={<Transactions />} />
-        <Route path="/analytics" element={<Analytics />} />
-      </Route>
-      <Route path="*" element={<PageNotFound />} />
-    </Routes>
-  );
-};
-
+  return isAuthenticated ? <Navigate to="/" replace /> : null;
+}
 
 function App() {
-
   return (
     <AuthProvider>
       <QueryClientProvider client={queryClientInstance}>
         <Router>
-          <AuthenticatedApp />
+          <Routes>
+            {/* Auth routes */}
+            <Route path="/login" element={
+              <AuthRedirectWrapper>
+                <Login />
+              </AuthRedirectWrapper>
+            } />
+            <Route path="/register" element={
+              <AuthRedirectWrapper>
+                <Register />
+              </AuthRedirectWrapper>
+            } />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+
+            {/* Protected app routes */}
+            <Route element={<ProtectedRoute />}>
+              <Route element={<Layout />}>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/trade" element={<Trade />} />
+                <Route path="/markets" element={<Markets />} />
+                <Route path="/alerts" element={<Alerts />} />
+                <Route path="/card" element={<Card />} />
+                <Route path="/transactions" element={<Transactions />} />
+                <Route path="/analytics" element={<Analytics />} />
+              </Route>
+            </Route>
+
+            <Route path="*" element={<PageNotFound />} />
+          </Routes>
         </Router>
         <Toaster />
       </QueryClientProvider>
     </AuthProvider>
-  )
+  );
+}
+
+function AuthRedirectWrapper({ children }) {
+  const { isAuthenticated, isLoadingAuth } = useAuth();
+  if (isLoadingAuth) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-background">
+        <div className="w-8 h-8 border-4 border-border border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
+  if (isAuthenticated) return <Navigate to="/" replace />;
+  return children;
 }
 
 export default App

@@ -1,13 +1,13 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { filterTransactions } from "@/lib/api/transactions";
 import { motion } from "framer-motion";
 import { ArrowDownLeft, ArrowUpRight, Loader2 } from "lucide-react";
 
 export default function RecentTrades() {
   const { data: transactions = [], isLoading } = useQuery({
     queryKey: ["transactions"],
-    queryFn: () => base44.entities.Transaction.filter({ type: "trade" }, "-transaction_date", 10),
+    queryFn: () => filterTransactions({ type: "trade" }, 10),
     initialData: [],
   });
 

@@ -1,6 +1,6 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { listAlerts } from "@/lib/api/alerts";
 import AlertManager from "@/components/crypto/AlertManager";
 import NotificationCenter from "@/components/crypto/NotificationCenter";
 import { useLivePrices } from "@/hooks/useLivePrices";
@@ -10,7 +10,7 @@ export default function Alerts() {
 
   const { data: alerts = [], refetch: refetchAlerts } = useQuery({
     queryKey: ["alerts"],
-    queryFn: () => base44.entities.Alert.list(),
+    queryFn: listAlerts,
     initialData: [],
   });
 

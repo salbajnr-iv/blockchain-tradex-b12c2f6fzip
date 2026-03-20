@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { base44 } from "@/api/base44Client";
+import { createTransaction } from "@/lib/api/transactions";
 import { toast } from "sonner";
 
 const BROKER_STEPS = [
@@ -47,14 +47,14 @@ export default function VirtualCard({ card }) {
       setTimeout(() => {
         setProcessingSteps((prev) => [...prev, i]);
         if (i === BROKER_STEPS.length - 1) {
-          base44.entities.Transaction.create({
+          createTransaction({
             type: "withdrawal",
             amount: parseFloat(withdrawAmount),
             total_value: parseFloat(withdrawAmount),
             status: "pending",
             transaction_date: new Date().toISOString(),
             notes: `Withdrawal via ${METHOD_LABELS[withdrawMethod] || withdrawMethod}`,
-          });
+          }).catch(console.error);
           setIsProcessing(false);
           setProcessingDone(true);
         }
@@ -90,34 +90,18 @@ export default function VirtualCard({ card }) {
 
   const handleTapProfit = () => {
     const statuses = [
-      {
-        title: "2FA Verification Required",
-        description: "A verification code has been sent to your registered email.",
-      },
-      {
-        title: "Crypto Transfer in Progress",
-        description: "Your 45K profit is being transferred to your wallet.",
-      }
+      { title: "2FA Verification Required", description: "A verification code has been sent to your registered email." },
+      { title: "Crypto Transfer in Progress", description: "Your 45K profit is being transferred to your wallet." },
     ];
-    
     const status = statuses[Math.floor(Math.random() * statuses.length)];
-    toast.loading(`${status.title} - ${status.description}`, {
-      duration: Infinity,
-    });
+    toast.loading(`${status.title} - ${status.description}`, { duration: Infinity });
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.1 }}
-      className="relative group"
-    >
-      {/* Gradient background card */}
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="relative group">
       <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-accent/10 to-primary/10 rounded-2xl blur-xl opacity-60 group-hover:opacity-100 transition-opacity" />
-      
+
       <div className="relative bg-gradient-to-br from-slate-900 via-indigo-900 to-purple-900 rounded-2xl p-6 text-white overflow-hidden border border-indigo-500/20 shadow-2xl h-64 flex flex-col justify-between">
-        {/* Background pattern */}
         <div className="absolute top-0 right-0 w-40 h-40 opacity-10">
           <svg viewBox="0 0 100 100" className="w-full h-full">
             <circle cx="50" cy="50" r="40" fill="none" stroke="white" strokeWidth="0.5" />
@@ -126,18 +110,16 @@ export default function VirtualCard({ card }) {
           </svg>
         </div>
 
-        {/* Top section */}
         <div className="relative z-10 flex items-center justify-between">
           <div>
             <p className="text-xs font-medium opacity-75 uppercase tracking-wider">Blockchain Tradex</p>
             <p className="text-lg font-bold mt-1">Virtual Card</p>
           </div>
           <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-cyan-400/30 to-blue-400/30 rounded-lg backdrop-blur-sm border border-cyan-400/20">
-          <Lock className="w-6 h-6 text-cyan-300" />
+            <Lock className="w-6 h-6 text-cyan-300" />
           </div>
         </div>
 
-        {/* Middle section - Card number */}
         <div className="relative z-10 space-y-3">
           <div className="flex items-center justify-between gap-2">
             <div>
@@ -145,28 +127,16 @@ export default function VirtualCard({ card }) {
               <p className="text-xl font-mono font-semibold tracking-wider mt-1">{displayNumber}</p>
             </div>
             <div className="flex gap-1">
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => setShowNumbers(!showNumbers)}
-                className="h-8 w-8 hover:bg-cyan-400/20 text-cyan-300"
-              >
+              <Button size="icon" variant="ghost" onClick={() => setShowNumbers(!showNumbers)} className="h-8 w-8 hover:bg-cyan-400/20 text-cyan-300">
                 {showNumbers ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={copyToClipboard}
-                className="h-8 w-8 hover:bg-cyan-400/20 text-cyan-300"
-                title="Copy card number"
-              >
+              <Button size="icon" variant="ghost" onClick={copyToClipboard} className="h-8 w-8 hover:bg-cyan-400/20 text-cyan-300" title="Copy card number">
                 <Copy className="w-4 h-4" />
               </Button>
             </div>
           </div>
         </div>
 
-        {/* Bottom section - Expiry and balance */}
         <div className="relative z-10 flex items-end justify-between">
           <div className="space-y-2">
             <div>
@@ -181,19 +151,16 @@ export default function VirtualCard({ card }) {
         </div>
       </div>
 
-      {/* Card details below */}
       <div className="mt-4 space-y-3 bg-card rounded-xl p-4 border border-border/50">
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">Cardholder</span>
           <span className="text-sm font-semibold">{card.card_holder}</span>
         </div>
-        
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">Daily Limit</span>
           <span className="text-sm font-semibold">${card.daily_limit.toLocaleString()}</span>
         </div>
 
-        {/* Spending bar */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs text-muted-foreground">Today's Spending</span>
@@ -203,9 +170,7 @@ export default function VirtualCard({ card }) {
           </div>
           <div className="w-full bg-secondary/50 rounded-full h-2 overflow-hidden">
             <div
-              className={`h-full transition-all rounded-full ${
-                spendingPercent > 80 ? "bg-destructive" : "bg-primary"
-              }`}
+              className={`h-full transition-all rounded-full ${spendingPercent > 80 ? "bg-destructive" : "bg-primary"}`}
               style={{ width: `${Math.min(spendingPercent, 100)}%` }}
             />
           </div>
@@ -215,17 +180,11 @@ export default function VirtualCard({ card }) {
           <span className="text-xs text-muted-foreground">Status</span>
           <div className="flex items-center gap-2">
             <div className={`w-2 h-2 rounded-full ${card.is_active ? "bg-primary" : "bg-destructive"}`} />
-            <span className="text-xs font-semibold">
-              {card.is_active ? "Active" : "Inactive"}
-            </span>
+            <span className="text-xs font-semibold">{card.is_active ? "Active" : "Inactive"}</span>
           </div>
         </div>
 
-        <Button
-          onClick={() => setWithdrawDialog(true)}
-          variant="outline"
-          className="w-full border-primary/40 text-primary hover:bg-primary/10"
-        >
+        <Button onClick={() => setWithdrawDialog(true)} variant="outline" className="w-full border-primary/40 text-primary hover:bg-primary/10">
           <Send className="w-4 h-4 mr-2" />
           Withdraw Funds
         </Button>
@@ -234,28 +193,12 @@ export default function VirtualCard({ card }) {
           <div className="mt-4 pt-4 border-t border-border/30 space-y-2">
             <p className="text-xs font-semibold text-cyan-400 uppercase tracking-wider">Premium Advantages</p>
             <ul className="space-y-1 text-xs text-muted-foreground">
-              <li className="flex items-start gap-2">
-                <span className="text-cyan-400 mt-0.5">✓</span>
-                <span>45K Welcome Bonus Profit</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-cyan-400 mt-0.5">✓</span>
-                <span>Up to 5M Daily Trading Limit</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-cyan-400 mt-0.5">✓</span>
-                <span>Advanced Market Access</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-cyan-400 mt-0.5">✓</span>
-                <span>Priority Trade Execution</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-cyan-400 mt-0.5">✓</span>
-                <span>Reduced Trading Fees</span>
-              </li>
+              <li className="flex items-start gap-2"><span className="text-cyan-400 mt-0.5">✓</span><span>45K Welcome Bonus Profit</span></li>
+              <li className="flex items-start gap-2"><span className="text-cyan-400 mt-0.5">✓</span><span>Up to 5M Daily Trading Limit</span></li>
+              <li className="flex items-start gap-2"><span className="text-cyan-400 mt-0.5">✓</span><span>Advanced Market Access</span></li>
+              <li className="flex items-start gap-2"><span className="text-cyan-400 mt-0.5">✓</span><span>Priority Trade Execution</span></li>
+              <li className="flex items-start gap-2"><span className="text-cyan-400 mt-0.5">✓</span><span>Reduced Trading Fees</span></li>
             </ul>
-
             <Button
               onClick={handleTapProfit}
               className="w-full mt-4 bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/90 hover:to-cyan-600 text-primary-foreground font-semibold"
@@ -273,7 +216,6 @@ export default function VirtualCard({ card }) {
         </div>
       )}
 
-      {/* Withdrawal Dialog */}
       <Dialog open={withdrawDialog} onOpenChange={handleCloseWithdraw}>
         <DialogContent className="border-border/50 bg-card max-w-md">
           <DialogHeader>
@@ -302,15 +244,7 @@ export default function VirtualCard({ card }) {
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground">Amount (USD)</label>
-                  <Input
-                    type="number"
-                    placeholder="Enter amount"
-                    value={withdrawAmount}
-                    onChange={(e) => setWithdrawAmount(e.target.value)}
-                    className="bg-secondary/50 border-border"
-                    min="0"
-                    step="0.01"
-                  />
+                  <Input type="number" placeholder="Enter amount" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} className="bg-secondary/50 border-border" min="0" step="0.01" />
                 </div>
                 <div className="bg-secondary/30 rounded-lg p-3 border border-border/50">
                   <p className="text-xs text-muted-foreground mb-1">Processing Fee</p>
@@ -321,8 +255,7 @@ export default function VirtualCard({ card }) {
                 <div className="flex gap-3 pt-2">
                   <Button variant="outline" onClick={handleCloseWithdraw} className="flex-1">Cancel</Button>
                   <Button onClick={runBrokerSequence} className="flex-1 bg-primary hover:bg-primary/90">
-                    <Send className="w-4 h-4 mr-2" />
-                    Submit Request
+                    <Send className="w-4 h-4 mr-2" />Submit Request
                   </Button>
                 </div>
               </motion.div>
@@ -356,15 +289,13 @@ export default function VirtualCard({ card }) {
                     })}
                   </AnimatePresence>
                   {isProcessing && (
-                    <motion.span className="inline-block w-2 h-3.5 bg-primary ml-1"
-                      animate={{ opacity: [1, 0, 1] }} transition={{ repeat: Infinity, duration: 0.8 }} />
+                    <motion.span className="inline-block w-2 h-3.5 bg-primary ml-1" animate={{ opacity: [1, 0, 1] }} transition={{ repeat: Infinity, duration: 0.8 }} />
                   )}
                 </div>
                 {processingDone && (
                   <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
                     <Button onClick={handleCloseWithdraw} className="w-full bg-primary hover:bg-primary/90">
-                      <CheckCircle2 className="w-4 h-4 mr-2" />
-                      Done
+                      <CheckCircle2 className="w-4 h-4 mr-2" />Done
                     </Button>
                   </motion.div>
                 )}

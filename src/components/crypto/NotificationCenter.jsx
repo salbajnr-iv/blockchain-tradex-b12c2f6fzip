@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
-import { base44 } from "@/api/base44Client";
+import { updateAlert } from "@/lib/api/alerts";
 import { AlertCircle, TrendingUp, TrendingDown, Zap, X, Bell } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function NotificationCenter({ alerts, cryptoPrices, cryptoChanges }) {
   const [notifications, setNotifications] = useState([]);
-  const triggeredRef = useRef(new Set()); // track already-fired alert IDs this session
+  const triggeredRef = useRef(new Set());
 
-  // Check alerts every 5 seconds against live prices
   useEffect(() => {
     if (!alerts.length || !Object.keys(cryptoPrices).length) return;
 
@@ -39,7 +38,6 @@ export default function NotificationCenter({ alerts, cryptoPrices, cryptoChanges
             }
             break;
           case "volatility":
-            // Trigger if 24h change exceeds threshold %
             if (Math.abs(change24h) >= alert.threshold_value) {
               triggered = true;
               message = `${alert.crypto_symbol} is volatile — ${change24h >= 0 ? "+" : ""}${change24h}% in 24h (threshold: ${alert.threshold_value}%) ⚡`;
@@ -59,12 +57,11 @@ export default function NotificationCenter({ alerts, cryptoPrices, cryptoChanges
             timestamp: new Date(),
           });
 
-          // Persist triggered state
-          base44.entities.Alert.update(alert.id, {
+          updateAlert(alert.id, {
             is_triggered: true,
             triggered_at: new Date().toISOString(),
             current_price: currentPrice,
-          });
+          }).catch(console.error);
         }
       });
 
@@ -73,12 +70,11 @@ export default function NotificationCenter({ alerts, cryptoPrices, cryptoChanges
       }
     };
 
-    checkAlerts(); // run immediately when prices change
+    checkAlerts();
     const interval = setInterval(checkAlerts, 5000);
     return () => clearInterval(interval);
   }, [alerts, cryptoPrices, cryptoChanges]);
 
-  // Auto-dismiss oldest notification after 12s
   useEffect(() => {
     if (notifications.length === 0) return;
     const timer = setTimeout(() => {
@@ -120,7 +116,6 @@ export default function NotificationCenter({ alerts, cryptoPrices, cryptoChanges
             className={`pointer-events-auto bg-card border rounded-xl p-4 shadow-2xl ${getBorderColor(notif.type)}`}
           >
             <div className="flex items-start gap-3">
-              {/* Pulsing icon */}
               <div className="relative mt-0.5 shrink-0">
                 <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center">
                   {getIcon(notif.type)}

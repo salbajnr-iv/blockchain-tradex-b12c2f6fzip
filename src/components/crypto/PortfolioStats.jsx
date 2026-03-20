@@ -2,12 +2,12 @@ import React from "react";
 import { TrendingUp, TrendingDown, DollarSign, BarChart3, Activity, ArrowUpRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { listTransactions } from "@/lib/api/transactions";
 
 export default function PortfolioStats({ portfolioTotal, portfolioChange24h, isLoading }) {
   const { data: transactions = [] } = useQuery({
     queryKey: ["transactions-stats"],
-    queryFn: () => base44.entities.Transaction.list("-transaction_date", 200),
+    queryFn: () => listTransactions(200),
     initialData: [],
   });
 

@@ -4,7 +4,7 @@ import { X, Send, Wallet, CheckCircle2, Loader2, ShieldCheck, Server, Database, 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { base44 } from "@/api/base44Client";
+import { createTransaction } from "@/lib/api/transactions";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -50,7 +50,7 @@ export default function WithdrawalSidebar({ open, onClose }) {
       setTimeout(() => {
         setProcessingSteps((prev) => [...prev, i]);
         if (i === BROKER_STEPS.length - 1) {
-          base44.entities.Transaction.create({
+          createTransaction({
             type: "withdrawal",
             amount: parseFloat(amount),
             total_value: parseFloat(amount),
@@ -60,7 +60,7 @@ export default function WithdrawalSidebar({ open, onClose }) {
           }).then(() => {
             queryClient.invalidateQueries({ queryKey: ["transactions"] });
             queryClient.invalidateQueries({ queryKey: ["transactions-stats"] });
-          });
+          }).catch(console.error);
           setIsProcessing(false);
           setProcessingDone(true);
         }
@@ -86,7 +86,6 @@ export default function WithdrawalSidebar({ open, onClose }) {
     <AnimatePresence>
       {open && (
         <>
-          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -95,7 +94,6 @@ export default function WithdrawalSidebar({ open, onClose }) {
             className="fixed inset-0 bg-black/50 z-40"
           />
 
-          {/* Sidebar */}
           <motion.div
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
@@ -103,7 +101,6 @@ export default function WithdrawalSidebar({ open, onClose }) {
             transition={{ type: "spring", damping: 30, stiffness: 300 }}
             className="fixed top-0 right-0 h-full w-full max-w-md bg-card border-l border-border/50 z-50 flex flex-col shadow-2xl"
           >
-            {/* Header */}
             <div className="flex items-center justify-between px-6 py-5 border-b border-border/50">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -119,13 +116,10 @@ export default function WithdrawalSidebar({ open, onClose }) {
               </Button>
             </div>
 
-            {/* Body */}
             <div className="flex-1 overflow-y-auto px-6 py-6">
               <AnimatePresence mode="wait">
                 {showForm && (
                   <motion.div key="form" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-5">
-
-                    {/* Method */}
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-foreground">Withdrawal Method <span className="text-destructive">*</span></label>
                       <Select value={method} onValueChange={setMethod}>
@@ -141,42 +135,21 @@ export default function WithdrawalSidebar({ open, onClose }) {
                       </Select>
                     </div>
 
-                    {/* Amount */}
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-foreground">Amount (USD) <span className="text-destructive">*</span></label>
-                      <Input
-                        type="number"
-                        placeholder="Enter amount"
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        className="bg-secondary/50 border-border"
-                        min="0"
-                        step="0.01"
-                      />
+                      <Input type="number" placeholder="Enter amount" value={amount} onChange={(e) => setAmount(e.target.value)} className="bg-secondary/50 border-border" min="0" step="0.01" />
                     </div>
 
-                    {/* Wallet / Account */}
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-foreground">
                         {method === "crypto_wallet" ? "Wallet Address" : "Account / Reference"}
                         <span className="text-muted-foreground text-xs ml-1">(optional)</span>
                       </label>
-                      <Input
-                        type="text"
-                        placeholder={method === "crypto_wallet" ? "0x..." : "Account number or reference"}
-                        value={walletAddress}
-                        onChange={(e) => setWalletAddress(e.target.value)}
-                        className="bg-secondary/50 border-border"
-                      />
+                      <Input type="text" placeholder={method === "crypto_wallet" ? "0x..." : "Account number or reference"} value={walletAddress} onChange={(e) => setWalletAddress(e.target.value)} className="bg-secondary/50 border-border" />
                     </div>
 
-                    {/* Summary */}
                     {amount && parseFloat(amount) > 0 && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="bg-secondary/30 rounded-xl p-4 border border-border/50 space-y-3"
-                      >
+                      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="bg-secondary/30 rounded-xl p-4 border border-border/50 space-y-3">
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Summary</p>
                         <div className="space-y-2">
                           <div className="flex justify-between text-sm">
@@ -195,7 +168,6 @@ export default function WithdrawalSidebar({ open, onClose }) {
                       </motion.div>
                     )}
 
-                    {/* Info box */}
                     <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 text-xs text-muted-foreground space-y-1">
                       <p className="font-semibold text-foreground text-sm mb-2">ℹ️ Processing Times</p>
                       <p>• Bank Transfer: 1–3 business days</p>
@@ -234,14 +206,11 @@ export default function WithdrawalSidebar({ open, onClose }) {
                         })}
                       </AnimatePresence>
                       {isProcessing && (
-                        <motion.span className="inline-block w-2 h-3.5 bg-primary ml-1"
-                          animate={{ opacity: [1, 0, 1] }} transition={{ repeat: Infinity, duration: 0.8 }} />
+                        <motion.span className="inline-block w-2 h-3.5 bg-primary ml-1" animate={{ opacity: [1, 0, 1] }} transition={{ repeat: Infinity, duration: 0.8 }} />
                       )}
                     </div>
-
                     {processingDone && (
-                      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
-                        className="bg-primary/10 border border-primary/30 rounded-xl p-4 text-center">
+                      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-primary/10 border border-primary/30 rounded-xl p-4 text-center">
                         <CheckCircle2 className="w-8 h-8 text-primary mx-auto mb-2" />
                         <p className="font-semibold text-foreground">Withdrawal Submitted!</p>
                         <p className="text-xs text-muted-foreground mt-1">Your request is being processed.</p>
@@ -252,13 +221,9 @@ export default function WithdrawalSidebar({ open, onClose }) {
               </AnimatePresence>
             </div>
 
-            {/* Footer */}
             {showForm && (
               <div className="px-6 py-4 border-t border-border/50">
-                <Button
-                  onClick={handleSubmit}
-                  className="w-full bg-primary hover:bg-primary/90 font-semibold"
-                >
+                <Button onClick={handleSubmit} className="w-full bg-primary hover:bg-primary/90 font-semibold">
                   <Send className="w-4 h-4 mr-2" />
                   Submit Withdrawal Request
                 </Button>
@@ -268,8 +233,7 @@ export default function WithdrawalSidebar({ open, onClose }) {
             {processingDone && (
               <div className="px-6 py-4 border-t border-border/50">
                 <Button onClick={handleClose} className="w-full bg-primary hover:bg-primary/90">
-                  <CheckCircle2 className="w-4 h-4 mr-2" />
-                  Done
+                  <CheckCircle2 className="w-4 h-4 mr-2" />Done
                 </Button>
               </div>
             )}
