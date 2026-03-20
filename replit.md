@@ -15,11 +15,17 @@
 - **Routing**: React Router with 7 main pages
 - **State Management**: TanStack Query (React Query)
 - **Development Workflow**: npm run dev (configured and running)
+- **Database Client**: Supabase @supabase/supabase-js installed & configured
+- **Supabase Connection**: Client initialized with credentials
+- **Connection Testing**: useSupabaseConnection hook ready
 
 ### ⏳ In Progress / Planned
 
 #### Phase 1: Database Setup (Supabase)
-- [ ] Create Supabase project
+- [ ] Create Supabase project (Project: https://scofzdhtjowzcztbabsu.supabase.co)
+- [x] Supabase client installed and configured
+- [x] Environment variables set up
+- [ ] Apply database.sql schema to Supabase
 - [ ] Create PostgreSQL schema (users, portfolios, holdings, trades, alerts)
 - [ ] Set up Row Level Security (RLS)
 - [ ] Enable real-time publications
