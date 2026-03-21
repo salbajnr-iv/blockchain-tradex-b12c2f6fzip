@@ -14,16 +14,16 @@ const ALERT_TYPE_META = {
   volatility:  { label: "High Volatility",icon: Zap,          hint: "24h change % threshold", color: "text-yellow-400" },
 };
 
-export default function AlertManager({ alerts, onAlertsUpdate, cryptoPrices, cryptoChanges }) {
+export default function AlertManager({ alerts, onAlertsUpdate, cryptoPrices, cryptoChanges, portfolioId }) {
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({ crypto_symbol: "BTC", alert_type: "price_above", threshold_value: "" });
   const [loading, setLoading] = useState(false);
 
   const handleCreate = async () => {
-    if (!formData.threshold_value) return;
+    if (!formData.threshold_value || !portfolioId) return;
     setLoading(true);
     try {
-      await createAlert({
+      await createAlert(portfolioId, {
         ...formData,
         threshold_value: parseFloat(formData.threshold_value),
         is_active: true,
@@ -96,7 +96,7 @@ export default function AlertManager({ alerts, onAlertsUpdate, cryptoPrices, cry
               <p className="text-xs text-muted-foreground">
                 {alert.alert_type === "volatility"
                   ? `Change ≥ ${alert.threshold_value}%`
-                  : `$${alert.threshold_value.toLocaleString()}`}
+                  : `$${alert.threshold_value?.toLocaleString()}`}
                 {currentPrice && alert.alert_type !== "volatility" && (
                   <span className="ml-1.5">
                     · Live: <span className="text-foreground font-medium">${currentPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
@@ -175,7 +175,7 @@ export default function AlertManager({ alerts, onAlertsUpdate, cryptoPrices, cry
             </span>
           )}
         </div>
-        <Button onClick={() => setShowForm(!showForm)} size="sm" className="bg-primary hover:bg-primary/90">
+        <Button onClick={() => setShowForm(!showForm)} size="sm" className="bg-primary hover:bg-primary/90" disabled={!portfolioId}>
           <Plus className="w-4 h-4 mr-1" />
           New Alert
         </Button>
@@ -249,7 +249,7 @@ export default function AlertManager({ alerts, onAlertsUpdate, cryptoPrices, cry
             )}
             {triggeredAlerts.length > 0 && (
               <div className="space-y-1.5">
-                <p className="text-[10px] font-semibold text-yellow-400/80 uppercase tracking-wider pt-1 pb-0.5 px-1">✓ Triggered</p>
+                <p className="text-[10px] font-semibold text-yellow-400/80 uppercase tracking-wider pt-1 pb-0.5 px-1">Triggered</p>
                 {triggeredAlerts.map((a) => <AlertRow key={a.id} alert={a} />)}
               </div>
             )}

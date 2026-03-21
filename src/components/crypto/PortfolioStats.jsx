@@ -1,26 +1,36 @@
 import React from "react";
-import { TrendingUp, TrendingDown, DollarSign, BarChart3, Activity, ArrowUpRight } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, BarChart3, ArrowUpRight, Wallet } from "lucide-react";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { listTransactions } from "@/lib/api/transactions";
+import { listTrades } from "@/lib/api/portfolio";
+import { usePortfolio } from "@/contexts/PortfolioContext";
 
 export default function PortfolioStats({ portfolioTotal, portfolioChange24h, isLoading }) {
+  const { portfolioId, cashBalance } = usePortfolio();
+
   const { data: transactions = [] } = useQuery({
-    queryKey: ["transactions-stats"],
-    queryFn: () => listTransactions(200),
+    queryKey: ["transactions", portfolioId],
+    queryFn: () => listTransactions(portfolioId, 200),
+    enabled: !!portfolioId,
     initialData: [],
   });
 
-  const totalTrades = transactions.filter((t) => t.type === "trade").length;
-  const completedTrades = transactions.filter((t) => t.type === "trade" && t.status === "completed");
-  const sells = completedTrades.filter((t) => t.side === "sell");
-  const winRate = completedTrades.length > 0
-    ? Math.round((sells.length / completedTrades.length) * 100 * 10) / 10
-    : 0;
+  const { data: trades = [] } = useQuery({
+    queryKey: ["trades", portfolioId],
+    queryFn: () => listTrades(portfolioId, 200),
+    enabled: !!portfolioId,
+    initialData: [],
+  });
 
-  const withdrawals = transactions.filter((t) => t.type === "withdrawal");
-  const totalWithdrawn = withdrawals.reduce((sum, t) => sum + (t.amount || 0), 0);
+  const withdrawals = transactions.filter((t) => t.type === "WITHDRAWAL");
+  const totalWithdrawn = withdrawals.reduce((sum, t) => sum + (t.total_amount || 0), 0);
   const pendingWithdrawals = withdrawals.filter((t) => t.status === "pending").length;
+
+  const todayTrades = trades.filter((t) => {
+    const d = new Date(t.trade_date);
+    return d.toDateString() === new Date().toDateString();
+  }).length;
 
   const pnl24h = portfolioTotal * (portfolioChange24h / 100);
 
@@ -41,20 +51,17 @@ export default function PortfolioStats({ portfolioTotal, portfolioChange24h, isL
     },
     {
       label: "Total Trades",
-      value: totalTrades.toLocaleString(),
-      change: `${transactions.filter((t) => {
-        const d = new Date(t.transaction_date);
-        return d.toDateString() === new Date().toDateString();
-      }).length} today`,
+      value: trades.length.toLocaleString(),
+      change: `${todayTrades} today`,
       isPositive: true,
       icon: BarChart3,
     },
     {
-      label: "Withdrawals",
-      value: `$${totalWithdrawn.toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
-      change: pendingWithdrawals > 0 ? `${pendingWithdrawals} pending` : `${withdrawals.length} total`,
-      isPositive: pendingWithdrawals === 0,
-      icon: ArrowUpRight,
+      label: "Cash Balance",
+      value: `$${cashBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
+      change: pendingWithdrawals > 0 ? `${pendingWithdrawals} withdrawal pending` : "available",
+      isPositive: true,
+      icon: Wallet,
     },
   ];
 

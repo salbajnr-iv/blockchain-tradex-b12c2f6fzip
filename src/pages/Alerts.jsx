@@ -4,13 +4,16 @@ import { listAlerts } from "@/lib/api/alerts";
 import AlertManager from "@/components/crypto/AlertManager";
 import NotificationCenter from "@/components/crypto/NotificationCenter";
 import { useLivePrices } from "@/hooks/useLivePrices";
+import { usePortfolio } from "@/contexts/PortfolioContext";
 
 export default function Alerts() {
   const { cryptoList } = useLivePrices();
+  const { portfolioId } = usePortfolio();
 
   const { data: alerts = [], refetch: refetchAlerts } = useQuery({
-    queryKey: ["alerts"],
-    queryFn: listAlerts,
+    queryKey: ["alerts", portfolioId],
+    queryFn: () => listAlerts(portfolioId),
+    enabled: !!portfolioId,
     initialData: [],
   });
 
@@ -20,7 +23,13 @@ export default function Alerts() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <h1 className="text-2xl font-bold">Price Alerts</h1>
-      <AlertManager alerts={alerts} onAlertsUpdate={refetchAlerts} cryptoPrices={cryptoPrices} cryptoChanges={cryptoChanges} />
+      <AlertManager
+        alerts={alerts}
+        onAlertsUpdate={refetchAlerts}
+        cryptoPrices={cryptoPrices}
+        cryptoChanges={cryptoChanges}
+        portfolioId={portfolioId}
+      />
       <NotificationCenter alerts={alerts} cryptoPrices={cryptoPrices} cryptoChanges={cryptoChanges} />
     </div>
   );

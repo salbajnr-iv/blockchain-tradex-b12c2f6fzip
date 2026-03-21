@@ -4,6 +4,7 @@ import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
+import { PortfolioProvider } from '@/contexts/PortfolioContext';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/auth/Login';
@@ -32,40 +33,40 @@ function AuthRedirect() {
 function App() {
   return (
     <AuthProvider>
-      <QueryClientProvider client={queryClientInstance}>
-        <Router>
-          <Routes>
-            {/* Auth routes */}
-            <Route path="/login" element={
-              <AuthRedirectWrapper>
-                <Login />
-              </AuthRedirectWrapper>
-            } />
-            <Route path="/register" element={
-              <AuthRedirectWrapper>
-                <Register />
-              </AuthRedirectWrapper>
-            } />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
+      <PortfolioProvider>
+        <QueryClientProvider client={queryClientInstance}>
+          <Router>
+            <Routes>
+              <Route path="/login" element={
+                <AuthRedirectWrapper>
+                  <Login />
+                </AuthRedirectWrapper>
+              } />
+              <Route path="/register" element={
+                <AuthRedirectWrapper>
+                  <Register />
+                </AuthRedirectWrapper>
+              } />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
 
-            {/* Protected app routes */}
-            <Route element={<ProtectedRoute />}>
-              <Route element={<Layout />}>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/trade" element={<Trade />} />
-                <Route path="/markets" element={<Markets />} />
-                <Route path="/alerts" element={<Alerts />} />
-                <Route path="/card" element={<Card />} />
-                <Route path="/transactions" element={<Transactions />} />
-                <Route path="/analytics" element={<Analytics />} />
+              <Route element={<ProtectedRoute />}>
+                <Route element={<Layout />}>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/trade" element={<Trade />} />
+                  <Route path="/markets" element={<Markets />} />
+                  <Route path="/alerts" element={<Alerts />} />
+                  <Route path="/card" element={<Card />} />
+                  <Route path="/transactions" element={<Transactions />} />
+                  <Route path="/analytics" element={<Analytics />} />
+                </Route>
               </Route>
-            </Route>
 
-            <Route path="*" element={<PageNotFound />} />
-          </Routes>
-        </Router>
-        <Toaster />
-      </QueryClientProvider>
+              <Route path="*" element={<PageNotFound />} />
+            </Routes>
+          </Router>
+          <Toaster />
+        </QueryClientProvider>
+      </PortfolioProvider>
     </AuthProvider>
   );
 }

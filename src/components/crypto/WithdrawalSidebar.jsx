@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { createTransaction } from "@/lib/api/transactions";
+import { usePortfolio } from "@/contexts/PortfolioContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -32,6 +33,7 @@ export default function WithdrawalSidebar({ open, onClose }) {
   const [processingSteps, setProcessingSteps] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingDone, setProcessingDone] = useState(false);
+  const { portfolioId } = usePortfolio();
   const queryClient = useQueryClient();
 
   const fee = amount ? (parseFloat(amount) * 0.02).toFixed(2) : "0.00";
@@ -50,16 +52,15 @@ export default function WithdrawalSidebar({ open, onClose }) {
       setTimeout(() => {
         setProcessingSteps((prev) => [...prev, i]);
         if (i === BROKER_STEPS.length - 1) {
-          createTransaction({
-            type: "withdrawal",
-            amount: parseFloat(amount),
-            total_value: parseFloat(amount),
+          createTransaction(portfolioId, {
+            type: "WITHDRAWAL",
+            total_amount: parseFloat(amount),
             status: "pending",
+            payment_method: method,
             transaction_date: new Date().toISOString(),
             notes: `Withdrawal via ${METHOD_LABELS[method] || method}${walletAddress ? ` — ${walletAddress}` : ""}`,
           }).then(() => {
-            queryClient.invalidateQueries({ queryKey: ["transactions"] });
-            queryClient.invalidateQueries({ queryKey: ["transactions-stats"] });
+            queryClient.invalidateQueries({ queryKey: ["transactions", portfolioId] });
           }).catch(console.error);
           setIsProcessing(false);
           setProcessingDone(true);
@@ -169,7 +170,7 @@ export default function WithdrawalSidebar({ open, onClose }) {
                     )}
 
                     <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 text-xs text-muted-foreground space-y-1">
-                      <p className="font-semibold text-foreground text-sm mb-2">ℹ️ Processing Times</p>
+                      <p className="font-semibold text-foreground text-sm mb-2">Processing Times</p>
                       <p>• Bank Transfer: 1–3 business days</p>
                       <p>• Crypto Wallet: 10–30 minutes</p>
                       <p>• PayPal: Instant – 24 hours</p>

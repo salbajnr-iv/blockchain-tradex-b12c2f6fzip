@@ -1,19 +1,23 @@
 import { supabase } from '@/lib/supabaseClient';
 
-export const listTransactions = async (limit = 50) => {
+export const listTransactions = async (portfolioId, limit = 50) => {
+  if (!portfolioId) return [];
   const { data, error } = await supabase
     .from('transactions')
     .select('*')
+    .eq('portfolio_id', portfolioId)
     .order('transaction_date', { ascending: false })
     .limit(limit);
   if (error) throw error;
   return data ?? [];
 };
 
-export const filterTransactions = async (filters = {}, limit = 50) => {
+export const filterTransactions = async (portfolioId, filters = {}, limit = 50) => {
+  if (!portfolioId) return [];
   let query = supabase
     .from('transactions')
     .select('*')
+    .eq('portfolio_id', portfolioId)
     .order('transaction_date', { ascending: false })
     .limit(limit);
   Object.entries(filters).forEach(([key, value]) => {
@@ -24,15 +28,14 @@ export const filterTransactions = async (filters = {}, limit = 50) => {
   return data ?? [];
 };
 
-export const createTransaction = async (transaction) => {
-  const { data: { user } } = await supabase.auth.getUser();
+export const createTransaction = async (portfolioId, transaction) => {
+  if (!portfolioId) throw new Error('Portfolio ID required');
   const { data, error } = await supabase
     .from('transactions')
-    .insert({ ...transaction, user_id: user?.id })
+    .insert({ ...transaction, portfolio_id: portfolioId })
     .select()
     .single();
   if (error) throw error;
-  window.dispatchEvent(new CustomEvent('transaction:created', { detail: data }));
   return data;
 };
 

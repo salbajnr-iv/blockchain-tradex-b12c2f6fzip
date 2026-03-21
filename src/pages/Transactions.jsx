@@ -1,10 +1,12 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { listTransactions, createTransaction, updateTransaction } from "@/lib/api/transactions";
+import { listTransactions, createTransaction } from "@/lib/api/transactions";
+import { listTrades } from "@/lib/api/portfolio";
+import { usePortfolio } from "@/contexts/PortfolioContext";
 import {
   ArrowUpRight, ArrowDownLeft, Clock, CheckCircle2, XCircle,
   Loader2, Send, Wallet, ShieldCheck, Server, Database,
-  RefreshCcw, UserCheck, CircleDollarSign, BadgeCheck
+  RefreshCcw, UserCheck, CircleDollarSign, BadgeCheck, BarChart3
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
@@ -39,27 +41,44 @@ export default function Transactions() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingDone, setProcessingDone] = useState(false);
 
+  const { portfolioId } = usePortfolio();
   const queryClient = useQueryClient();
 
-  const { data: transactions = [], isLoading } = useQuery({
-    queryKey: ["transactions"],
-    queryFn: () => listTransactions(50),
+  const { data: transactions = [], isLoading: txLoading } = useQuery({
+    queryKey: ["transactions", portfolioId],
+    queryFn: () => listTransactions(portfolioId, 50),
+    enabled: !!portfolioId,
     initialData: [],
   });
 
+  const { data: trades = [], isLoading: tradesLoading } = useQuery({
+    queryKey: ["trades", portfolioId],
+    queryFn: () => listTrades(portfolioId, 50),
+    enabled: !!portfolioId,
+    initialData: [],
+  });
+
+  const isLoading = txLoading || tradesLoading;
+
+  // Combine and sort by date descending
+  const allActivity = [
+    ...transactions.map((t) => ({ ...t, _source: "transaction" })),
+    ...trades.map((t) => ({ ...t, _source: "trade", transaction_date: t.trade_date })),
+  ].sort((a, b) => new Date(b.transaction_date) - new Date(a.transaction_date));
+
   const withdrawalMutation = useMutation({
     mutationFn: async (data) => {
-      await createTransaction({
-        type: "withdrawal",
-        amount: parseFloat(data.amount),
-        total_value: parseFloat(data.amount),
+      await createTransaction(portfolioId, {
+        type: "WITHDRAWAL",
+        total_amount: parseFloat(data.amount),
         status: "pending",
+        payment_method: data.method,
         transaction_date: new Date().toISOString(),
         notes: `Withdrawal via ${METHOD_LABELS[data.method] || data.method}`,
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["transactions", portfolioId] });
     },
   });
 
@@ -94,7 +113,7 @@ export default function Transactions() {
   };
 
   const getStatusIcon = (status) => {
-    switch (status) {
+    switch ((status || "").toLowerCase()) {
       case "completed": return <CheckCircle2 className="w-5 h-5 text-primary" />;
       case "pending":   return <Clock className="w-5 h-5 text-yellow-400" />;
       case "failed":    return <XCircle className="w-5 h-5 text-destructive" />;
@@ -103,7 +122,7 @@ export default function Transactions() {
   };
 
   const getStatusColor = (status) => {
-    switch (status) {
+    switch ((status || "").toLowerCase()) {
       case "completed": return "bg-primary/10 text-primary";
       case "pending":   return "bg-yellow-400/10 text-yellow-400";
       case "failed":    return "bg-destructive/10 text-destructive";
@@ -111,11 +130,104 @@ export default function Transactions() {
     }
   };
 
-  const getTypeIcon = (type, side) => {
-    if (type === "withdrawal") return <ArrowUpRight className="w-5 h-5 text-primary" />;
-    return side === "buy"
-      ? <ArrowDownLeft className="w-5 h-5 text-yellow-400" />
-      : <ArrowUpRight className="w-5 h-5 text-primary" />;
+  const renderActivity = (item, index) => {
+    if (item._source === "trade") {
+      const isBuy = item.type === "BUY";
+      return (
+        <motion.div
+          key={item.id}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: index * 0.04 }}
+          className="bg-card rounded-lg border border-border/50 p-4 hover:border-primary/30 transition-colors"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="p-2.5 rounded-lg bg-secondary/50">
+                {isBuy
+                  ? <ArrowDownLeft className="w-5 h-5 text-primary" />
+                  : <ArrowUpRight className="w-5 h-5 text-destructive" />}
+              </div>
+              <div>
+                <p className="font-semibold text-foreground">
+                  {isBuy ? "Buy" : "Sell"} {item.symbol}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {format(new Date(item.trade_date), "MMM d, yyyy • h:mm a")}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <p className="font-semibold text-foreground">
+                  {isBuy ? "+" : "-"}{item.quantity} {item.symbol}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  @${item.unit_price?.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                </p>
+              </div>
+              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${getStatusColor(item.status)}`}>
+                {getStatusIcon(item.status)}
+                <span className="text-xs font-medium capitalize">{item.status}</span>
+              </div>
+            </div>
+          </div>
+          {item.fees > 0 && (
+            <div className="mt-3 pl-14 text-xs text-muted-foreground">
+              Fee: ${item.fees?.toFixed(2)} · Net: ${item.net_value?.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+            </div>
+          )}
+        </motion.div>
+      );
+    }
+
+    // Withdrawal / deposit
+    const typeLabel = item.type === "WITHDRAWAL" ? "Withdrawal"
+      : item.type === "DEPOSIT" ? "Deposit"
+      : item.type;
+
+    return (
+      <motion.div
+        key={item.id}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: index * 0.04 }}
+        className="bg-card rounded-lg border border-border/50 p-4 hover:border-primary/30 transition-colors"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="p-2.5 rounded-lg bg-secondary/50">
+              <ArrowUpRight className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <p className="font-semibold text-foreground">{typeLabel}</p>
+              <p className="text-xs text-muted-foreground">
+                {format(new Date(item.transaction_date), "MMM d, yyyy • h:mm a")}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <p className="font-semibold text-foreground">
+                ${item.total_amount?.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+              </p>
+              {item.payment_method && (
+                <p className="text-xs text-muted-foreground capitalize">
+                  {METHOD_LABELS[item.payment_method] || item.payment_method}
+                </p>
+              )}
+            </div>
+            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${getStatusColor(item.status)}`}>
+              {getStatusIcon(item.status)}
+              <span className="text-xs font-medium capitalize">{item.status}</span>
+            </div>
+          </div>
+        </div>
+        {item.notes && (
+          <div className="mt-3 pl-14 text-xs text-muted-foreground italic">{item.notes}</div>
+        )}
+      </motion.div>
+    );
   };
 
   const showForm = processingSteps.length === 0 && !isProcessing && !processingDone;
@@ -126,9 +238,9 @@ export default function Transactions() {
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground mb-2">Transactions</h1>
-            <p className="text-muted-foreground">Recent trading activity and withdrawal requests</p>
+            <p className="text-muted-foreground">All trades, deposits, and withdrawal requests</p>
           </div>
-          <Button onClick={() => setWithdrawalDialog(true)} className="bg-primary hover:bg-primary/90">
+          <Button onClick={() => setWithdrawalDialog(true)} className="bg-primary hover:bg-primary/90" disabled={!portfolioId}>
             <Send className="w-4 h-4 mr-2" />
             Withdraw Funds
           </Button>
@@ -138,55 +250,14 @@ export default function Transactions() {
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-6 h-6 animate-spin text-primary" />
           </div>
-        ) : transactions.length === 0 ? (
+        ) : allActivity.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-muted-foreground">No transactions yet</p>
+            <BarChart3 className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+            <p className="text-muted-foreground">No activity yet. Start trading to see your history here.</p>
           </div>
         ) : (
           <div className="space-y-3">
-            {transactions.map((tx, index) => (
-              <motion.div
-                key={tx.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.04 }}
-                className="bg-card rounded-lg border border-border/50 p-4 hover:border-primary/30 transition-colors"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="p-2.5 rounded-lg bg-secondary/50">
-                      {getTypeIcon(tx.type, tx.side)}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-foreground capitalize">
-                        {tx.type === "withdrawal" ? "Withdrawal" : `${tx.side} ${tx.crypto_symbol}`}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {format(new Date(tx.transaction_date), "MMM d, yyyy • h:mm a")}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <p className="font-semibold text-foreground">
-                        {tx.side === "sell" || tx.type === "withdrawal" ? "-" : "+"}
-                        {tx.amount} {tx.crypto_symbol || "USD"}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        ${(tx.total_value ?? tx.amount * tx.price)?.toLocaleString()}
-                      </p>
-                    </div>
-                    <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${getStatusColor(tx.status)}`}>
-                      {getStatusIcon(tx.status)}
-                      <span className="text-xs font-medium capitalize">{tx.status}</span>
-                    </div>
-                  </div>
-                </div>
-                {tx.notes && (
-                  <div className="mt-3 pl-14 text-xs text-muted-foreground italic">{tx.notes}</div>
-                )}
-              </motion.div>
-            ))}
+            {allActivity.map((item, index) => renderActivity(item, index))}
           </div>
         )}
 

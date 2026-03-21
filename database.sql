@@ -822,6 +822,52 @@ ON CONFLICT (symbol) DO NOTHING;
 */
 
 -- ============================================================================
+-- 28. AUTO-CREATE USER PROFILE AND PORTFOLIO ON SIGNUP
+-- ============================================================================
+
+-- Function triggered when a new auth user signs up
+CREATE OR REPLACE FUNCTION public.handle_new_auth_user()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE
+  new_portfolio_id uuid;
+  username_val text;
+BEGIN
+  -- Generate a unique username from email prefix + part of UUID
+  username_val := split_part(NEW.email, '@', 1) || '_' || substring(replace(NEW.id::text, '-', ''), 1, 6);
+
+  -- Create the user profile row
+  INSERT INTO public.users (id, email, username, full_name)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    username_val,
+    COALESCE(NEW.raw_user_meta_data->>'full_name', split_part(NEW.email, '@', 1))
+  )
+  ON CONFLICT (id) DO NOTHING;
+
+  -- Create a default portfolio with $10,000 starting cash balance
+  INSERT INTO public.portfolios (user_id, name, cash_balance, initial_investment)
+  VALUES (NEW.id, 'My Portfolio', 10000.00, 10000.00)
+  RETURNING id INTO new_portfolio_id;
+
+  RETURN NEW;
+END;
+$$;
+
+-- Attach trigger to auth.users so it fires on every new registration
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_new_auth_user();
+
+-- Grant execution rights
+GRANT EXECUTE ON FUNCTION public.handle_new_auth_user TO authenticated, service_role;
+
+-- ============================================================================
 -- DATABASE SCHEMA COMPLETE
 -- ============================================================================
 -- All tables, relationships, RLS policies, and real-time subscriptions are now set up
