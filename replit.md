@@ -9,7 +9,26 @@
 ### ✅ Phase 1 — Supabase Connection + DB Schema + RLS
 - Supabase auth (email/password) fully wired — Base44 removed
 - `database.sql` contains the complete schema with RLS + auto-create trigger
-- Trigger auto-creates `public.users` profile + `portfolios` row ($10k cash) on signup
+- Trigger auto-creates `public.users` profile + `portfolios` row ($0 cash) on signup
+
+### ✅ Phase 3 — Trade Execution + Realtime Feed
+
+- **Default balance is $0** — new users start with no cash; they must fund their account first
+- **Deposit flow** — `DepositDialog` with preset amounts ($100, $500, $1k, $5k, $10k) + custom input
+  - Accessible from: sidebar "Fund" button, TradePanel "Fund Account" CTA, Transactions page
+  - Calls `depositFunds()` → updates `portfolios.cash_balance` + logs to `transactions` table
+- **TradePanel fully wired**:
+  - Buy validates cash balance; shows red warning and shortfall amount when insufficient
+  - Sell validates holdings; "Max" button fills the max sellable amount
+  - "Fund Account" CTA appears when balance is $0
+  - Disabled button shows "Insufficient Funds" / "Insufficient Holdings" instead of trade action
+- **Supabase Realtime** — `RecentTrades` subscribes to `trades` INSERT events via `postgres_changes`; updates without page refresh. Same subscription also active in Transactions page for both tables.
+- **Transaction filters** (Transactions page):
+  - Symbol search (type BTC, ETH, etc.)
+  - Type filter: All / Buy / Sell / Deposit / Withdrawal
+  - Date range: All Time / Today / This Week / This Month
+  - Live result count shown
+- **Layout sidebar** — shows Portfolio Value + Cash Balance; "Fund" + "Withdraw" buttons side by side
 
 ### ✅ Phase 2 — Real Per-User Portfolio Data
 - `PortfolioContext` provides `portfolioId`, `cashBalance`, `holdings`, `holdingsMap` app-wide

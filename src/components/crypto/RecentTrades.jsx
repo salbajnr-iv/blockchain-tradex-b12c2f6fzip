@@ -1,12 +1,14 @@
-import React from "react";
-import { useQuery } from "@tanstack/react-query";
+import React, { useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listTrades } from "@/lib/api/portfolio";
 import { usePortfolio } from "@/contexts/PortfolioContext";
+import { supabase } from "@/lib/supabaseClient";
 import { motion } from "framer-motion";
-import { ArrowDownLeft, ArrowUpRight, Loader2 } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Loader2, Zap } from "lucide-react";
 
 export default function RecentTrades() {
   const { portfolioId } = usePortfolio();
+  const queryClient = useQueryClient();
 
   const { data: trades = [], isLoading } = useQuery({
     queryKey: ["trades", portfolioId],
@@ -15,6 +17,31 @@ export default function RecentTrades() {
     initialData: [],
   });
 
+  // Supabase Realtime — auto-refresh when a new trade is inserted
+  useEffect(() => {
+    if (!portfolioId) return;
+
+    const channel = supabase
+      .channel(`realtime:trades:${portfolioId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "trades",
+          filter: `portfolio_id=eq.${portfolioId}`,
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["trades", portfolioId] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [portfolioId, queryClient]);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -22,7 +49,13 @@ export default function RecentTrades() {
       transition={{ delay: 0.5 }}
       className="bg-card rounded-xl border border-border/50 p-5"
     >
-      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Recent Trades</h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Recent Trades</h3>
+        <div className="flex items-center gap-1 text-[10px] text-primary/70 font-medium">
+          <Zap className="w-3 h-3" />
+          Live
+        </div>
+      </div>
 
       {isLoading ? (
         <div className="flex items-center justify-center py-8">
@@ -35,8 +68,10 @@ export default function RecentTrades() {
           {trades.map((trade) => {
             const isBuy = trade.type === "BUY";
             return (
-              <div
+              <motion.div
                 key={trade.id}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
                 className="flex items-center justify-between py-2 border-b border-border/20 last:border-0"
               >
                 <div className="flex items-center gap-3">
@@ -58,13 +93,13 @@ export default function RecentTrades() {
                 </div>
                 <div className="text-right">
                   <p className={`text-sm font-semibold ${isBuy ? "text-primary" : "text-destructive"}`}>
-                    {isBuy ? "+" : "-"}{trade.quantity} {trade.symbol}
+                    {isBuy ? "+" : "-"}{Number(trade.quantity).toLocaleString(undefined, { maximumFractionDigits: 6 })} {trade.symbol}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    @${trade.unit_price?.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                    @${Number(trade.unit_price).toLocaleString(undefined, { maximumFractionDigits: 2 })}
                   </p>
                 </div>
-              </div>
+              </motion.div>
             );
           })}
         </div>

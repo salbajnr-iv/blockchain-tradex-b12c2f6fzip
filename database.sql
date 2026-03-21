@@ -848,9 +848,9 @@ BEGIN
   )
   ON CONFLICT (id) DO NOTHING;
 
-  -- Create a default portfolio with $10,000 starting cash balance
+  -- Create a default portfolio with $0 starting cash balance
   INSERT INTO public.portfolios (user_id, name, cash_balance, initial_investment)
-  VALUES (NEW.id, 'My Portfolio', 10000.00, 10000.00)
+  VALUES (NEW.id, 'My Portfolio', 0.00, 0.00)
   RETURNING id INTO new_portfolio_id;
 
   RETURN NEW;

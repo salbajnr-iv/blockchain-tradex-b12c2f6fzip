@@ -151,12 +151,35 @@ export const updatePortfolioCash = async (portfolioId, newBalance) => {
   return data
 }
 
+export const depositFunds = async (portfolioId, amount, currentBalance) => {
+  if (amount <= 0) throw new Error('Deposit amount must be greater than 0')
+  const newBalance = parseFloat((currentBalance + amount).toFixed(2))
+  await updatePortfolioCash(portfolioId, newBalance)
+
+  // Log the deposit in the transactions table (non-blocking — don't throw if it fails)
+  supabase
+    .from('transactions')
+    .insert({
+      portfolio_id: portfolioId,
+      type: 'DEPOSIT',
+      total_amount: amount,
+      status: 'completed',
+      transaction_date: new Date().toISOString(),
+      notes: `Paper money deposit of $${amount.toLocaleString()}`,
+    })
+    .then(({ error }) => {
+      if (error) console.warn('Deposit log error:', error.message)
+    })
+
+  return newBalance
+}
+
 export const executeTrade = async (portfolioId, cashBalance, { symbol, name, type, quantity, unitPrice }) => {
   const fees = parseFloat((quantity * unitPrice * 0.001).toFixed(2))
-  const totalCost = type === 'BUY' ? quantity * unitPrice + fees : quantity * unitPrice - fees
+  const totalCost = type === 'BUY' ? quantity * unitPrice + fees : 0
 
   if (type === 'BUY' && totalCost > cashBalance) {
-    throw new Error(`Insufficient cash balance. Need $${totalCost.toFixed(2)}, have $${cashBalance.toFixed(2)}`)
+    throw new Error(`Insufficient cash. Need $${totalCost.toFixed(2)}, have $${cashBalance.toFixed(2)}`)
   }
 
   const trade = await createTrade(portfolioId, { symbol, name, type, quantity, unitPrice })
@@ -169,11 +192,12 @@ export const executeTrade = async (portfolioId, cashBalance, { symbol, name, typ
     isBuy: type === 'BUY',
   })
 
+  const sellProceeds = quantity * unitPrice - parseFloat((quantity * unitPrice * 0.001).toFixed(2))
   const newCash = type === 'BUY'
     ? cashBalance - totalCost
-    : cashBalance + (quantity * unitPrice - fees)
+    : cashBalance + sellProceeds
 
-  await updatePortfolioCash(portfolioId, newCash)
+  await updatePortfolioCash(portfolioId, parseFloat(newCash.toFixed(2)))
 
   return trade
 }

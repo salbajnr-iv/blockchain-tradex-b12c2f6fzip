@@ -1,10 +1,12 @@
 import React, { useState } from "react";
 import { Link, useLocation, Outlet } from "react-router-dom";
-import { LayoutDashboard, BarChart3, ArrowUpDown, Bell, CreditCard, History, ArrowUpRight, Menu, X, RefreshCw, LogOut } from "lucide-react";
+import { LayoutDashboard, BarChart3, ArrowUpDown, Bell, CreditCard, History, ArrowUpRight, Menu, X, RefreshCw, LogOut, PlusCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import WithdrawalSidebar from "@/components/crypto/WithdrawalSidebar";
+import DepositDialog from "@/components/crypto/DepositDialog";
 import { useLivePrices } from "@/hooks/useLivePrices";
 import { useAuth } from "@/lib/AuthContext";
+import { usePortfolio } from "@/contexts/PortfolioContext";
 
 const NAV_ITEMS = [
   { label: "Dashboard",    icon: LayoutDashboard, path: "/" },
@@ -19,7 +21,9 @@ export default function Layout() {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [depositOpen, setDepositOpen] = useState(false);
   const { portfolioTotal, isLoading, lastUpdated, refetch } = useLivePrices();
+  const { cashBalance } = usePortfolio();
   const { user, signOut } = useAuth();
 
   const handleLogout = async () => {
@@ -81,19 +85,37 @@ export default function Layout() {
         </nav>
 
         <div className="px-4 py-4 border-t border-border/50 space-y-3">
-          <div className="bg-secondary/40 rounded-xl px-4 py-3">
-            <p className="text-xs text-muted-foreground mb-1">Portfolio Value</p>
-            <p className="text-lg font-bold">
-              {isLoading ? "..." : `$${portfolioTotal?.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
-            </p>
+          <div className="bg-secondary/40 rounded-xl px-4 py-3 space-y-1.5">
+            <div>
+              <p className="text-xs text-muted-foreground">Portfolio Value</p>
+              <p className="text-lg font-bold">
+                {isLoading ? "..." : `$${portfolioTotal?.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
+              </p>
+            </div>
+            <div className="border-t border-border/30 pt-1.5">
+              <p className="text-xs text-muted-foreground">Cash Balance</p>
+              <p className={`text-sm font-semibold ${cashBalance === 0 ? "text-muted-foreground" : "text-foreground"}`}>
+                ${cashBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+              </p>
+            </div>
           </div>
-          <Button
-            onClick={() => setWithdrawOpen(true)}
-            className="w-full bg-primary hover:bg-primary/90 gap-2 text-sm"
-          >
-            <ArrowUpRight className="w-4 h-4" />
-            Withdraw
-          </Button>
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              onClick={() => setDepositOpen(true)}
+              variant="outline"
+              className="gap-1.5 text-sm border-primary/30 text-primary hover:bg-primary/5"
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              Fund
+            </Button>
+            <Button
+              onClick={() => setWithdrawOpen(true)}
+              className="bg-primary hover:bg-primary/90 gap-1.5 text-sm"
+            >
+              <ArrowUpRight className="w-3.5 h-3.5" />
+              Withdraw
+            </Button>
+          </div>
         </div>
       </aside>
 
@@ -142,6 +164,7 @@ export default function Layout() {
       </div>
 
       <WithdrawalSidebar open={withdrawOpen} onClose={() => setWithdrawOpen(false)} />
+      <DepositDialog open={depositOpen} onClose={() => setDepositOpen(false)} />
     </div>
   );
 }
