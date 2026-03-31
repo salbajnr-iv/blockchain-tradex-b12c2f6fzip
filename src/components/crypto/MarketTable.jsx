@@ -1,8 +1,10 @@
 import React from "react";
 import { TrendingUp, TrendingDown, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 
 export default function MarketTable({ cryptoList, isLoading }) {
+  const navigate = useNavigate();
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -32,6 +34,7 @@ export default function MarketTable({ cryptoList, isLoading }) {
               return (
                 <tr
                   key={coin.symbol}
+                  onClick={() => navigate(`/trade?coin=${coin.symbol}`)}
                   className="border-b border-border/20 hover:bg-secondary/30 transition-colors cursor-pointer"
                 >
                   <td className="px-5 py-4">

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { useAuth } from '@/lib/AuthContext'
 import { getPortfolio, getHoldings } from '@/lib/api/portfolio'
+import { supabase } from '@/lib/supabaseClient'
 
 const PortfolioContext = createContext(null)
 
@@ -32,6 +33,29 @@ export function PortfolioProvider({ children }) {
   useEffect(() => {
     fetchPortfolioData()
   }, [fetchPortfolioData, user?.id])
+
+  // Realtime: refetch when portfolio or holdings change in DB
+  useEffect(() => {
+    if (!portfolio?.id) return
+
+    const portfolioChannel = supabase
+      .channel(`realtime:portfolio:${portfolio.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'portfolios',
+        filter: `id=eq.${portfolio.id}`,
+      }, () => fetchPortfolioData())
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'holdings',
+        filter: `portfolio_id=eq.${portfolio.id}`,
+      }, () => fetchPortfolioData())
+      .subscribe()
+
+    return () => supabase.removeChannel(portfolioChannel)
+  }, [portfolio?.id, fetchPortfolioData])
 
   const holdingsMap = holdings.reduce((acc, h) => {
     acc[h.symbol] = h

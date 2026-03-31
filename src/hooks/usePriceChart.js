@@ -27,37 +27,43 @@ export function usePriceChart(symbol = "BTC", timeframe = "1D") {
 
   const fetchChart = useCallback(async () => {
     setIsLoading(true);
-    const id = COINGECKO_IDS[symbol] || "bitcoin";
-    const days = TIMEFRAME_DAYS[timeframe] || 1;
-    const url = `https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=${days}`;
+    try {
+      const id = COINGECKO_IDS[symbol] || "bitcoin";
+      const days = TIMEFRAME_DAYS[timeframe] || 1;
+      const url = `https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=${days}`;
 
-    const res = await fetch(url);
-    const data = await res.json();
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`CoinGecko error: ${res.status}`);
+      const data = await res.json();
 
-    const prices = data.prices || [];
-    const formatted = prices.map(([ts, price]) => ({
-      time: new Date(ts).toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-        ...(days >= 1 ? { month: "short", day: "numeric" } : {}),
-        hour12: false,
-      }),
-      price: parseFloat(price.toFixed(4)),
-    }));
+      const prices = data.prices || [];
+      const formatted = prices.map(([ts, price]) => ({
+        time: new Date(ts).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+          ...(days >= 1 ? { month: "short", day: "numeric" } : {}),
+          hour12: false,
+        }),
+        price: parseFloat(price.toFixed(4)),
+      }));
 
-    // downsample to max 60 points
-    const step = Math.max(1, Math.floor(formatted.length / 60));
-    const sampled = formatted.filter((_, i) => i % step === 0);
+      // downsample to max 60 points
+      const step = Math.max(1, Math.floor(formatted.length / 60));
+      const sampled = formatted.filter((_, i) => i % step === 0);
 
-    setChartData(sampled);
+      setChartData(sampled);
 
-    if (prices.length > 0) {
-      const first = prices[0][1];
-      const last = prices[prices.length - 1][1];
-      setCurrentPrice(last);
-      setPriceChange(parseFloat((((last - first) / first) * 100).toFixed(2)));
+      if (prices.length > 0) {
+        const first = prices[0][1];
+        const last = prices[prices.length - 1][1];
+        setCurrentPrice(last);
+        setPriceChange(parseFloat((((last - first) / first) * 100).toFixed(2)));
+      }
+    } catch (err) {
+      console.warn("Chart fetch failed:", err.message);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   }, [symbol, timeframe]);
 
   useEffect(() => {

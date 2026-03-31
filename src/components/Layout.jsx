@@ -4,9 +4,12 @@ import { LayoutDashboard, BarChart3, ArrowUpDown, Bell, CreditCard, History, Arr
 import { Button } from "@/components/ui/button";
 import WithdrawalSidebar from "@/components/crypto/WithdrawalSidebar";
 import DepositDialog from "@/components/crypto/DepositDialog";
+import NotificationCenter from "@/components/crypto/NotificationCenter";
 import { useLivePrices } from "@/hooks/useLivePrices";
 import { useAuth } from "@/lib/AuthContext";
 import { usePortfolio } from "@/contexts/PortfolioContext";
+import { useQuery } from "@tanstack/react-query";
+import { listAlerts } from "@/lib/api/alerts";
 
 const NAV_ITEMS = [
   { label: "Dashboard",    icon: LayoutDashboard, path: "/" },
@@ -127,8 +130,19 @@ export default function Layout() {
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [depositOpen, setDepositOpen] = useState(false);
   const { portfolioTotal, isLoading, lastUpdated, refetch, cryptoList } = useLivePrices();
-  const { cashBalance } = usePortfolio();
+  const { cashBalance, portfolioId } = usePortfolio();
   const { user, signOut } = useAuth();
+
+  const { data: alerts = [] } = useQuery({
+    queryKey: ["alerts", portfolioId],
+    queryFn: () => listAlerts(portfolioId),
+    enabled: !!portfolioId,
+    initialData: [],
+    refetchInterval: 30000,
+  });
+
+  const cryptoPrices = cryptoList.reduce((acc, c) => { acc[c.symbol] = c.price; return acc; }, {});
+  const cryptoChanges = cryptoList.reduce((acc, c) => { acc[c.symbol] = c.change24h; return acc; }, {});
 
   const handleLogout = async () => {
     try {
@@ -267,6 +281,7 @@ export default function Layout() {
 
       <WithdrawalSidebar open={withdrawOpen} onClose={() => setWithdrawOpen(false)} />
       <DepositDialog open={depositOpen} onClose={() => setDepositOpen(false)} />
+      <NotificationCenter alerts={alerts} cryptoPrices={cryptoPrices} cryptoChanges={cryptoChanges} />
     </div>
   );
 }

@@ -4,14 +4,30 @@ export const getPortfolio = async () => {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
-  const { data, error } = await supabase
+  const { data: existing, error: fetchError } = await supabase
     .from('portfolios')
     .select('*')
     .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (fetchError) throw fetchError
+  if (existing) return existing
+
+  // Auto-create portfolio for new users
+  const fullName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'User'
+  const { data: created, error: createError } = await supabase
+    .from('portfolios')
+    .insert({
+      user_id: user.id,
+      name: `${fullName}'s Portfolio`,
+      cash_balance: 0,
+      total_value: 0,
+    })
+    .select()
     .single()
 
-  if (error) throw error
-  return data
+  if (createError) throw createError
+  return created
 }
 
 export const getHoldings = async (portfolioId) => {

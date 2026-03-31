@@ -42,6 +42,19 @@
 - Transactions page shows both trades and withdrawal/deposit history
 - WithdrawalSidebar stores withdrawals in `transactions` table with `portfolio_id`
 
+### ✅ Phase 4 — UI/UX Polish + Realtime Subscriptions
+
+- **NotificationCenter moved to Layout.jsx** — price alert toasts fire on every page, not just Alerts page
+  - Alerts fetched via `useQuery` with 30s refetch interval; `triggeredRef` persists across navigation
+  - Layout reads `portfolioId` from `usePortfolio()` and `cryptoList` from `useLivePrices()`
+- **Alerts page** — removed duplicate `NotificationCenter` mount; added Supabase realtime subscription on `price_alerts` table so the list updates instantly when an alert is triggered
+- **Analytics page** — fully rewritten:
+  - New **Portfolio Allocation** donut chart (inner radius/outer radius) with holdings from `useLivePrices()` + cash balance; bar legend with percentage bars
+  - Summary stats row: Portfolio Value, Total Withdrawals, Trading Volume, Total Activity
+  - Monthly Activity bar chart, Withdrawal Methods pie, Cumulative Withdrawals area chart
+  - Empty-state messages for each chart; animated entry with `framer-motion`
+- **PortfolioContext** — added Supabase realtime subscriptions on `portfolios` (UPDATE) and `holdings` (*) tables so cash balance and holdings sync automatically when DB changes without needing explicit `refetch()`
+
 ### ⚠️ One-time Manual Step Required
 The user must run `database.sql` in the Supabase SQL Editor before the app fully works. This creates all tables, RLS policies, and the auto-signup trigger.
 

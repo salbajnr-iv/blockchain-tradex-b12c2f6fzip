@@ -128,10 +128,12 @@ export default function Transactions() {
     };
   }, [portfolioId, queryClient]);
 
-  // Combine all activity
+  // Combine all activity — BUY/SELL come from trades table to avoid duplicates
   const allActivity = useMemo(() => {
     const combined = [
-      ...transactions.map((t) => ({
+      ...transactions
+        .filter((t) => t.type !== "BUY" && t.type !== "SELL")
+        .map((t) => ({
         ...t,
         _source: "transaction",
         _type: t.type,
