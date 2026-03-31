@@ -1,6 +1,6 @@
-import React, { useState } from "react";
-import { Link, useLocation, Outlet } from "react-router-dom";
-import { LayoutDashboard, BarChart3, ArrowUpDown, Bell, CreditCard, History, ArrowUpRight, Menu, X, RefreshCw, LogOut, PlusCircle } from "lucide-react";
+import React, { useState, useRef, useEffect } from "react";
+import { Link, useLocation, useNavigate, Outlet } from "react-router-dom";
+import { LayoutDashboard, BarChart3, ArrowUpDown, Bell, CreditCard, History, ArrowUpRight, Menu, X, RefreshCw, LogOut, PlusCircle, LineChart, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import WithdrawalSidebar from "@/components/crypto/WithdrawalSidebar";
 import DepositDialog from "@/components/crypto/DepositDialog";
@@ -15,14 +15,118 @@ const NAV_ITEMS = [
   { label: "Alerts",       icon: Bell,             path: "/alerts" },
   { label: "Card",         icon: CreditCard,       path: "/card" },
   { label: "Transactions", icon: History,          path: "/transactions" },
+  { label: "Analytics",   icon: LineChart,        path: "/analytics" },
 ];
+
+function CoinSearch({ cryptoList }) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
+  const inputRef = useRef(null);
+  const containerRef = useRef(null);
+
+  const results = query.trim().length > 0
+    ? cryptoList.filter((c) =>
+        c.symbol.toUpperCase().includes(query.toUpperCase()) ||
+        c.name.toLowerCase().includes(query.toLowerCase())
+      ).slice(0, 6)
+    : [];
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setOpen(false);
+        setQuery("");
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleSelect = (coin) => {
+    setOpen(false);
+    setQuery("");
+    navigate(`/trade?coin=${coin.symbol}`);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Escape") {
+      setOpen(false);
+      setQuery("");
+      inputRef.current?.blur();
+    }
+    if (e.key === "Enter" && results.length > 0) {
+      handleSelect(results[0]);
+    }
+  };
+
+  return (
+    <div ref={containerRef} className="relative hidden lg:flex items-center w-72">
+      <div className="flex items-center gap-2 bg-secondary/50 rounded-xl px-3 py-2 w-full border border-transparent focus-within:border-primary/30 transition-colors">
+        <Search className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+        <input
+          ref={inputRef}
+          type="text"
+          placeholder="Search markets..."
+          value={query}
+          onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={handleKeyDown}
+          className="bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none w-full"
+        />
+        {query && (
+          <button onClick={() => { setQuery(""); setOpen(false); }} className="text-muted-foreground hover:text-foreground">
+            <X className="w-3 h-3" />
+          </button>
+        )}
+      </div>
+
+      {open && results.length > 0 && (
+        <div className="absolute top-full left-0 right-0 mt-1.5 bg-card border border-border/50 rounded-xl shadow-2xl z-50 overflow-hidden">
+          {results.map((coin) => (
+            <button
+              key={coin.symbol}
+              onClick={() => handleSelect(coin)}
+              className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-secondary/50 transition-colors text-left"
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="text-base">{coin.icon}</span>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">{coin.symbol}</p>
+                  <p className="text-xs text-muted-foreground">{coin.name}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-medium text-foreground tabular-nums">
+                  ${coin.price?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <p className={`text-xs font-medium ${coin.change24h >= 0 ? "text-primary" : "text-destructive"}`}>
+                  {coin.change24h >= 0 ? "+" : ""}{coin.change24h?.toFixed(2)}%
+                </p>
+              </div>
+            </button>
+          ))}
+          <div className="px-4 py-2 border-t border-border/30 bg-secondary/20">
+            <p className="text-[10px] text-muted-foreground">Press Enter to trade {results[0]?.symbol} · Esc to close</p>
+          </div>
+        </div>
+      )}
+
+      {open && query.trim().length > 0 && results.length === 0 && (
+        <div className="absolute top-full left-0 right-0 mt-1.5 bg-card border border-border/50 rounded-xl shadow-2xl z-50 p-4 text-center">
+          <p className="text-xs text-muted-foreground">No coins found for "{query}"</p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Layout() {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [depositOpen, setDepositOpen] = useState(false);
-  const { portfolioTotal, isLoading, lastUpdated, refetch } = useLivePrices();
+  const { portfolioTotal, isLoading, lastUpdated, refetch, cryptoList } = useLivePrices();
   const { cashBalance } = usePortfolio();
   const { user, signOut } = useAuth();
 
@@ -124,9 +228,7 @@ export default function Layout() {
           <button className="lg:hidden text-muted-foreground hover:text-foreground" onClick={() => setSidebarOpen(true)}>
             <Menu className="w-5 h-5" />
           </button>
-          <div className="hidden lg:flex items-center gap-2 bg-secondary/50 rounded-xl px-4 py-2 w-72">
-            <span className="text-xs text-muted-foreground">Search markets...</span>
-          </div>
+          <CoinSearch cryptoList={cryptoList} />
           <div className="flex items-center gap-3 ml-auto">
             {lastUpdated && (
               <span className="hidden lg:block text-xs text-muted-foreground">

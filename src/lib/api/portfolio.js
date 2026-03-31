@@ -199,5 +199,23 @@ export const executeTrade = async (portfolioId, cashBalance, { symbol, name, typ
 
   await updatePortfolioCash(portfolioId, parseFloat(newCash.toFixed(2)))
 
+  // Log to transactions table for analytics/history (non-blocking)
+  supabase
+    .from('transactions')
+    .insert({
+      portfolio_id: portfolioId,
+      type,
+      symbol,
+      quantity,
+      price_per_unit: unitPrice,
+      total_amount: parseFloat((quantity * unitPrice).toFixed(2)),
+      status: 'completed',
+      transaction_date: new Date().toISOString(),
+      notes: `${type} ${quantity} ${symbol} @ $${unitPrice.toLocaleString()}`,
+    })
+    .then(({ error }) => {
+      if (error) console.warn('Trade transaction log error:', error.message)
+    })
+
   return trade
 }

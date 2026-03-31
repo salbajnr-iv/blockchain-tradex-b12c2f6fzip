@@ -38,3 +38,11 @@ externalPort = 80
 deploymentTarget = "autoscale"
 run = ["node", "./dist/index.cjs"]
 build = ["npm", "run", "build"]
+
+[userenv]
+
+[userenv.shared]
+VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY = "sb_publishable_A8XBaB1jOVwnuM8YuIT1RQ_Wt4GtPK7"
+VITE_SUPABASE_URL = "https://scofzdhtjowzcztbabsu.supabase.co"
+VITE_SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNjb2Z6ZGh0am93emN6dGJhYnN1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NDAxODcxMiwiZXhwIjoyMDg5NTk0NzEyfQ.xQAP1X_TcZOpeURvJO6E0SKXlHjxxOyB7vgCHMduMl4"
+VITE_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNjb2Z6ZGh0am93emN6dGJhYnN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwMTg3MTIsImV4cCI6MjA4OTU5NDcxMn0.O4-UxS8QbUWN5ttC8AbMVG_n1MyC27s4fTL-zPNs8qo"

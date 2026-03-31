@@ -6,6 +6,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { createTransaction } from "@/lib/api/transactions";
+import { usePortfolio } from "@/contexts/PortfolioContext";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 const BROKER_STEPS = [
@@ -34,6 +36,8 @@ export default function VirtualCard({ card }) {
   const [processingSteps, setProcessingSteps] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingDone, setProcessingDone] = useState(false);
+  const { portfolioId } = usePortfolio();
+  const queryClient = useQueryClient();
 
   const runBrokerSequence = () => {
     if (!withdrawMethod || !withdrawAmount) {
@@ -47,14 +51,18 @@ export default function VirtualCard({ card }) {
       setTimeout(() => {
         setProcessingSteps((prev) => [...prev, i]);
         if (i === BROKER_STEPS.length - 1) {
-          createTransaction({
-            type: "withdrawal",
-            amount: parseFloat(withdrawAmount),
-            total_value: parseFloat(withdrawAmount),
-            status: "pending",
-            transaction_date: new Date().toISOString(),
-            notes: `Withdrawal via ${METHOD_LABELS[withdrawMethod] || withdrawMethod}`,
-          }).catch(console.error);
+          if (portfolioId) {
+            createTransaction(portfolioId, {
+              type: "WITHDRAWAL",
+              total_amount: parseFloat(withdrawAmount),
+              status: "pending",
+              payment_method: withdrawMethod,
+              transaction_date: new Date().toISOString(),
+              notes: `Withdrawal via ${METHOD_LABELS[withdrawMethod] || withdrawMethod}`,
+            }).then(() => {
+              queryClient.invalidateQueries({ queryKey: ["transactions", portfolioId] });
+            }).catch(console.error);
+          }
           setIsProcessing(false);
           setProcessingDone(true);
         }

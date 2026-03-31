@@ -10,10 +10,17 @@ import { usePortfolio } from "@/contexts/PortfolioContext";
 import DepositDialog from "@/components/crypto/DepositDialog";
 import { toast } from "sonner";
 
-export default function TradePanel({ cryptoList = [] }) {
+export default function TradePanel({ cryptoList = [], initialCoin = null }) {
   const [side, setSide] = useState("buy");
   const [amount, setAmount] = useState("");
-  const [selectedCoin, setSelectedCoin] = useState("BTC");
+  const [selectedCoin, setSelectedCoin] = useState(initialCoin || "BTC");
+
+  React.useEffect(() => {
+    if (initialCoin && cryptoList.some((c) => c.symbol === initialCoin)) {
+      setSelectedCoin(initialCoin);
+    }
+  }, [initialCoin, cryptoList]);
+
   const [isPending, setIsPending] = useState(false);
   const [depositOpen, setDepositOpen] = useState(false);
   const { portfolioId, cashBalance, holdingsMap, refetch } = usePortfolio();

@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { listTransactions } from "@/lib/api/transactions";
+import { usePortfolio } from "@/contexts/PortfolioContext";
 import { format, parseISO, startOfMonth } from "date-fns";
 import { groupBy, sumBy } from "lodash";
 import {
@@ -55,9 +56,12 @@ const PieTooltip = ({ active, payload }) => {
 };
 
 export default function Analytics() {
+  const { portfolioId } = usePortfolio();
+
   const { data: transactions = [], isLoading } = useQuery({
-    queryKey: ["transactions-analytics"],
-    queryFn: () => listTransactions(200),
+    queryKey: ["transactions-analytics", portfolioId],
+    queryFn: () => listTransactions(portfolioId, 500),
+    enabled: !!portfolioId,
     initialData: [],
   });
 
@@ -68,15 +72,15 @@ export default function Analytics() {
     return Object.entries(byMonth)
       .map(([month, txs]) => ({
         month,
-        Withdrawals: sumBy(txs.filter((t) => t.type === "withdrawal"), "total_value") || 0,
-        Trading: sumBy(txs.filter((t) => t.type === "trade"), "total_value") || 0,
+        Withdrawals: sumBy(txs.filter((t) => t.type === "WITHDRAWAL"), "total_amount") || 0,
+        Trading: sumBy(txs.filter((t) => t.type === "BUY" || t.type === "SELL"), "total_amount") || 0,
       }))
       .sort((a, b) => new Date(a.month) - new Date(b.month))
       .slice(-12);
   }, [transactions]);
 
   const pieData = useMemo(() => {
-    const withdrawals = transactions.filter((t) => t.type === "withdrawal");
+    const withdrawals = transactions.filter((t) => t.type === "WITHDRAWAL");
     const methodGroups = groupBy(withdrawals, (tx) => {
       const notes = tx.notes || "";
       if (notes.toLowerCase().includes("bank")) return "bank_transfer";
@@ -88,7 +92,7 @@ export default function Analytics() {
     return Object.entries(methodGroups)
       .map(([key, txs]) => ({
         name: METHOD_LABELS[key] || key,
-        value: Math.round(sumBy(txs, "total_value")),
+        value: Math.round(sumBy(txs, "total_amount")),
         color: COLORS[key] || COLORS.other,
       }))
       .filter((d) => d.value > 0);
@@ -97,10 +101,10 @@ export default function Analytics() {
   const cumulativeData = useMemo(() => {
     let running = 0;
     return transactions
-      .filter((t) => t.type === "withdrawal")
+      .filter((t) => t.type === "WITHDRAWAL")
       .sort((a, b) => new Date(a.transaction_date) - new Date(b.transaction_date))
       .map((tx) => {
-        running += tx.total_value || 0;
+        running += tx.total_amount || 0;
         return {
           date: format(parseISO(tx.transaction_date), "MMM d"),
           Total: Math.round(running),
@@ -108,8 +112,8 @@ export default function Analytics() {
       });
   }, [transactions]);
 
-  const totalWithdrawals = sumBy(transactions.filter((t) => t.type === "withdrawal"), "total_value") || 0;
-  const totalTrading = sumBy(transactions.filter((t) => t.type === "trade"), "total_value") || 0;
+  const totalWithdrawals = sumBy(transactions.filter((t) => t.type === "WITHDRAWAL"), "total_amount") || 0;
+  const totalTrading = sumBy(transactions.filter((t) => t.type === "BUY" || t.type === "SELL"), "total_amount") || 0;
   const totalTxCount = transactions.length;
 
   if (isLoading) {
@@ -166,7 +170,7 @@ export default function Analytics() {
           <h2 className="text-lg font-semibold text-foreground mb-1">Monthly Activity</h2>
           <p className="text-xs text-muted-foreground mb-6">Withdrawals vs. trading volume by month</p>
           {monthlyData.length === 0 ? (
-            <p className="text-muted-foreground text-sm text-center py-12">No data yet</p>
+            <p className="text-muted-foreground text-sm text-center py-12">No data yet. Start trading to see your analytics here.</p>
           ) : (
             <ResponsiveContainer width="100%" height={280}>
               <BarChart data={monthlyData} barCategoryGap="30%">
