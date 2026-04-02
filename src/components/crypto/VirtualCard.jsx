@@ -120,7 +120,7 @@ export default function VirtualCard({ card }) {
 
         <div className="relative z-10 flex items-center justify-between">
           <div>
-            <p className="text-xs font-medium opacity-75 uppercase tracking-wider">Blockchain Tradex</p>
+            <p className="text-xs font-medium opacity-75 uppercase tracking-wider">BlockTrade</p>
             <p className="text-lg font-bold mt-1">Virtual Card</p>
           </div>
           <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-cyan-400/30 to-blue-400/30 rounded-lg backdrop-blur-sm border border-cyan-400/20">

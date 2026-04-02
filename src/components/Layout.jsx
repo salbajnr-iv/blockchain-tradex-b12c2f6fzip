@@ -173,7 +173,7 @@ export default function Layout() {
               <span className="text-primary font-bold text-sm">BT</span>
             </div>
             <span className="text-base font-bold">
-              Blockchain <span className="text-primary">Tradex</span>
+              Block<span className="text-primary">Trade</span>
             </span>
           </Link>
           <button className="lg:hidden text-muted-foreground" onClick={() => setSidebarOpen(false)}>

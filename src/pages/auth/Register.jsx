@@ -75,7 +75,7 @@ export default function Register() {
               <span className="text-primary font-bold">BT</span>
             </div>
             <span className="text-xl font-bold">
-              Blockchain <span className="text-primary">Tradex</span>
+              Block<span className="text-primary">Trade</span>
             </span>
           </div>
           <h1 className="text-2xl font-bold text-foreground">Create account</h1>

@@ -4,6 +4,7 @@ import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
+import { supabaseMisconfigured } from '@/lib/supabaseClient';
 import { PortfolioProvider } from '@/contexts/PortfolioContext';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -36,6 +37,19 @@ function App() {
     <AuthProvider>
       <PortfolioProvider>
         <QueryClientProvider client={queryClientInstance}>
+          {supabaseMisconfigured && (
+            <div style={{
+              position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
+              background: '#dc2626', color: '#fff', padding: '12px 20px',
+              fontSize: '14px', fontWeight: 600, textAlign: 'center', lineHeight: 1.5,
+            }}>
+              ⚠️ BlockTrade is missing its database configuration. Add{' '}
+              <code style={{ background: 'rgba(0,0,0,0.25)', borderRadius: 4, padding: '1px 6px' }}>VITE_SUPABASE_URL</code>{' '}
+              and{' '}
+              <code style={{ background: 'rgba(0,0,0,0.25)', borderRadius: 4, padding: '1px 6px' }}>VITE_SUPABASE_ANON_KEY</code>{' '}
+              to your Vercel Environment Variables, then redeploy.
+            </div>
+          )}
           <Router>
             <Routes>
               <Route path="/login" element={
