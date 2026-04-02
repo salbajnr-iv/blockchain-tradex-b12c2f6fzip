@@ -155,39 +155,18 @@ export const listTrades = async (portfolioId, limit = 20) => {
   return data ?? []
 }
 
+// All cash_balance updates now go through SECURITY DEFINER RPC functions.
+// Users cannot directly UPDATE cash_balance via the REST API.
 export const updatePortfolioCash = async (portfolioId, newBalance) => {
   const { data, error } = await supabase
-    .from('portfolios')
-    .update({ cash_balance: newBalance, updated_at: new Date().toISOString() })
-    .eq('id', portfolioId)
-    .select()
-    .single()
+    .rpc('fn_update_cash_after_trade', {
+      p_portfolio_id: portfolioId,
+      p_new_balance:  newBalance,
+    })
 
   if (error) throw error
+  if (!data.success) throw new Error(data.error || 'Failed to update cash balance')
   return data
-}
-
-export const depositFunds = async (portfolioId, amount, currentBalance) => {
-  if (amount <= 0) throw new Error('Deposit amount must be greater than 0')
-  const newBalance = parseFloat((currentBalance + amount).toFixed(2))
-  await updatePortfolioCash(portfolioId, newBalance)
-
-  // Log the deposit in the transactions table (non-blocking — don't throw if it fails)
-  supabase
-    .from('transactions')
-    .insert({
-      portfolio_id: portfolioId,
-      type: 'DEPOSIT',
-      total_amount: amount,
-      status: 'completed',
-      transaction_date: new Date().toISOString(),
-      notes: `Paper money deposit of $${amount.toLocaleString()}`,
-    })
-    .then(({ error }) => {
-      if (error) console.warn('Deposit log error:', error.message)
-    })
-
-  return newBalance
 }
 
 export const executeTrade = async (portfolioId, cashBalance, { symbol, name, type, quantity, unitPrice }) => {
