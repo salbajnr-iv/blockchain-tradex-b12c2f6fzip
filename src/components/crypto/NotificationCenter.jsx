@@ -1,18 +1,21 @@
 import React, { useState, useEffect, useRef } from "react";
 import { updateAlert } from "@/lib/api/alerts";
-import { AlertCircle, TrendingUp, TrendingDown, Zap, X, Bell } from "lucide-react";
+import { AlertCircle, TrendingUp, TrendingDown, Zap, X, Bell, Info, BarChart2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useSystemNotifications, emitSystemNotif } from "@/hooks/useSystemNotifications";
 
-export default function NotificationCenter({ alerts, cryptoPrices, cryptoChanges }) {
-  const [notifications, setNotifications] = useState([]);
+export default function NotificationCenter({ alerts, cryptoPrices, cryptoChanges, cryptoList, portfolioTotal }) {
+  const [toastQueue, setToastQueue] = useState([]);
   const triggeredRef = useRef(new Set());
+  const { notifications: sysNotifs } = useSystemNotifications({ cryptoList, portfolioTotal });
+  const prevSysCount = useRef(0);
 
+  // ── Price alert checks ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!alerts.length || !Object.keys(cryptoPrices).length) return;
 
     const checkAlerts = () => {
       const toAdd = [];
-
       alerts.forEach((alert) => {
         if (!alert.is_active || alert.is_triggered) return;
         if (triggeredRef.current.has(alert.id)) return;
@@ -48,7 +51,8 @@ export default function NotificationCenter({ alerts, cryptoPrices, cryptoChanges
         if (triggered) {
           triggeredRef.current.add(alert.id);
           toAdd.push({
-            tempId: `${alert.id}-${Date.now()}`,
+            tempId: `alert-${alert.id}-${Date.now()}`,
+            source: "alert",
             alertId: alert.id,
             symbol: alert.crypto_symbol,
             type: alert.alert_type,
@@ -56,7 +60,6 @@ export default function NotificationCenter({ alerts, cryptoPrices, cryptoChanges
             currentPrice,
             timestamp: new Date(),
           });
-
           updateAlert(alert.id, {
             is_triggered: true,
             triggered_at: new Date().toISOString(),
@@ -66,7 +69,7 @@ export default function NotificationCenter({ alerts, cryptoPrices, cryptoChanges
       });
 
       if (toAdd.length > 0) {
-        setNotifications((prev) => [...toAdd, ...prev].slice(0, 6));
+        setToastQueue((prev) => [...toAdd, ...prev].slice(0, 6));
       }
     };
 
@@ -75,18 +78,48 @@ export default function NotificationCenter({ alerts, cryptoPrices, cryptoChanges
     return () => clearInterval(interval);
   }, [alerts, cryptoPrices, cryptoChanges]);
 
+  // ── System notifications → show as toasts ──────────────────────────────────
   useEffect(() => {
-    if (notifications.length === 0) return;
+    if (sysNotifs.length > prevSysCount.current) {
+      const newest = sysNotifs.slice(0, sysNotifs.length - prevSysCount.current);
+      const toastItems = newest.map((n) => ({
+        tempId: `sys-toast-${n.id}`,
+        source: "system",
+        type: n.type,
+        icon: n.icon,
+        title: n.title,
+        message: n.message,
+        timestamp: n.timestamp,
+      }));
+      setToastQueue((prev) => [...toastItems, ...prev].slice(0, 6));
+    }
+    prevSysCount.current = sysNotifs.length;
+  }, [sysNotifs]);
+
+  // ── Auto-dismiss oldest toast after 10s ────────────────────────────────────
+  useEffect(() => {
+    if (toastQueue.length === 0) return;
     const timer = setTimeout(() => {
-      setNotifications((prev) => prev.slice(0, -1));
-    }, 12000);
+      setToastQueue((prev) => prev.slice(0, -1));
+    }, 10000);
     return () => clearTimeout(timer);
-  }, [notifications]);
+  }, [toastQueue]);
 
-  const dismiss = (tempId) => setNotifications((prev) => prev.filter((n) => n.tempId !== tempId));
+  const dismiss = (tempId) => setToastQueue((prev) => prev.filter((n) => n.tempId !== tempId));
 
-  const getIcon = (type) => {
-    switch (type) {
+  // ── Icon & colors ───────────────────────────────────────────────────────────
+  const getIcon = (item) => {
+    if (item.source === "system") {
+      switch (item.type) {
+        case "welcome":        return <Bell className="w-4 h-4 text-primary" />;
+        case "market_mover":  return item.message?.includes("up") || item.message?.includes("surging")
+          ? <TrendingUp className="w-4 h-4 text-emerald-500" />
+          : <TrendingDown className="w-4 h-4 text-red-500" />;
+        case "portfolio_change": return <BarChart2 className="w-4 h-4 text-primary" />;
+        default: return <Info className="w-4 h-4 text-primary" />;
+      }
+    }
+    switch (item.type) {
       case "price_above": return <TrendingUp className="w-4 h-4 text-primary" />;
       case "price_below": return <TrendingDown className="w-4 h-4 text-destructive" />;
       case "volatility":  return <Zap className="w-4 h-4 text-yellow-400" />;
@@ -94,8 +127,16 @@ export default function NotificationCenter({ alerts, cryptoPrices, cryptoChanges
     }
   };
 
-  const getBorderColor = (type) => {
-    switch (type) {
+  const getBorderColor = (item) => {
+    if (item.source === "system") {
+      switch (item.type) {
+        case "market_mover": return item.message?.includes("up") || item.message?.includes("surging")
+          ? "border-emerald-500/30 bg-emerald-500/5"
+          : "border-red-500/30 bg-red-500/5";
+        default: return "border-primary/30 bg-primary/5";
+      }
+    }
+    switch (item.type) {
       case "price_above": return "border-primary/40 bg-primary/5";
       case "price_below": return "border-destructive/40 bg-destructive/5";
       case "volatility":  return "border-yellow-400/40 bg-yellow-400/5";
@@ -103,22 +144,27 @@ export default function NotificationCenter({ alerts, cryptoPrices, cryptoChanges
     }
   };
 
+  const getLabel = (item) => {
+    if (item.source === "system") return item.title || "System";
+    return "Alert Triggered";
+  };
+
   return (
     <div className="fixed bottom-6 right-6 space-y-2 z-50 w-80 pointer-events-none">
       <AnimatePresence>
-        {notifications.map((notif) => (
+        {toastQueue.map((notif) => (
           <motion.div
             key={notif.tempId}
             initial={{ opacity: 0, x: 320, scale: 0.9 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
             exit={{ opacity: 0, x: 320, scale: 0.9 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className={`pointer-events-auto bg-card border rounded-xl p-4 shadow-2xl ${getBorderColor(notif.type)}`}
+            className={`pointer-events-auto bg-card border rounded-xl p-4 shadow-2xl ${getBorderColor(notif)}`}
           >
             <div className="flex items-start gap-3">
               <div className="relative mt-0.5 shrink-0">
                 <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center">
-                  {getIcon(notif.type)}
+                  {getIcon(notif)}
                 </div>
                 <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-primary animate-ping" />
                 <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-primary" />
@@ -127,11 +173,13 @@ export default function NotificationCenter({ alerts, cryptoPrices, cryptoChanges
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1 mb-0.5">
                   <Bell className="w-3 h-3 text-primary" />
-                  <span className="text-xs font-bold text-primary uppercase tracking-wide">Alert Triggered</span>
+                  <span className="text-xs font-bold text-primary uppercase tracking-wide">{getLabel(notif)}</span>
                 </div>
                 <p className="text-sm font-medium text-foreground leading-snug">{notif.message}</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {notif.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                  {notif.timestamp instanceof Date
+                    ? notif.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+                    : new Date(notif.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                 </p>
               </div>
 

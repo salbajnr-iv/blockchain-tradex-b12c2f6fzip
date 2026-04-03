@@ -42,6 +42,40 @@
 - Transactions page shows both trades and withdrawal/deposit history
 - WithdrawalSidebar stores withdrawals in `transactions` table with `portfolio_id`
 
+### ✅ Phase 6 — Auth Redesign + System Notifications + Live Markets
+
+**Auth Pages (Full Redesign):**
+- All 4 auth pages (Login, Register, ForgotPassword, ResetPassword) redesigned with professional split-panel layout
+- Left panel: fixed dark brand panel (`#080d14`) with grid pattern, logo, taglines, feature bullets, social proof stats
+- Right panel: adapts to light/dark theme via CSS variables
+- `ThemeToggle` added to all auth pages — users can switch theme before logging in
+- Register page has numbered section headers (1 Personal, 2 Contact, 3 Security) for clearer UX
+- ForgotPassword shows a step-by-step guide after sending the reset email
+
+**Light Theme:**
+- `ThemeContext` was already fully wired; now the auth pages expose the toggle button so it's accessible pre-login
+- CSS variables already fully define both `:root` (light) and `.dark` (dark) themes
+
+**System Notifications:**
+- New `src/hooks/useSystemNotifications.js` — global event emitter for system-level notifications
+  - Auto-fires "Markets are live" welcome message on first load (2s delay)
+  - Auto-detects coins with ≥5% 24h movement and emits market mover alerts (deduplicated per hour per coin)
+  - Monitors portfolio total for ≥2% changes and emits portfolio gain/loss alerts
+- `NotificationCenter.jsx` updated to handle both price alert toasts AND system notification toasts
+- **Notification bell** added to the main header with a live unread badge count
+  - Dropdown panel shows full notification history (system + alert-triggered) with dismiss/clear-all
+  - Link to the Alerts page for configured price alerts
+
+**Markets Page — Live CoinGecko Data:**
+- Completely rebuilt `Markets.jsx` — no longer uses old `MarketTable.jsx`
+- New `src/hooks/useMarketCoins.js` fetches top 100 coins from CoinGecko `/coins/markets` every 60 seconds
+- Features: search bar, filter tabs (All/Top Gainers/Top Losers/Top 10), sortable columns (all 7 columns)
+- Shows coin image from CoinGecko, rank, name, price, 24h %, 7d %, volume, market cap, holdings
+- Watchlist toggle (⭐) saved to localStorage per coin
+- Hover shows "Trade →" button for coins not in portfolio
+- Pagination: 25 coins per page with prev/next + page number controls
+- Summary stats strip: total coins, top gainer, top loser, gainers/losers ratio
+
 ### ✅ Phase 5 — KYC Verification + Trade Page Upgrade
 
 **KYC System (End-to-End):**

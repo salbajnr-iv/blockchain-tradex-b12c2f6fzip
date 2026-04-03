@@ -4,6 +4,7 @@ import {
   LayoutDashboard, BarChart3, ArrowUpDown, Bell, CreditCard, History,
   ArrowUpRight, Menu, X, RefreshCw, LogOut, PlusCircle, LineChart, Search,
   ChevronDown, Wallet, TrendingUp, ShieldCheck, Settings, ChevronRight,
+  Info, BarChart2, Zap, TrendingDown, CheckCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import WithdrawalSidebar from "@/components/crypto/WithdrawalSidebar";
@@ -15,44 +16,41 @@ import { useAuth } from "@/lib/AuthContext";
 import { usePortfolio } from "@/contexts/PortfolioContext";
 import { useQuery } from "@tanstack/react-query";
 import { listAlerts } from "@/lib/api/alerts";
+import { useSystemNotifications } from "@/hooks/useSystemNotifications";
+import { motion, AnimatePresence } from "framer-motion";
 
 const NAV_SECTIONS = [
   {
     title: "Overview",
-    items: [
-      { label: "Dashboard",    icon: LayoutDashboard, path: "/" },
-    ],
+    items: [{ label: "Dashboard", icon: LayoutDashboard, path: "/" }],
   },
   {
     title: "Portfolio",
     items: [
-      { label: "My Portfolio", icon: Wallet,      path: "/transactions" },
-      { label: "Analytics",    icon: LineChart,   path: "/analytics" },
-      { label: "Card",         icon: CreditCard,  path: "/card" },
+      { label: "My Portfolio", icon: Wallet,     path: "/transactions" },
+      { label: "Analytics",   icon: LineChart,   path: "/analytics" },
+      { label: "Card",        icon: CreditCard,  path: "/card" },
     ],
   },
   {
     title: "Markets",
     items: [
-      { label: "Markets",      icon: BarChart3,   path: "/markets" },
-      { label: "Trade",        icon: ArrowUpDown, path: "/trade" },
-      { label: "Notifications", icon: Bell,       path: "/alerts" },
+      { label: "Markets",       icon: BarChart3,   path: "/markets" },
+      { label: "Trade",         icon: ArrowUpDown, path: "/trade" },
+      { label: "Notifications", icon: Bell,        path: "/alerts" },
     ],
   },
   {
     title: "History",
-    items: [
-      { label: "Transactions", icon: History,     path: "/transactions" },
-    ],
+    items: [{ label: "Transactions", icon: History, path: "/transactions" }],
   },
   {
     title: "Account",
-    items: [
-      { label: "Settings",     icon: Settings,   path: "/settings" },
-    ],
+    items: [{ label: "Settings", icon: Settings, path: "/settings" }],
   },
 ];
 
+// ── Coin search ──────────────────────────────────────────────────────────────
 function CoinSearch({ cryptoList }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -70,24 +68,14 @@ function CoinSearch({ cryptoList }) {
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (containerRef.current && !containerRef.current.contains(e.target)) {
-        setOpen(false);
-        setQuery("");
+        setOpen(false); setQuery("");
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleSelect = (coin) => {
-    setOpen(false);
-    setQuery("");
-    navigate(`/trade?coin=${coin.symbol}`);
-  };
-
-  const handleKeyDown = (e) => {
-    if (e.key === "Escape") { setOpen(false); setQuery(""); inputRef.current?.blur(); }
-    if (e.key === "Enter" && results.length > 0) handleSelect(results[0]);
-  };
+  const handleSelect = (coin) => { setOpen(false); setQuery(""); navigate(`/trade?coin=${coin.symbol}`); };
 
   return (
     <div ref={containerRef} className="relative hidden lg:flex items-center w-72">
@@ -100,7 +88,10 @@ function CoinSearch({ cryptoList }) {
           value={query}
           onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
           onFocus={() => setOpen(true)}
-          onKeyDown={handleKeyDown}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") { setOpen(false); setQuery(""); inputRef.current?.blur(); }
+            if (e.key === "Enter" && results.length > 0) handleSelect(results[0]);
+          }}
           className="bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none w-full"
         />
         {query && (
@@ -109,15 +100,11 @@ function CoinSearch({ cryptoList }) {
           </button>
         )}
       </div>
-
       {open && results.length > 0 && (
         <div className="absolute top-full left-0 right-0 mt-1.5 bg-card border border-border/50 rounded-xl shadow-2xl z-50 overflow-hidden">
           {results.map((coin) => (
-            <button
-              key={coin.symbol}
-              onClick={() => handleSelect(coin)}
-              className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-secondary/50 transition-colors text-left"
-            >
+            <button key={coin.symbol} onClick={() => handleSelect(coin)}
+              className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-secondary/50 transition-colors text-left">
               <div className="flex items-center gap-2.5">
                 <span className="text-base">{coin.icon}</span>
                 <div>
@@ -140,7 +127,6 @@ function CoinSearch({ cryptoList }) {
           </div>
         </div>
       )}
-
       {open && query.trim().length > 0 && results.length === 0 && (
         <div className="absolute top-full left-0 right-0 mt-1.5 bg-card border border-border/50 rounded-xl shadow-2xl z-50 p-4 text-center">
           <p className="text-xs text-muted-foreground">No coins found for "{query}"</p>
@@ -150,6 +136,124 @@ function CoinSearch({ cryptoList }) {
   );
 }
 
+// ── Notification Bell + Dropdown ──────────────────────────────────────────────
+function NotificationBell({ cryptoList, portfolioTotal }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const { notifications, dismiss, clearAll } = useSystemNotifications({ cryptoList, portfolioTotal });
+
+  const unread = notifications.length;
+
+  useEffect(() => {
+    const handleClick = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const getIcon = (n) => {
+    switch (n.type) {
+      case "welcome":          return <Bell className="w-4 h-4 text-primary" />;
+      case "market_mover":     return n.message?.includes("up") || n.message?.includes("surging")
+        ? <TrendingUp className="w-4 h-4 text-emerald-500" />
+        : <TrendingDown className="w-4 h-4 text-red-500" />;
+      case "portfolio_change": return <BarChart2 className="w-4 h-4 text-primary" />;
+      case "price_above":      return <TrendingUp className="w-4 h-4 text-primary" />;
+      case "price_below":      return <TrendingDown className="w-4 h-4 text-destructive" />;
+      case "volatility":       return <Zap className="w-4 h-4 text-yellow-400" />;
+      default:                 return <Info className="w-4 h-4 text-muted-foreground" />;
+    }
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="relative w-8 h-8 flex items-center justify-center rounded-lg border border-border/50 bg-secondary/50 hover:bg-secondary hover:border-primary/30 transition-all"
+        aria-label="Notifications"
+      >
+        <Bell className="w-3.5 h-3.5 text-muted-foreground" />
+        {unread > 0 && (
+          <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[9px] font-bold flex items-center justify-center">
+            {unread > 9 ? "9+" : unread}
+          </span>
+        )}
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -8, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.97 }}
+            transition={{ duration: 0.15 }}
+            className="absolute right-0 top-full mt-2 w-80 bg-card border border-border/60 rounded-2xl shadow-2xl z-50 overflow-hidden"
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
+              <div className="flex items-center gap-2">
+                <Bell className="w-3.5 h-3.5 text-primary" />
+                <span className="text-sm font-semibold text-foreground">Notifications</span>
+                {unread > 0 && (
+                  <span className="bg-primary/15 text-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full">{unread} new</span>
+                )}
+              </div>
+              {unread > 0 && (
+                <button onClick={clearAll} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
+                  <CheckCheck className="w-3 h-3" />
+                  Clear all
+                </button>
+              )}
+            </div>
+
+            <div className="max-h-80 overflow-y-auto">
+              {notifications.length === 0 ? (
+                <div className="py-10 text-center">
+                  <Bell className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">No notifications yet</p>
+                  <p className="text-xs text-muted-foreground/60 mt-0.5">System and market alerts will appear here</p>
+                </div>
+              ) : (
+                notifications.map((n) => (
+                  <div key={n.id} className="flex items-start gap-3 px-4 py-3 hover:bg-secondary/30 transition-colors border-b border-border/20 last:border-0 group">
+                    <div className="w-8 h-8 rounded-xl bg-secondary/60 flex items-center justify-center shrink-0 mt-0.5">
+                      {getIcon(n)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-foreground">{n.title}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed line-clamp-2">{n.message}</p>
+                      <p className="text-[10px] text-muted-foreground/60 mt-1">
+                        {n.timestamp instanceof Date
+                          ? n.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                          : new Date(n.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => dismiss(n.id)}
+                      className="text-muted-foreground/40 hover:text-muted-foreground transition-colors opacity-0 group-hover:opacity-100 shrink-0 mt-0.5"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="px-4 py-2.5 border-t border-border/30 bg-secondary/20">
+              <Link
+                to="/alerts"
+                onClick={() => setOpen(false)}
+                className="text-xs text-primary hover:text-primary/80 font-medium transition-colors"
+              >
+                View all price alerts →
+              </Link>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ── Sidebar sub-components ────────────────────────────────────────────────────
 function SidebarSearch({ value, onChange }) {
   return (
     <div className="relative px-3 pb-3">
@@ -165,10 +269,9 @@ function SidebarSearch({ value, onChange }) {
 }
 
 function NavSection({ section, location, onNavigate, isOpen, onToggle, searchActive }) {
-  const hasActiveItem = section.items.some(i =>
+  const hasActiveItem = section.items.some((i) =>
     i.path === "/" ? location.pathname === "/" : location.pathname.startsWith(i.path)
   );
-
   return (
     <div className="mb-1">
       {!searchActive && (
@@ -190,9 +293,7 @@ function NavSection({ section, location, onNavigate, isOpen, onToggle, searchAct
                 to={path}
                 onClick={onNavigate}
                 className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                  active
-                    ? "bg-primary/15 text-primary"
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                  active ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
                 }`}
               >
                 <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
@@ -211,6 +312,7 @@ function NavSection({ section, location, onNavigate, isOpen, onToggle, searchAct
   );
 }
 
+// ── Main Layout ───────────────────────────────────────────────────────────────
 export default function Layout() {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -218,7 +320,7 @@ export default function Layout() {
   const [depositOpen, setDepositOpen] = useState(false);
   const [sidebarSearch, setSidebarSearch] = useState("");
   const [openSections, setOpenSections] = useState(() =>
-    Object.fromEntries(NAV_SECTIONS.map(s => [s.title, true]))
+    Object.fromEntries(NAV_SECTIONS.map((s) => [s.title, true]))
   );
 
   const { portfolioTotal, isLoading, lastUpdated, refetch, cryptoList } = useLivePrices();
@@ -246,13 +348,13 @@ export default function Layout() {
 
   const isSearchActive = sidebarSearch.trim().length > 0;
   const filteredSections = isSearchActive
-    ? NAV_SECTIONS.map(s => ({
+    ? NAV_SECTIONS.map((s) => ({
         ...s,
-        items: s.items.filter(i => i.label.toLowerCase().includes(sidebarSearch.toLowerCase())),
-      })).filter(s => s.items.length > 0)
+        items: s.items.filter((i) => i.label.toLowerCase().includes(sidebarSearch.toLowerCase())),
+      })).filter((s) => s.items.length > 0)
     : NAV_SECTIONS;
 
-  const toggleSection = (title) => setOpenSections(prev => ({ ...prev, [title]: !prev[title] }));
+  const toggleSection = (title) => setOpenSections((prev) => ({ ...prev, [title]: !prev[title] }));
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -297,7 +399,7 @@ export default function Layout() {
           <SidebarSearch value={sidebarSearch} onChange={setSidebarSearch} />
         </div>
 
-        {/* Navigation sections */}
+        {/* Navigation */}
         <nav className="flex-1 overflow-y-auto py-1 space-y-1 scrollbar-thin">
           {filteredSections.map((section) => (
             <NavSection
@@ -315,7 +417,7 @@ export default function Layout() {
           )}
         </nav>
 
-        {/* Balance card + actions */}
+        {/* Balance card */}
         <div className="px-3 py-3 border-t border-border/50 space-y-3">
           <div className="bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 rounded-xl px-4 py-3 space-y-2">
             <div className="flex items-center justify-between">
@@ -337,22 +439,14 @@ export default function Layout() {
               <ShieldCheck className="w-4 h-4 text-primary/40" />
             </div>
           </div>
-
           <div className="grid grid-cols-2 gap-2">
-            <Button
-              onClick={() => setDepositOpen(true)}
-              variant="outline"
-              size="sm"
-              className="gap-1.5 text-xs border-primary/30 text-primary hover:bg-primary/5 rounded-xl h-9"
-            >
+            <Button onClick={() => setDepositOpen(true)} variant="outline" size="sm"
+              className="gap-1.5 text-xs border-primary/30 text-primary hover:bg-primary/5 rounded-xl h-9">
               <PlusCircle className="w-3.5 h-3.5" />
               Add Funds
             </Button>
-            <Button
-              onClick={() => setWithdrawOpen(true)}
-              size="sm"
-              className="bg-primary hover:bg-primary/90 gap-1.5 text-xs rounded-xl h-9"
-            >
+            <Button onClick={() => setWithdrawOpen(true)} size="sm"
+              className="bg-primary hover:bg-primary/90 gap-1.5 text-xs rounded-xl h-9">
               <ArrowUpRight className="w-3.5 h-3.5" />
               Withdraw
             </Button>
@@ -373,19 +467,21 @@ export default function Layout() {
         </div>
       </aside>
 
+      {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
         <header className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-card/50">
           <button className="lg:hidden text-muted-foreground hover:text-foreground" onClick={() => setSidebarOpen(true)}>
             <Menu className="w-5 h-5" />
           </button>
           <CoinSearch cryptoList={cryptoList} />
-          <div className="flex items-center gap-3 ml-auto">
+          <div className="flex items-center gap-2 ml-auto">
             {lastUpdated && (
               <span className="hidden lg:block text-xs text-muted-foreground">
-                Live • {lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                Live · {lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
               </span>
             )}
             <ThemeToggle />
+            <NotificationBell cryptoList={cryptoList} portfolioTotal={portfolioTotal} />
             <Button variant="ghost" size="icon" onClick={refetch} className="text-muted-foreground hover:text-foreground">
               <RefreshCw className="w-4 h-4" />
             </Button>
@@ -396,13 +492,8 @@ export default function Layout() {
               <span className="hidden lg:block text-sm font-medium text-foreground max-w-[120px] truncate">
                 {displayName}
               </span>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleLogout}
-                className="text-muted-foreground hover:text-destructive transition-colors"
-                title="Sign out"
-              >
+              <Button variant="ghost" size="icon" onClick={handleLogout}
+                className="text-muted-foreground hover:text-destructive transition-colors" title="Sign out">
                 <LogOut className="w-4 h-4" />
               </Button>
             </div>
@@ -416,7 +507,13 @@ export default function Layout() {
 
       <WithdrawalSidebar open={withdrawOpen} onClose={() => setWithdrawOpen(false)} />
       <DepositDialog open={depositOpen} onClose={() => setDepositOpen(false)} />
-      <NotificationCenter alerts={alerts} cryptoPrices={cryptoPrices} cryptoChanges={cryptoChanges} />
+      <NotificationCenter
+        alerts={alerts}
+        cryptoPrices={cryptoPrices}
+        cryptoChanges={cryptoChanges}
+        cryptoList={cryptoList}
+        portfolioTotal={portfolioTotal}
+      />
     </div>
   );
 }
