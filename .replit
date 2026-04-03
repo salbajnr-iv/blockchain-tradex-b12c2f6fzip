@@ -1,4 +1,4 @@
-modules = ["nodejs-20"]
+modules = ["nodejs-20", "web"]
 [nix]
 channel = "stable-25_05"
 packages = ["unzip"]
@@ -27,15 +27,12 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npx vite --port 5000 --host 0.0.0.0"
+args = "npm run dev"
 waitForPort = 5000
 
 [[ports]]
 localPort = 5000
-
-[[ports]]
-localPort = 5001
-externalPort = 3000
+externalPort = 80
 
 [deployment]
 deploymentTarget = "autoscale"
