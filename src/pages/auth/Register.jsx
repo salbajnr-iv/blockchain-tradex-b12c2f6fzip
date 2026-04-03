@@ -75,7 +75,7 @@ export default function Register() {
     }
     setLoading(true);
     try {
-      const result = await signUp(email, password, fullName);
+      const result = await signUp(email, password, fullName, { phone, country, dateOfBirth });
       if (result.session) {
         navigate('/');
       } else {

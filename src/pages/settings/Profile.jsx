@@ -42,10 +42,20 @@ export default function ProfileSettings() {
     e.preventDefault();
     setSaving(true);
     try {
-      const { error } = await supabase.auth.updateUser({
+      const { data: { user: updatedUser }, error } = await supabase.auth.updateUser({
         data: { full_name: fullName, phone, country, bio },
       });
       if (error) throw error;
+
+      // Sync changes into public.users table via secure RPC
+      await supabase.rpc("fn_sync_user_profile", {
+        p_user_id:   updatedUser?.id ?? user?.id,
+        p_full_name: fullName || null,
+        p_phone:     phone || null,
+        p_country:   country || null,
+        p_bio:       bio || null,
+      });
+
       toast.success("Profile updated successfully");
     } catch (err) {
       toast.error(err.message || "Failed to update profile");

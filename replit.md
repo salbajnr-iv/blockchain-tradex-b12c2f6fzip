@@ -42,6 +42,34 @@
 - Transactions page shows both trades and withdrawal/deposit history
 - WithdrawalSidebar stores withdrawals in `transactions` table with `portfolio_id`
 
+### ✅ Phase 5 — KYC Verification + Trade Page Upgrade
+
+**KYC System (End-to-End):**
+- `src/lib/api/kyc.js` — API layer: fetch submission, upload files, submit application, get signed URLs, realtime subscription
+- `src/pages/settings/Kyc.jsx` — Full multi-step KYC flow (5 steps): Personal Info → Document Info → Upload ID → Selfie → Review & Submit
+- Drag-and-drop file upload zones for ID front/back, selfie, proof of address
+- Files uploaded to Supabase Storage buckets: `kyc-documents` (10MB, images+PDF), `kyc-selfies` (5MB, images)
+- Real-time status tracking via `subscribeToKycStatus()` — Supabase `postgres_changes` subscription
+- Status badge shows: pending / under_review / approved / rejected / more_info_needed
+- Submission timeline shows progress; reviewer notes and rejection reasons displayed live
+- Users can resubmit after rejection or when more info is needed
+- KYC nav item added to Settings sidebar
+
+**Signup + Profile Sync Fix:**
+- `AuthContext.signUp()` now passes phone, country, date_of_birth as auth metadata options
+- `Register.jsx` passes all collected fields (phone, country, dateOfBirth) to signUp
+- `Profile.jsx` handleSave now calls `fn_sync_user_profile()` RPC to sync changes to `public.users`
+
+**Trade Page Full Redesign:**
+- Coin selector strip at the top with colored icons + 24h change
+- Live stats bar showing price, 24h change badge, volume, market cap, holdings
+- Full-width price chart section
+- Live order book with bid/ask visualization (depth bars)
+- Trade panel with Market/Limit order types, 25%/50%/75%/Max quick-fill buttons
+- Position card showing current holding, avg cost, market value, unrealized P&L
+- Market info panel (fee rate, min order, volume, etc.)
+- Trade history with real-time Supabase subscription
+
 ### ✅ Phase 4 — UI/UX Polish + Realtime Subscriptions
 
 - **NotificationCenter moved to Layout.jsx** — price alert toasts fire on every page, not just Alerts page

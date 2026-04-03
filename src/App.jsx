@@ -26,6 +26,7 @@ import SecuritySettings from './pages/settings/Security';
 import AppearanceSettings from './pages/settings/Appearance';
 import NotificationPrefs from './pages/settings/NotificationPrefs';
 import PaymentsSettings from './pages/settings/Payments';
+import KycSettings from './pages/settings/Kyc';
 
 function App() {
   return (
@@ -77,6 +78,7 @@ function App() {
                       <Route path="appearance" element={<AppearanceSettings />} />
                       <Route path="notifications" element={<NotificationPrefs />} />
                       <Route path="payments" element={<PaymentsSettings />} />
+                      <Route path="kyc" element={<KycSettings />} />
                     </Route>
                   </Route>
                 </Route>
