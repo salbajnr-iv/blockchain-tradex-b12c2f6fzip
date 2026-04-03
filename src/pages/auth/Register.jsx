@@ -7,10 +7,21 @@ import { Loader2, Eye, EyeOff, CheckCircle2, User, Mail, Lock, Phone, Globe, Cal
 import { toast } from 'sonner';
 
 const COUNTRIES = [
-  "United States", "United Kingdom", "Canada", "Australia", "Germany",
-  "France", "Japan", "Singapore", "United Arab Emirates", "India",
-  "Brazil", "Netherlands", "Switzerland", "Sweden", "Norway",
-  "Denmark", "New Zealand", "South Korea", "Hong Kong", "Spain",
+  "Algeria", "Angola", "Australia", "Benin", "Botswana", "Brazil",
+  "Burkina Faso", "Burundi", "Cabo Verde", "Cameroon", "Canada",
+  "Central African Republic", "Chad", "Comoros", "Congo (Republic)",
+  "Congo (Democratic Republic)", "Denmark", "Djibouti", "Egypt",
+  "Equatorial Guinea", "Eritrea", "Eswatini", "Ethiopia", "France",
+  "Gabon", "Gambia", "Germany", "Ghana", "Guinea", "Guinea-Bissau",
+  "Hong Kong", "India", "Israel", "Ivory Coast", "Japan", "Kenya",
+  "Lesotho", "Liberia", "Libya", "Madagascar", "Malawi", "Mali",
+  "Mauritania", "Mauritius", "Morocco", "Mozambique", "Namibia",
+  "Netherlands", "New Zealand", "Niger", "Nigeria", "Norway",
+  "Rwanda", "São Tomé and Príncipe", "Senegal", "Seychelles",
+  "Sierra Leone", "Singapore", "Somalia", "South Africa", "South Korea",
+  "South Sudan", "Spain", "Sudan", "Sweden", "Switzerland", "Tanzania",
+  "Togo", "Tunisia", "Uganda", "United Arab Emirates", "United Kingdom",
+  "United States", "Zambia", "Zimbabwe",
 ];
 
 export default function Register() {
