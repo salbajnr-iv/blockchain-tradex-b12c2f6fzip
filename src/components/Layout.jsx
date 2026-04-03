@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import WithdrawalSidebar from "@/components/crypto/WithdrawalSidebar";
 import DepositDialog from "@/components/crypto/DepositDialog";
 import NotificationCenter from "@/components/crypto/NotificationCenter";
+import ThemeToggle from "@/components/ThemeToggle";
 import { useLivePrices } from "@/hooks/useLivePrices";
 import { useAuth } from "@/lib/AuthContext";
 import { usePortfolio } from "@/contexts/PortfolioContext";
@@ -35,13 +36,19 @@ const NAV_SECTIONS = [
     items: [
       { label: "Markets",      icon: BarChart3,   path: "/markets" },
       { label: "Trade",        icon: ArrowUpDown, path: "/trade" },
-      { label: "Alerts",       icon: Bell,        path: "/alerts" },
+      { label: "Notifications", icon: Bell,       path: "/alerts" },
     ],
   },
   {
     title: "History",
     items: [
       { label: "Transactions", icon: History,     path: "/transactions" },
+    ],
+  },
+  {
+    title: "Account",
+    items: [
+      { label: "Settings",     icon: Settings,   path: "/settings" },
     ],
   },
 ];
@@ -158,7 +165,9 @@ function SidebarSearch({ value, onChange }) {
 }
 
 function NavSection({ section, location, onNavigate, isOpen, onToggle, searchActive }) {
-  const hasActiveItem = section.items.some(i => location.pathname === i.path);
+  const hasActiveItem = section.items.some(i =>
+    i.path === "/" ? location.pathname === "/" : location.pathname.startsWith(i.path)
+  );
 
   return (
     <div className="mb-1">
@@ -174,7 +183,7 @@ function NavSection({ section, location, onNavigate, isOpen, onToggle, searchAct
       {(isOpen || searchActive) && (
         <div className="px-2 space-y-0.5">
           {section.items.map(({ label, icon: Icon, path }) => {
-            const active = location.pathname === path;
+            const active = path === "/" ? location.pathname === "/" : location.pathname.startsWith(path);
             return (
               <Link
                 key={path}
@@ -376,6 +385,7 @@ export default function Layout() {
                 Live • {lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
               </span>
             )}
+            <ThemeToggle />
             <Button variant="ghost" size="icon" onClick={refetch} className="text-muted-foreground hover:text-foreground">
               <RefreshCw className="w-4 h-4" />
             </Button>
@@ -400,7 +410,7 @@ export default function Layout() {
         </header>
 
         <main className="flex-1 p-4 md:p-6 overflow-auto">
-          <Outlet />
+          <Outlet context={{ onDepositOpen: () => setDepositOpen(true), onWithdrawOpen: () => setWithdrawOpen(true) }} />
         </main>
       </div>
 

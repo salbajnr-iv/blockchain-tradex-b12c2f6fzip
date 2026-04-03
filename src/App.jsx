@@ -6,6 +6,7 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { supabaseMisconfigured } from '@/lib/supabaseClient';
 import { PortfolioProvider } from '@/contexts/PortfolioContext';
+import { ThemeProvider } from '@/contexts/ThemeContext';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/auth/Login';
@@ -19,71 +20,75 @@ import Alerts from './pages/Alerts';
 import Card from './pages/Card';
 import Transactions from './pages/Transactions';
 import Analytics from './pages/Analytics';
-
-function AuthRedirect() {
-  const { isAuthenticated, isLoadingAuth } = useAuth();
-  if (isLoadingAuth) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-background">
-        <div className="w-8 h-8 border-4 border-border border-t-primary rounded-full animate-spin" />
-      </div>
-    );
-  }
-  return isAuthenticated ? <Navigate to="/" replace /> : null;
-}
+import SettingsLayout from './pages/settings/Layout';
+import ProfileSettings from './pages/settings/Profile';
+import SecuritySettings from './pages/settings/Security';
+import AppearanceSettings from './pages/settings/Appearance';
+import NotificationPrefs from './pages/settings/NotificationPrefs';
+import PaymentsSettings from './pages/settings/Payments';
 
 function App() {
   return (
-    <AuthProvider>
-      <PortfolioProvider>
-        <QueryClientProvider client={queryClientInstance}>
-          {supabaseMisconfigured && (
-            <div style={{
-              position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
-              background: '#dc2626', color: '#fff', padding: '12px 20px',
-              fontSize: '14px', fontWeight: 600, textAlign: 'center', lineHeight: 1.5,
-            }}>
-              ⚠️ BlockTrade is missing its database configuration. Add{' '}
-              <code style={{ background: 'rgba(0,0,0,0.25)', borderRadius: 4, padding: '1px 6px' }}>VITE_SUPABASE_URL</code>{' '}
-              and{' '}
-              <code style={{ background: 'rgba(0,0,0,0.25)', borderRadius: 4, padding: '1px 6px' }}>VITE_SUPABASE_ANON_KEY</code>{' '}
-              to your Vercel Environment Variables, then redeploy.
-            </div>
-          )}
-          <Router>
-            <Routes>
-              <Route path="/login" element={
-                <AuthRedirectWrapper>
-                  <Login />
-                </AuthRedirectWrapper>
-              } />
-              <Route path="/register" element={
-                <AuthRedirectWrapper>
-                  <Register />
-                </AuthRedirectWrapper>
-              } />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
+    <ThemeProvider>
+      <AuthProvider>
+        <PortfolioProvider>
+          <QueryClientProvider client={queryClientInstance}>
+            {supabaseMisconfigured && (
+              <div style={{
+                position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
+                background: '#dc2626', color: '#fff', padding: '12px 20px',
+                fontSize: '14px', fontWeight: 600, textAlign: 'center', lineHeight: 1.5,
+              }}>
+                ⚠️ BlockTrade is missing its database configuration. Add{' '}
+                <code style={{ background: 'rgba(0,0,0,0.25)', borderRadius: 4, padding: '1px 6px' }}>VITE_SUPABASE_URL</code>{' '}
+                and{' '}
+                <code style={{ background: 'rgba(0,0,0,0.25)', borderRadius: 4, padding: '1px 6px' }}>VITE_SUPABASE_ANON_KEY</code>{' '}
+                to your Vercel Environment Variables, then redeploy.
+              </div>
+            )}
+            <Router>
+              <Routes>
+                <Route path="/login" element={
+                  <AuthRedirectWrapper>
+                    <Login />
+                  </AuthRedirectWrapper>
+                } />
+                <Route path="/register" element={
+                  <AuthRedirectWrapper>
+                    <Register />
+                  </AuthRedirectWrapper>
+                } />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
 
-              <Route element={<ProtectedRoute />}>
-                <Route element={<Layout />}>
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="/trade" element={<Trade />} />
-                  <Route path="/markets" element={<Markets />} />
-                  <Route path="/alerts" element={<Alerts />} />
-                  <Route path="/card" element={<Card />} />
-                  <Route path="/transactions" element={<Transactions />} />
-                  <Route path="/analytics" element={<Analytics />} />
+                <Route element={<ProtectedRoute />}>
+                  <Route element={<Layout />}>
+                    <Route path="/" element={<Dashboard />} />
+                    <Route path="/trade" element={<Trade />} />
+                    <Route path="/markets" element={<Markets />} />
+                    <Route path="/alerts" element={<Alerts />} />
+                    <Route path="/card" element={<Card />} />
+                    <Route path="/transactions" element={<Transactions />} />
+                    <Route path="/analytics" element={<Analytics />} />
+
+                    <Route path="/settings" element={<SettingsLayout />}>
+                      <Route index element={<ProfileSettings />} />
+                      <Route path="security" element={<SecuritySettings />} />
+                      <Route path="appearance" element={<AppearanceSettings />} />
+                      <Route path="notifications" element={<NotificationPrefs />} />
+                      <Route path="payments" element={<PaymentsSettings />} />
+                    </Route>
+                  </Route>
                 </Route>
-              </Route>
 
-              <Route path="*" element={<PageNotFound />} />
-            </Routes>
-          </Router>
-          <Toaster />
-        </QueryClientProvider>
-      </PortfolioProvider>
-    </AuthProvider>
+                <Route path="*" element={<PageNotFound />} />
+              </Routes>
+            </Router>
+            <Toaster />
+          </QueryClientProvider>
+        </PortfolioProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

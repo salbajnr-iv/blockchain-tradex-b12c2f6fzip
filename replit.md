@@ -156,9 +156,26 @@ npm run dev   # Runs on port 5000
 
 ## Recent UI Changes (April 2026)
 
-- **Sidebar redesign** — Grouped navigation sections (Overview, Portfolio, Markets, History) with collapsible toggles, user profile card at top (avatar, name, email, active dot), inline feature search, gradient balance card, rounded icon badges per nav item, and a dedicated Sign Out row at the bottom.
-- **Register form expanded** — Now includes Full Name, Date of Birth, Email, Phone Number, Country (dropdown), Password (with 5-level strength meter), Confirm Password, and a Terms of Service / Privacy Policy checkbox. Organized into labelled sections: Personal Information, Contact Information, Security.
-- **Deposit loading state** — Replaced the terminal/console style with a professional animated UI: spinning circular icon, live progress bar with percentage, step-by-step list with completed/active/pending states, and a security notice banner at the bottom.
+- **Sidebar redesign** — Grouped navigation sections (Overview, Portfolio, Markets, History, Account) with collapsible toggles, user profile card at top, inline feature search, gradient balance card, and a Settings nav item linking to /settings.
+- **Register form expanded** — Full Name, DOB, Email, Phone, Country dropdown, password strength meter, Terms checkbox.
+- **Deposit loading state** — Professional animated progress bar with step checklist and security notice.
+- **Theme system** — Full light/dark theme support via `ThemeContext` + Tailwind `darkMode: ["class"]`. Default is dark. Toggle button in header. Theme persisted to `localStorage`. Flash-free via inline script in `index.html`.
+- **Settings pages** — Full `/settings` route with sub-pages: Profile, Security, Appearance, Notifications, Payments. Settings layout has a sidebar sub-nav.
+- **Notifications hub** — `/alerts` page now shows all account activity: price alerts, trades, deposits, withdrawals. Filterable by category. Collapsible Alert Manager panel.
+- **Dashboard rebuilt** — Live Market Ticker (top 4 coins), Quick Actions grid (Trade, Deposit, Withdraw, Alerts, Markets, Analytics), Top Gainers/Losers panel, Recent Activity feed, Holdings Summary. All sections use `useOutletContext` for deposit/withdraw actions.
+- **Outlet context** — Layout.jsx passes `onDepositOpen` and `onWithdrawOpen` via outlet context to child pages.
+
+## New Files (April 2026)
+
+- `src/contexts/ThemeContext.jsx` — ThemeProvider + useTheme hook
+- `src/components/ThemeToggle.jsx` — sun/moon toggle button
+- `src/pages/settings/Layout.jsx` — settings wrapper with sidebar sub-nav
+- `src/pages/settings/Profile.jsx` — profile editing (name, phone, country, bio)
+- `src/pages/settings/Security.jsx` — password change + session management
+- `src/pages/settings/Appearance.jsx` — light/dark theme selector
+- `src/pages/settings/NotificationPrefs.jsx` — per-category notification toggles
+- `src/pages/settings/Payments.jsx` — saved payment methods manager
+- `supabase-updates.sql` — `user_preferences` table (optional, for future cloud sync)
 
 ## Last Updated
 April 3, 2026
