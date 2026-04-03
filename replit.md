@@ -154,5 +154,11 @@ npm run dev   # Runs on port 5000
 - **sonner** — toast notifications
 - **date-fns** — date formatting
 
+## Recent UI Changes (April 2026)
+
+- **Sidebar redesign** — Grouped navigation sections (Overview, Portfolio, Markets, History) with collapsible toggles, user profile card at top (avatar, name, email, active dot), inline feature search, gradient balance card, rounded icon badges per nav item, and a dedicated Sign Out row at the bottom.
+- **Register form expanded** — Now includes Full Name, Date of Birth, Email, Phone Number, Country (dropdown), Password (with 5-level strength meter), Confirm Password, and a Terms of Service / Privacy Policy checkbox. Organized into labelled sections: Personal Information, Contact Information, Security.
+- **Deposit loading state** — Replaced the terminal/console style with a professional animated UI: spinning circular icon, live progress bar with percentage, step-by-step list with completed/active/pending states, and a security notice banner at the bottom.
+
 ## Last Updated
-March 21, 2026
+April 3, 2026

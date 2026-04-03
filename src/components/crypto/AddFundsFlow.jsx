@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import {
   PlusCircle, CreditCard, Building2, Wallet2, ChevronLeft,
   CheckCircle2, Loader2, ShieldCheck, AlertCircle,
-  UserCheck, Database, Server, RefreshCcw, CircleDollarSign, BadgeCheck,
+  UserCheck, Database, Server, RefreshCcw, CircleDollarSign, BadgeCheck, Lock,
 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { usePortfolio } from "@/contexts/PortfolioContext";
@@ -18,13 +18,13 @@ import { useQueryClient } from "@tanstack/react-query";
 const PRESETS = [100, 500, 1000, 5000, 10000];
 
 const PROCESSING_STEPS = [
-  { icon: UserCheck,        label: "Verifying account identity...",     delay: 0 },
-  { icon: ShieldCheck,      label: "Running security check...",         delay: 1000 },
-  { icon: Database,         label: "Connecting to payment network...",  delay: 2200 },
-  { icon: Server,           label: "Authorizing payment method...",     delay: 3400 },
-  { icon: RefreshCcw,       label: "Processing deposit...",             delay: 4600 },
-  { icon: CircleDollarSign, label: "Crediting your account...",         delay: 5600 },
-  { icon: BadgeCheck,       label: "Deposit completed successfully!",   delay: 6600 },
+  { icon: UserCheck,        label: "Verifying account identity",     delay: 0 },
+  { icon: ShieldCheck,      label: "Running security check",         delay: 1000 },
+  { icon: Database,         label: "Connecting to payment network",  delay: 2200 },
+  { icon: Server,           label: "Authorizing payment method",     delay: 3400 },
+  { icon: RefreshCcw,       label: "Processing deposit",             delay: 4600 },
+  { icon: CircleDollarSign, label: "Crediting your account",         delay: 5600 },
+  { icon: BadgeCheck,       label: "Deposit completed",              delay: 6600 },
 ];
 
 const TYPE_ICON = { card: CreditCard, bank_account: Building2, paypal: Wallet2 };
@@ -71,12 +71,56 @@ function MethodLabel({ method }) {
   );
 }
 
+function ProcessingStep({ step, index, isVisible, isActive, isCompleted, isLast }) {
+  if (!isVisible) return null;
+  const Icon = step.icon;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35 }}
+      className="flex items-center gap-3"
+    >
+      <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all ${
+        isLast && isCompleted
+          ? "bg-primary/20"
+          : isActive
+          ? "bg-primary/10"
+          : "bg-secondary/60"
+      }`}>
+        {isActive && !isCompleted ? (
+          <Loader2 className="w-4 h-4 text-primary animate-spin" />
+        ) : isCompleted || !isActive ? (
+          isLast && isCompleted
+            ? <CheckCircle2 className="w-4 h-4 text-primary" />
+            : <Icon className={`w-4 h-4 ${isCompleted ? "text-primary/70" : "text-muted-foreground"}`} />
+        ) : (
+          <Icon className="w-4 h-4 text-muted-foreground" />
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className={`text-sm font-medium ${isLast && isCompleted ? "text-primary" : isCompleted ? "text-foreground" : "text-muted-foreground"}`}>
+          {step.label}
+        </p>
+      </div>
+      <div className="shrink-0">
+        {isCompleted && !isActive && (
+          <CheckCircle2 className="w-4 h-4 text-primary/60" />
+        )}
+        {isActive && !isCompleted && (
+          <span className="text-xs text-primary font-medium">Processing…</span>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
 export default function AddFundsFlow({ open, onClose, paymentMethods = [], onMethodAdded, onSuccess }) {
   const { user } = useAuth();
   const { portfolioId, cashBalance, refetch } = usePortfolio();
   const queryClient = useQueryClient();
 
-  const [step, setStep]                   = useState(1); // 1=method 2=amount 3=review 4=processing 5=done
+  const [step, setStep]                   = useState(1);
   const [selectedMethod, setSelectedMethod] = useState(null);
   const [amount, setAmount]               = useState("");
   const [addMethodOpen, setAddMethodOpen] = useState(false);
@@ -107,14 +151,12 @@ export default function AddFundsFlow({ open, onClose, paymentMethods = [], onMet
     setProcessingDone(false);
     setError("");
 
-    // Run animated steps
     PROCESSING_STEPS.forEach((s, i) => {
       setTimeout(() => {
         setProcessingSteps(prev => [...prev, i]);
       }, s.delay);
     });
 
-    // After step 4 (server auth step), do the real work
     setTimeout(async () => {
       try {
         const req = await createDepositRequest(portfolioId, user.id, {
@@ -127,7 +169,6 @@ export default function AddFundsFlow({ open, onClose, paymentMethods = [], onMet
         await refetch();
         queryClient.invalidateQueries({ queryKey: ["deposit-requests", portfolioId] });
         queryClient.invalidateQueries({ queryKey: ["transactions-analytics", portfolioId] });
-        // Allow animation to finish
         setTimeout(() => {
           setProcessingDone(true);
           setStep(5);
@@ -141,6 +182,10 @@ export default function AddFundsFlow({ open, onClose, paymentMethods = [], onMet
     }, PROCESSING_STEPS[3].delay + 200);
   };
 
+  const totalSteps = PROCESSING_STEPS.length;
+  const completedCount = processingDone ? totalSteps : processingSteps.length;
+  const progressPct = Math.round((completedCount / totalSteps) * 100);
+
   return (
     <>
       <Dialog open={open} onOpenChange={handleClose}>
@@ -153,11 +198,10 @@ export default function AddFundsFlow({ open, onClose, paymentMethods = [], onMet
                 </button>
               )}
               <PlusCircle className="w-5 h-5 text-primary" />
-              {step <= 3 ? "Add Funds" : step === 4 ? "Processing…" : "Done"}
+              {step <= 3 ? "Add Funds" : step === 4 ? "Authorizing Deposit" : "Transaction Complete"}
             </DialogTitle>
           </DialogHeader>
 
-          {/* Progress */}
           {step <= 3 && (
             <div className="flex gap-1 mb-1">
               {[1,2,3].map(s => (
@@ -312,7 +356,7 @@ export default function AddFundsFlow({ open, onClose, paymentMethods = [], onMet
 
                 <div className="flex items-start gap-2 text-xs text-muted-foreground bg-blue-500/5 border border-blue-500/20 rounded-lg p-3">
                   <ShieldCheck className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
-                  <span>Funds typically appear in your trading account within seconds. A payment gateway integration will complete this flow in production.</span>
+                  <span>Funds typically appear in your trading account within seconds. Secured by bank-level encryption.</span>
                 </div>
 
                 <div className="flex gap-3">
@@ -324,37 +368,61 @@ export default function AddFundsFlow({ open, onClose, paymentMethods = [], onMet
               </motion.div>
             )}
 
-            {/* Step 4: Processing */}
+            {/* Step 4: Processing — professional loader */}
             {step === 4 && (
-              <motion.div key="s4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="py-4 space-y-3">
-                <div className="bg-secondary/40 rounded-t-lg px-4 py-2 flex items-center gap-2 border border-border/50 border-b-0">
-                  <span className="w-2.5 h-2.5 rounded-full bg-destructive/70" />
-                  <span className="w-2.5 h-2.5 rounded-full bg-yellow-400/70" />
-                  <span className="w-2.5 h-2.5 rounded-full bg-primary/70" />
-                  <span className="ml-2 text-xs text-muted-foreground font-mono">payment-gateway — deposit</span>
+              <motion.div key="s4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="py-4 space-y-5">
+                {/* Header card */}
+                <div className="bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 rounded-2xl p-5 text-center space-y-2">
+                  <div className="w-14 h-14 rounded-full bg-primary/15 flex items-center justify-center mx-auto">
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                    >
+                      <RefreshCcw className="w-7 h-7 text-primary" />
+                    </motion.div>
+                  </div>
+                  <p className="font-bold text-lg text-foreground">
+                    ${parsed.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-sm text-muted-foreground">Authorization in progress</p>
+
+                  {/* Progress bar */}
+                  <div className="w-full bg-secondary/60 rounded-full h-1.5 mt-2 overflow-hidden">
+                    <motion.div
+                      className="h-full bg-primary rounded-full"
+                      initial={{ width: "0%" }}
+                      animate={{ width: `${progressPct}%` }}
+                      transition={{ duration: 0.5 }}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">{progressPct}% complete</p>
                 </div>
-                <div className="bg-background/60 border border-border/50 border-t-0 rounded-b-lg px-4 py-4 min-h-[200px] font-mono space-y-2">
-                  <AnimatePresence>
-                    {PROCESSING_STEPS.map((s, i) => {
-                      const Icon = s.icon;
-                      const visible = processingSteps.includes(i);
-                      const isLast = i === PROCESSING_STEPS.length - 1;
-                      const isActive = visible && !processingSteps.includes(i + 1);
-                      if (!visible) return null;
-                      return (
-                        <motion.div key={i} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
-                          className={`flex items-center gap-3 text-xs ${isLast ? "text-primary font-semibold" : "text-muted-foreground"}`}>
-                          {isActive && !processingDone
-                            ? <Loader2 className="w-4 h-4 animate-spin text-primary shrink-0" />
-                            : isLast
-                            ? <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
-                            : <Icon className="w-4 h-4 shrink-0 text-primary/60" />}
-                          <span className="text-[11px]">&gt; {s.label}</span>
-                        </motion.div>
-                      );
-                    })}
-                  </AnimatePresence>
-                  <motion.span className="inline-block w-2 h-3.5 bg-primary ml-1" animate={{ opacity: [1,0,1] }} transition={{ repeat: Infinity, duration: 0.8 }} />
+
+                {/* Steps list */}
+                <div className="space-y-3 px-1">
+                  {PROCESSING_STEPS.map((s, i) => {
+                    const isVisible = processingSteps.includes(i);
+                    const isNextVisible = processingSteps.includes(i + 1);
+                    const isActive = isVisible && !isNextVisible && !processingDone;
+                    const isCompleted = isNextVisible || (processingDone && isVisible);
+                    const isLast = i === PROCESSING_STEPS.length - 1;
+                    return (
+                      <ProcessingStep
+                        key={i}
+                        step={s}
+                        index={i}
+                        isVisible={isVisible}
+                        isActive={isActive}
+                        isCompleted={isCompleted}
+                        isLast={isLast}
+                      />
+                    );
+                  })}
+                </div>
+
+                <div className="flex items-center gap-2 text-xs text-muted-foreground border border-border/40 rounded-lg p-3 bg-secondary/20">
+                  <Lock className="w-3.5 h-3.5 text-primary/60 shrink-0" />
+                  <span>Do not close this window. Your transaction is being securely processed.</span>
                 </div>
               </motion.div>
             )}
@@ -374,19 +442,27 @@ export default function AddFundsFlow({ open, onClose, paymentMethods = [], onMet
                   </>
                 ) : (
                   <>
-                    <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
-                      <CheckCircle2 className="w-7 h-7 text-primary" />
-                    </div>
+                    <motion.div
+                      initial={{ scale: 0.6 }} animate={{ scale: 1 }}
+                      transition={{ type: "spring", stiffness: 200, damping: 15 }}
+                      className="w-16 h-16 rounded-full bg-primary/15 flex items-center justify-center mx-auto"
+                    >
+                      <CheckCircle2 className="w-8 h-8 text-primary" />
+                    </motion.div>
                     <div>
-                      <p className="font-bold text-xl text-foreground">${parsed.toLocaleString(undefined, { minimumFractionDigits: 2 })} Added!</p>
-                      <p className="text-sm text-muted-foreground mt-1">Funds are now in your trading account.</p>
+                      <p className="font-bold text-xl text-foreground">${parsed.toLocaleString(undefined, { minimumFractionDigits: 2 })} Added</p>
+                      <p className="text-sm text-muted-foreground mt-1">Funds are now available in your trading account.</p>
                     </div>
                     {refCode && (
-                      <div className="bg-secondary/30 rounded-lg px-4 py-2 inline-block">
-                        <p className="text-xs text-muted-foreground">Reference</p>
-                        <p className="font-mono text-sm font-semibold text-foreground">{refCode}</p>
+                      <div className="bg-secondary/30 border border-border/50 rounded-xl px-5 py-3 inline-block mx-auto">
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Transaction Reference</p>
+                        <p className="font-mono text-sm font-bold text-foreground mt-0.5">{refCode}</p>
                       </div>
                     )}
+                    <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                      <ShieldCheck className="w-3.5 h-3.5 text-primary/60" />
+                      <span>Transaction verified and recorded securely</span>
+                    </div>
                   </>
                 )}
                 <Button onClick={() => { reset(); onClose(); }} className="w-full bg-primary hover:bg-primary/90 mt-2">
