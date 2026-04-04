@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import DepositDialog from "@/components/crypto/DepositDialog";
+import TransferDialog from "@/components/crypto/TransferDialog";
 import { useNavigate } from "react-router-dom";
 
 const METHOD_LABELS = {
@@ -37,6 +38,7 @@ const TYPE_FILTERS = [
   { label: "Sell",       value: "SELL" },
   { label: "Deposit",    value: "DEPOSIT" },
   { label: "Withdrawal", value: "WITHDRAWAL" },
+  { label: "Transfer",   value: "TRANSFER" },
 ];
 
 function getDateCutoff(range) {
@@ -52,6 +54,7 @@ function getDateCutoff(range) {
 export default function Transactions() {
   const navigate = useNavigate();
   const [depositDialog, setDepositDialog] = useState(false);
+  const [transferDialog, setTransferDialog] = useState(false);
 
   // Filters
   const [searchSymbol, setSearchSymbol] = useState("");
@@ -215,6 +218,55 @@ export default function Transactions() {
       );
     }
 
+    // Internal Transfer
+    if (item.type === "TRANSFER") {
+      const isIn = item.transfer_direction === "IN";
+      return (
+        <motion.div
+          key={`tx-${item.id}`}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: Math.min(index * 0.03, 0.3) }}
+          className="bg-card rounded-lg border border-border/50 p-4 hover:border-primary/30 transition-colors"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className={`p-2.5 rounded-lg ${isIn ? "bg-primary/10" : "bg-secondary/50"}`}>
+                {isIn
+                  ? <ArrowDownLeft className="w-5 h-5 text-primary" />
+                  : <ArrowUpRight className="w-5 h-5 text-blue-400" />}
+              </div>
+              <div>
+                <p className="font-semibold text-foreground">
+                  {isIn ? "Received" : "Sent"} · Internal Transfer
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {isIn ? "From" : "To"}: <span className="font-medium text-foreground/80">@{item.counterparty_username || "—"}</span>
+                  <span className="ml-1 font-mono text-muted-foreground/70">({item.counterparty_uid})</span>
+                </p>
+                <p className="text-xs text-muted-foreground">{format(item._date, "MMM d, yyyy • h:mm a")}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <p className={`font-semibold ${isIn ? "text-primary" : "text-blue-400"}`}>
+                  {isIn ? "+" : "−"}${Number(item.total_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs text-muted-foreground">Instant · Free</p>
+              </div>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary">
+                <CheckCircle2 className="w-4 h-4" />
+                <span className="text-xs font-medium">Completed</span>
+              </div>
+            </div>
+          </div>
+          {item.notes && (
+            <div className="mt-2 pl-14 text-xs text-muted-foreground italic">{item.notes}</div>
+          )}
+        </motion.div>
+      );
+    }
+
     // Withdrawal / Deposit
     const typeLabel = item.type === "WITHDRAWAL" ? "Withdrawal"
       : item.type === "DEPOSIT" ? "Deposit"
@@ -307,6 +359,15 @@ export default function Transactions() {
               <Send className="w-4 h-4 mr-2" />
               Withdraw
             </Button>
+            <Button
+              onClick={() => setTransferDialog(true)}
+              variant="outline"
+              className="border-border/60 hover:border-primary/40 hover:text-primary"
+              disabled={!portfolioId}
+            >
+              <ArrowUpRight className="w-4 h-4 mr-2 rotate-45" />
+              Send to User
+            </Button>
           </div>
         </div>
 
@@ -396,6 +457,7 @@ export default function Transactions() {
         )}
 
         <DepositDialog open={depositDialog} onClose={() => setDepositDialog(false)} />
+        <TransferDialog open={transferDialog} onClose={() => setTransferDialog(false)} />
       </div>
     </div>
   );

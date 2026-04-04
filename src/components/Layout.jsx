@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import DepositDialog from "@/components/crypto/DepositDialog";
+import TransferDialog from "@/components/crypto/TransferDialog";
 import NotificationCenter from "@/components/crypto/NotificationCenter";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useLivePrices } from "@/hooks/useLivePrices";
@@ -317,6 +318,7 @@ export default function Layout() {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [depositOpen, setDepositOpen] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
   const [sidebarSearch, setSidebarSearch] = useState("");
   const [openSections, setOpenSections] = useState(() =>
     Object.fromEntries(NAV_SECTIONS.map((s) => [s.title, true]))
@@ -450,6 +452,15 @@ export default function Layout() {
               Withdraw
             </Button>
           </div>
+          <Button
+            onClick={() => setTransferOpen(true)}
+            variant="outline"
+            size="sm"
+            className="w-full gap-1.5 text-xs border-border hover:border-primary/30 hover:bg-primary/5 hover:text-primary rounded-xl h-9 mt-1"
+          >
+            <ArrowUpRight className="w-3.5 h-3.5 rotate-45" />
+            Send to Another User
+          </Button>
         </div>
 
         {/* Logout */}
@@ -500,12 +511,13 @@ export default function Layout() {
         </header>
 
         <main className="flex-1 p-4 md:p-6 overflow-auto">
-          <Outlet context={{ onDepositOpen: () => setDepositOpen(true), onWithdrawOpen: () => navigate("/withdrawal") }} />
+          <Outlet context={{ onDepositOpen: () => setDepositOpen(true), onWithdrawOpen: () => navigate("/withdrawal"), onTransferOpen: () => setTransferOpen(true) }} />
         </main>
       </div>
 
 
       <DepositDialog open={depositOpen} onClose={() => setDepositOpen(false)} />
+      <TransferDialog open={transferOpen} onClose={() => setTransferOpen(false)} />
       <NotificationCenter
         alerts={alerts}
         cryptoPrices={cryptoPrices}
