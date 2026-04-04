@@ -1,11 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { usePortfolio } from "@/contexts/PortfolioContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
-import { User, Mail, Phone, Globe, Calendar, Save, Loader2, Camera } from "lucide-react";
+import { User, Mail, Phone, Globe, Save, Loader2, Camera, Trash2 } from "lucide-react";
 
 const COUNTRIES = [
   "Algeria", "Angola", "Australia", "Benin", "Botswana", "Brazil",
@@ -34,9 +34,90 @@ export default function ProfileSettings() {
   const [country, setCountry] = useState(user?.user_metadata?.country || "");
   const [bio, setBio] = useState(user?.user_metadata?.bio || "");
   const [saving, setSaving] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const fileInputRef = useRef(null);
 
   const userInitial = fullName?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || "U";
-  const memberSince = user?.created_at ? new Date(user.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" }) : "—";
+  const memberSince = user?.created_at
+    ? new Date(user.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" })
+    : "—";
+
+  useEffect(() => {
+    const storedPath = user?.user_metadata?.avatar_path;
+    if (!storedPath) return;
+    supabase.storage
+      .from("avatars")
+      .createSignedUrl(storedPath, 60 * 60)
+      .then(({ data }) => {
+        if (data?.signedUrl) setAvatarUrl(data.signedUrl);
+      })
+      .catch(() => {});
+  }, [user?.user_metadata?.avatar_path]);
+
+  const handleAvatarClick = () => fileInputRef.current?.click();
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image must be under 5 MB");
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file");
+      return;
+    }
+
+    setAvatarUploading(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `${user.id}/avatar.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(path, file, { upsert: true, contentType: file.type });
+      if (uploadError) throw uploadError;
+
+      const { data: signedData } = await supabase.storage
+        .from("avatars")
+        .createSignedUrl(path, 60 * 60);
+      if (signedData?.signedUrl) setAvatarUrl(signedData.signedUrl);
+
+      await supabase.auth.updateUser({ data: { avatar_path: path } });
+
+      await supabase.rpc("fn_sync_user_profile", {
+        p_user_id:   user.id,
+        p_full_name: fullName || null,
+        p_phone:     phone || null,
+        p_country:   country || null,
+        p_bio:       bio || null,
+      });
+
+      toast.success("Profile picture updated");
+    } catch (err) {
+      toast.error(err.message || "Failed to upload avatar");
+    } finally {
+      setAvatarUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    const storedPath = user?.user_metadata?.avatar_path;
+    if (!storedPath) return;
+    setAvatarUploading(true);
+    try {
+      await supabase.storage.from("avatars").remove([storedPath]);
+      await supabase.auth.updateUser({ data: { avatar_path: null } });
+      setAvatarUrl(null);
+      toast.success("Profile picture removed");
+    } catch (err) {
+      toast.error(err.message || "Failed to remove avatar");
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -47,7 +128,6 @@ export default function ProfileSettings() {
       });
       if (error) throw error;
 
-      // Sync changes into public.users table via secure RPC
       await supabase.rpc("fn_sync_user_profile", {
         p_user_id:   updatedUser?.id ?? user?.id,
         p_full_name: fullName || null,
@@ -66,27 +146,74 @@ export default function ProfileSettings() {
 
   return (
     <div className="space-y-6">
-      {/* Avatar section */}
       <div className="bg-card border border-border/50 rounded-xl p-6">
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Profile Picture</h2>
         <div className="flex items-center gap-5">
           <div className="relative">
-            <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center">
-              <span className="text-3xl font-bold text-primary">{userInitial}</span>
+            <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden border-2 border-border/50">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-3xl font-bold text-primary">{userInitial}</span>
+              )}
             </div>
-            <button className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-primary flex items-center justify-center border-2 border-card">
-              <Camera className="w-3.5 h-3.5 text-primary-foreground" />
+            <button
+              type="button"
+              onClick={handleAvatarClick}
+              disabled={avatarUploading}
+              className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-primary flex items-center justify-center border-2 border-card hover:bg-primary/90 transition-colors disabled:opacity-50"
+              title="Change profile picture"
+            >
+              {avatarUploading ? (
+                <Loader2 className="w-3.5 h-3.5 text-primary-foreground animate-spin" />
+              ) : (
+                <Camera className="w-3.5 h-3.5 text-primary-foreground" />
+              )}
             </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleAvatarChange}
+            />
           </div>
-          <div>
+
+          <div className="flex-1">
             <p className="font-semibold text-foreground">{fullName || "—"}</p>
             <p className="text-sm text-muted-foreground">{user?.email}</p>
             <p className="text-xs text-muted-foreground mt-1">Member since {memberSince}</p>
+            <div className="flex items-center gap-2 mt-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={handleAvatarClick}
+                disabled={avatarUploading}
+                className="h-7 text-xs gap-1.5"
+              >
+                <Camera className="w-3 h-3" />
+                {avatarUrl ? "Change Photo" : "Upload Photo"}
+              </Button>
+              {avatarUrl && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={handleRemoveAvatar}
+                  disabled={avatarUploading}
+                  className="h-7 text-xs gap-1.5 text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/5"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  Remove
+                </Button>
+              )}
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-1.5">JPG, PNG, GIF or WebP — max 5 MB</p>
           </div>
         </div>
       </div>
 
-      {/* Personal info form */}
       <form onSubmit={handleSave} className="bg-card border border-border/50 rounded-xl p-6 space-y-5">
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Personal Information</h2>
 
@@ -165,7 +292,6 @@ export default function ProfileSettings() {
         </div>
       </form>
 
-      {/* Account info */}
       <div className="bg-card border border-border/50 rounded-xl p-6">
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Account Information</h2>
         <div className="space-y-3">

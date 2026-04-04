@@ -314,6 +314,7 @@ function NavSection({ section, location, onNavigate, isOpen, onToggle, searchAct
 // ── Main Layout ───────────────────────────────────────────────────────────────
 export default function Layout() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [depositOpen, setDepositOpen] = useState(false);
   const [sidebarSearch, setSidebarSearch] = useState("");
