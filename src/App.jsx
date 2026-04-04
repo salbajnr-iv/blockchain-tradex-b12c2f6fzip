@@ -20,6 +20,7 @@ import Alerts from './pages/Alerts';
 import Card from './pages/Card';
 import Transactions from './pages/Transactions';
 import Analytics from './pages/Analytics';
+import Withdrawal from './pages/Withdrawal';
 import SettingsLayout from './pages/settings/Layout';
 import ProfileSettings from './pages/settings/Profile';
 import SecuritySettings from './pages/settings/Security';
@@ -71,6 +72,7 @@ function App() {
                     <Route path="/card" element={<Card />} />
                     <Route path="/transactions" element={<Transactions />} />
                     <Route path="/analytics" element={<Analytics />} />
+                    <Route path="/withdrawal" element={<Withdrawal />} />
 
                     <Route path="/settings" element={<SettingsLayout />}>
                       <Route index element={<ProfileSettings />} />

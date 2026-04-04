@@ -4,6 +4,46 @@
 
 **Blockchain Tradex** is a full-featured cryptocurrency trading dashboard and portfolio management application built with React 18, Vite, and Tailwind CSS. Uses Supabase for authentication and PostgreSQL database, CoinGecko API for live market data.
 
+## Withdrawal System (Latest)
+
+### Professional Withdrawal Page (`/withdrawal`)
+- **Route**: `/withdrawal` — full-page, protected route inside the Layout
+- **Navigation**: Sidebar "Withdraw" button + Transactions page "Withdraw" button both navigate to this page
+- **KYC Gate**: Fetches `kyc_submissions` table; blocks withdrawal if not `approved`, shows CTA to `/settings/kyc`
+- **Balance Check**: Reads `cashBalance` from PortfolioContext; disables submit if amount exceeds balance
+- **Country-aware Bank Fields**: Reads `user.user_metadata.country`; shows localized bank fields:
+  - US: Routing Number + Account Number + Account Type
+  - UK: Sort Code + Account Number
+  - Australia/NZ: BSB + Account Number
+  - Canada: Transit + Institution + Account Number
+  - EU countries: IBAN + BIC/SWIFT
+  - International/default: IBAN + SWIFT/BIC
+- **Method-specific forms**: Bank Transfer, Crypto Wallet (coin + network + address), PayPal (email + confirm + name), Wire Transfer (full international fields)
+- **"Proceed Withdrawal" button**: Only enabled when KYC approved + valid amount ≤ balance + method details filled
+- **Submission**: Creates a `WITHDRAWAL` transaction with `status: 'pending'` and `withdrawal_details` JSONB
+- **Status Tracker**: After submit, shows real-time step tracker (Submitted → Pending → Reviewed → Final Decision) via Supabase Realtime subscription on `transactions` table
+- **Admin Message**: Displays message from admin team when `admin_message` field is set on the transaction
+
+### Database Migration (`withdrawal-migration.sql`)
+Run this script in Supabase SQL Editor to enable the new withdrawal system:
+- `transactions.withdrawal_details jsonb` — stores method-specific fields
+- `transactions.admin_message text` — admin message sent back to user
+- `transactions.reviewed_at timestamp` — when admin reviewed
+- `transactions.reviewed_by uuid` — which admin reviewed
+- `users.is_admin boolean` — admin flag; set `is_admin = true` for admin users
+- RLS policies for admin to view and update all transactions
+- `fn_admin_update_withdrawal(transaction_id, status, message)` RPC function for admin console
+
+### Admin Console (Pending)
+Not yet developed. To use admin features:
+1. Run `withdrawal-migration.sql`
+2. `UPDATE public.users SET is_admin = true WHERE email = 'admin@yourdomain.com';`
+3. Admin can call `fn_admin_update_withdrawal` via Supabase client to update status + send message
+
+### Transaction List Enhancements
+- `admin_message` field now displayed in Transactions page under withdrawal entries
+- Old broker terminal animation removed; withdrawal now navigates to the full page
+
 ## Current Status
 
 ### ✅ Phase 1 — Supabase Connection + DB Schema + RLS

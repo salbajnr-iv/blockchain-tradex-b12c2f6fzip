@@ -7,7 +7,6 @@ import {
   Info, BarChart2, Zap, TrendingDown, CheckCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import WithdrawalSidebar from "@/components/crypto/WithdrawalSidebar";
 import DepositDialog from "@/components/crypto/DepositDialog";
 import NotificationCenter from "@/components/crypto/NotificationCenter";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -316,7 +315,6 @@ function NavSection({ section, location, onNavigate, isOpen, onToggle, searchAct
 export default function Layout() {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [depositOpen, setDepositOpen] = useState(false);
   const [sidebarSearch, setSidebarSearch] = useState("");
   const [openSections, setOpenSections] = useState(() =>
@@ -445,7 +443,7 @@ export default function Layout() {
               <PlusCircle className="w-3.5 h-3.5" />
               Add Funds
             </Button>
-            <Button onClick={() => setWithdrawOpen(true)} size="sm"
+            <Button onClick={() => navigate("/withdrawal")} size="sm"
               className="bg-primary hover:bg-primary/90 gap-1.5 text-xs rounded-xl h-9">
               <ArrowUpRight className="w-3.5 h-3.5" />
               Withdraw
@@ -501,11 +499,11 @@ export default function Layout() {
         </header>
 
         <main className="flex-1 p-4 md:p-6 overflow-auto">
-          <Outlet context={{ onDepositOpen: () => setDepositOpen(true), onWithdrawOpen: () => setWithdrawOpen(true) }} />
+          <Outlet context={{ onDepositOpen: () => setDepositOpen(true), onWithdrawOpen: () => navigate("/withdrawal") }} />
         </main>
       </div>
 
-      <WithdrawalSidebar open={withdrawOpen} onClose={() => setWithdrawOpen(false)} />
+
       <DepositDialog open={depositOpen} onClose={() => setDepositOpen(false)} />
       <NotificationCenter
         alerts={alerts}
