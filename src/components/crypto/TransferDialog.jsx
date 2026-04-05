@@ -14,49 +14,55 @@ import {
   Loader2, Copy, Users, Wallet, Send, RefreshCw, ChevronRight,
   ShieldCheck, UserCheck,
 } from "lucide-react";
-import { getMyTransferUid, lookupUserForTransfer, executeTransfer } from "@/lib/api/transfer";
+import { getMyTransferId, lookupUserForTransfer, executeTransfer } from "@/lib/api/transfer";
 
 const STEPS = ["recipient", "amount", "confirm", "success"];
 
-function MyTransferIdCard({ onClose }) {
-  const { data, isLoading } = useQuery({
-    queryKey: ["my-transfer-uid"],
-    queryFn: getMyTransferUid,
+function MyTransferIdCard() {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["my-transfer-id"],
+    queryFn: getMyTransferId,
     staleTime: Infinity,
   });
 
+  const transferId = data?.transfer_id ?? null;
+
   const handleCopy = () => {
-    if (!data?.transfer_uid) return;
-    navigator.clipboard.writeText(String(data.transfer_uid)).then(() => {
+    if (!transferId) return;
+    navigator.clipboard.writeText(transferId).then(() => {
       toast.success("Transfer ID copied!");
     });
   };
 
   return (
-    <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 flex items-center justify-between">
-      <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-          <UserCheck className="w-4 h-4 text-primary" />
+    <div className="bg-primary/5 border border-primary/20 rounded-xl p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+            <UserCheck className="w-4 h-4 text-primary" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs text-muted-foreground mb-0.5">Your Transfer ID</p>
+            {isLoading ? (
+              <div className="h-5 w-48 bg-secondary/80 rounded animate-pulse" />
+            ) : error || !transferId ? (
+              <p className="text-xs text-destructive">Could not load Transfer ID</p>
+            ) : (
+              <p className="font-mono font-bold text-foreground text-sm tracking-wider truncate">
+                {transferId}
+              </p>
+            )}
+          </div>
         </div>
-        <div>
-          <p className="text-xs text-muted-foreground">Your Transfer ID</p>
-          {isLoading ? (
-            <div className="h-5 w-24 bg-secondary/80 rounded animate-pulse mt-0.5" />
-          ) : (
-            <p className="font-mono font-bold text-foreground text-base tracking-wider">
-              {data?.transfer_uid ?? "—"}
-            </p>
-          )}
-        </div>
+        <button
+          onClick={handleCopy}
+          disabled={isLoading || !transferId}
+          className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors px-3 py-1.5 rounded-lg border border-primary/20 hover:bg-primary/5 shrink-0"
+        >
+          <Copy className="w-3 h-3" />
+          Copy
+        </button>
       </div>
-      <button
-        onClick={handleCopy}
-        disabled={isLoading || !data?.transfer_uid}
-        className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors px-3 py-1.5 rounded-lg border border-primary/20 hover:bg-primary/5"
-      >
-        <Copy className="w-3 h-3" />
-        Copy
-      </button>
     </div>
   );
 }
@@ -118,7 +124,7 @@ export default function TransferDialog({ open, onClose }) {
   const handleSubmitTransfer = async () => {
     setSubmitting(true);
     try {
-      const res = await executeTransfer(portfolioId, recipient.transfer_uid, parsedAmount, note.trim() || null);
+      const res = await executeTransfer(portfolioId, recipient.transfer_id, parsedAmount, note.trim() || null);
       setResult(res);
       setStep(3);
       queryClient.invalidateQueries({ queryKey: ["transactions", portfolioId] });
@@ -188,16 +194,15 @@ export default function TransferDialog({ open, onClose }) {
                   <label className="text-sm font-medium text-foreground">Recipient's Transfer ID</label>
                   <div className="flex gap-2">
                     <Input
-                      placeholder="e.g. 10000042"
+                      placeholder="e.g. xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                       value={recipientUid}
                       onChange={(e) => {
-                        setRecipientUid(e.target.value.replace(/\D/g, ""));
+                        setRecipientUid(e.target.value.trim());
                         setRecipient(null);
                         setLookupError("");
                       }}
                       onKeyDown={(e) => e.key === "Enter" && handleLookup()}
-                      className="bg-secondary/40 border-border font-mono"
-                      maxLength={12}
+                      className="bg-secondary/40 border-border font-mono text-xs"
                     />
                     <Button
                       onClick={handleLookup}
@@ -208,7 +213,7 @@ export default function TransferDialog({ open, onClose }) {
                       {lookingUp ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
                     </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground">Enter the 8-digit Transfer ID of the person you want to send funds to.</p>
+                  <p className="text-xs text-muted-foreground">Paste the Transfer ID (UUID) of the person you want to send funds to.</p>
                 </div>
 
                 <AnimatePresence>
@@ -233,7 +238,7 @@ export default function TransferDialog({ open, onClose }) {
                             <CheckCircle2 className="w-4 h-4 text-green-500" />
                           </div>
                           <p className="text-xs text-muted-foreground">@{recipient.username}</p>
-                          <p className="text-xs font-mono text-muted-foreground mt-0.5">ID: {recipient.transfer_uid}</p>
+                          <p className="text-xs font-mono text-muted-foreground mt-0.5 truncate max-w-[180px]">ID: {recipient.transfer_id}</p>
                         </div>
                       </div>
                     </motion.div>
@@ -259,7 +264,7 @@ export default function TransferDialog({ open, onClose }) {
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-foreground">{recipient?.display_name || recipient?.username}</p>
-                    <p className="text-xs text-muted-foreground">ID: {recipient?.transfer_uid}</p>
+                    <p className="text-xs font-mono text-muted-foreground truncate max-w-[160px]">ID: {recipient?.transfer_id?.slice(0, 18)}…</p>
                   </div>
                   <div className="ml-auto text-xs text-muted-foreground flex items-center gap-1">
                     <Wallet className="w-3.5 h-3.5" />
@@ -344,7 +349,7 @@ export default function TransferDialog({ open, onClose }) {
                       <span className="text-sm text-muted-foreground">To</span>
                       <div className="text-right">
                         <p className="text-sm font-semibold text-foreground">{recipient?.display_name || recipient?.username}</p>
-                        <p className="text-xs text-muted-foreground">ID: {recipient?.transfer_uid}</p>
+                        <p className="text-xs font-mono text-muted-foreground truncate">{recipient?.transfer_id?.slice(0, 18)}…</p>
                       </div>
                     </div>
                     <div className="flex items-center justify-between px-4 py-3">

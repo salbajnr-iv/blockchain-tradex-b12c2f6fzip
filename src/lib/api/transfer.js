@@ -1,31 +1,31 @@
 import { supabase } from '@/lib/supabaseClient';
 
-export const getMyTransferUid = async () => {
+export const getMyTransferId = async () => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
   const { data, error } = await supabase
     .from('users')
-    .select('transfer_uid, username')
+    .select('transfer_id, username, display_name')
     .eq('id', user.id)
     .single();
   if (error) throw error;
   return data;
 };
 
-export const lookupUserForTransfer = async (transferUid) => {
-  const uid = parseInt(transferUid, 10);
-  if (isNaN(uid)) throw new Error('Invalid Transfer ID — must be a number');
-  const { data, error } = await supabase.rpc('fn_lookup_user_for_transfer', {
-    p_transfer_uid: uid,
+export const lookupUserForTransfer = async (transferId) => {
+  const trimmed = transferId.trim();
+  if (!trimmed) throw new Error('Please enter a Transfer ID');
+  const { data, error } = await supabase.rpc('fn_lookup_user_by_transfer_id', {
+    p_transfer_id: trimmed,
   });
   if (error) throw error;
   return data;
 };
 
-export const executeTransfer = async (fromPortfolioId, toTransferUid, amount, note) => {
-  const { data, error } = await supabase.rpc('fn_transfer_funds', {
+export const executeTransfer = async (fromPortfolioId, toTransferId, amount, note) => {
+  const { data, error } = await supabase.rpc('fn_transfer_funds_by_id', {
     p_from_portfolio_id: fromPortfolioId,
-    p_to_transfer_uid:   parseInt(toTransferUid, 10),
+    p_to_transfer_id:    toTransferId,
     p_amount:            parseFloat(amount),
     p_note:              note || null,
   });
