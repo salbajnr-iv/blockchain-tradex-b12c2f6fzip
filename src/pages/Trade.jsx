@@ -487,6 +487,14 @@ export default function Trade() {
         </div>
       </div>
 
+      {/* Stale price warning */}
+      {coin?.isStale && (
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-2.5 flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400">
+          <Info className="w-3.5 h-3.5 shrink-0" />
+          Live prices unavailable — showing estimated prices. Use Limit order to set your own price.
+        </div>
+      )}
+
       {/* Stats bar */}
       {coin && (
         <div className="bg-card border border-border/50 rounded-xl px-4 py-3 flex flex-wrap gap-4 items-center">

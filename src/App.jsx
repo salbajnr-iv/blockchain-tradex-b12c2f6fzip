@@ -6,6 +6,7 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { supabaseMisconfigured } from '@/lib/supabaseClient';
 import { PortfolioProvider } from '@/contexts/PortfolioContext';
+import { LivePricesProvider } from '@/contexts/LivePricesContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -36,6 +37,7 @@ function App() {
     <ThemeProvider>
       <AuthProvider>
         <PortfolioProvider>
+          <LivePricesProvider>
           <QueryClientProvider client={queryClientInstance}>
             {supabaseMisconfigured && (
               <div style={{
@@ -94,6 +96,7 @@ function App() {
             </Router>
             <Toaster />
           </QueryClientProvider>
+          </LivePricesProvider>
         </PortfolioProvider>
       </AuthProvider>
     </ThemeProvider>
