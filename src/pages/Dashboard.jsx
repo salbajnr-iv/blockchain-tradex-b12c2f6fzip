@@ -3,6 +3,7 @@ import { useOutletContext } from "react-router-dom";
 import PortfolioStats from "@/components/crypto/PortfolioStats";
 import PriceChart from "@/components/crypto/PriceChart";
 import RecentTrades from "@/components/crypto/RecentTrades";
+import AssetsPanel from "@/components/crypto/AssetsPanel";
 import { useLivePrices } from "@/hooks/useLivePrices";
 import { usePortfolio } from "@/contexts/PortfolioContext";
 import { useQuery } from "@tanstack/react-query";
@@ -12,7 +13,7 @@ import { motion } from "framer-motion";
 import {
   TrendingUp, TrendingDown, ArrowUpRight, ArrowDownLeft, Zap,
   PlusCircle, ArrowUpRight as WithdrawIcon, BarChart3, Bell,
-  DollarSign, Activity, Target, Clock, Sparkles,
+  DollarSign, Activity, Clock, Sparkles,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -221,50 +222,6 @@ function RecentActivity({ trades, transactions }) {
   );
 }
 
-function HoldingsSummary({ cryptoList }) {
-  const holdings = cryptoList.filter(c => c.holdings > 0);
-  if (holdings.length === 0) return null;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.5 }}
-      className="bg-card border border-border/50 rounded-xl"
-    >
-      <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/30">
-        <div className="flex items-center gap-2">
-          <Target className="w-3.5 h-3.5 text-primary" />
-          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Your Holdings</span>
-        </div>
-        <Link to="/analytics" className="text-xs text-primary hover:text-primary/80 font-medium">Analytics</Link>
-      </div>
-      <div className="divide-y divide-border/20">
-        {holdings.map((coin) => {
-          const isPos = (coin.change24h || 0) >= 0;
-          const value = coin.holdings * coin.price;
-          return (
-            <Link to={`/trade?coin=${coin.symbol}`} key={coin.symbol} className="flex items-center justify-between px-5 py-3 hover:bg-secondary/20 transition-colors">
-              <div className="flex items-center gap-3">
-                <span className="text-xl">{coin.icon}</span>
-                <div>
-                  <p className="text-sm font-semibold text-foreground">{coin.symbol}</p>
-                  <p className="text-xs text-muted-foreground">{Number(coin.holdings).toLocaleString(undefined, { maximumFractionDigits: 6 })} coins</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-bold text-foreground">${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
-                <p className={`text-xs font-medium ${isPos ? "text-primary" : "text-destructive"}`}>
-                  {isPos ? "+" : ""}{coin.change24h?.toFixed(2)}%
-                </p>
-              </div>
-            </Link>
-          );
-        })}
-      </div>
-    </motion.div>
-  );
-}
 
 export default function Dashboard() {
   const { onDepositOpen, onWithdrawOpen } = useOutletContext() || {};
@@ -321,11 +278,11 @@ export default function Dashboard() {
       {/* Top movers */}
       <TopMovers cryptoList={cryptoList} />
 
-      {/* Bottom grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <RecentActivity trades={trades} transactions={transactions} />
-        <HoldingsSummary cryptoList={cryptoList} />
-      </div>
+      {/* My Assets — full-width prominent section */}
+      <AssetsPanel />
+
+      {/* Bottom grid: recent activity */}
+      <RecentActivity trades={trades} transactions={transactions} />
     </div>
   );
 }
