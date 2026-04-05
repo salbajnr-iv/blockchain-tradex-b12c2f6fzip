@@ -312,8 +312,11 @@ export default function Register() {
                     {agreeTerms && <CheckCircle2 className="w-3 h-3 text-primary-foreground" />}
                   </div>
                   <label className="text-xs text-muted-foreground leading-relaxed cursor-pointer" onClick={() => setAgreeTerms(!agreeTerms)}>
-                    I agree to the <span className="text-primary font-medium hover:underline">Terms of Service</span> and{' '}
-                    <span className="text-primary font-medium hover:underline">Privacy Policy</span>. I confirm I am at least 18 years old.
+                    I agree to the{' '}
+                    <Link to="/terms" className="text-primary font-medium hover:underline" onClick={(e) => e.stopPropagation()}>Terms of Service</Link>{' '}
+                    and{' '}
+                    <Link to="/privacy" className="text-primary font-medium hover:underline" onClick={(e) => e.stopPropagation()}>Privacy Policy</Link>.{' '}
+                    I confirm I am at least 18 years old.
                   </label>
                 </div>
 

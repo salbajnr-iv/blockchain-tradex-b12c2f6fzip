@@ -188,9 +188,9 @@ export default function Login() {
 
             <p className="text-center text-xs text-muted-foreground mt-6">
               By signing in you agree to our{' '}
-              <span className="text-primary cursor-pointer hover:underline">Terms of Service</span>{' '}
+              <Link to="/terms" className="text-primary hover:underline">Terms of Service</Link>{' '}
               and{' '}
-              <span className="text-primary cursor-pointer hover:underline">Privacy Policy</span>.
+              <Link to="/privacy" className="text-primary hover:underline">Privacy Policy</Link>.
             </p>
           </div>
         </div>

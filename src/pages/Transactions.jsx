@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listTransactions } from "@/lib/api/transactions";
 import { listTrades } from "@/lib/api/portfolio";
@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabaseClient";
 import {
   ArrowUpRight, ArrowDownLeft, Clock, CheckCircle2, XCircle,
   Loader2, Send, BarChart3, Search, SlidersHorizontal, X, MessageSquare,
+  Download, Receipt, Copy, CheckCheck, ExternalLink,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { format, startOfDay, startOfWeek, startOfMonth } from "date-fns";
@@ -17,6 +18,7 @@ import { toast } from "sonner";
 import DepositDialog from "@/components/crypto/DepositDialog";
 import TransferDialog from "@/components/crypto/TransferDialog";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/lib/AuthContext";
 
 const METHOD_LABELS = {
   bank_transfer: "Bank Transfer",
@@ -51,12 +53,307 @@ function getDateCutoff(range) {
   }
 }
 
+function getStatusIcon(status, size = "w-5 h-5") {
+  switch ((status || "").toLowerCase()) {
+    case "completed": return <CheckCircle2 className={`${size} text-primary`} />;
+    case "pending":   return <Clock className={`${size} text-yellow-400`} />;
+    case "failed":    return <XCircle className={`${size} text-destructive`} />;
+    default:          return null;
+  }
+}
+
+function getStatusColor(status) {
+  switch ((status || "").toLowerCase()) {
+    case "completed": return "bg-primary/10 text-primary";
+    case "pending":   return "bg-yellow-400/10 text-yellow-400";
+    case "failed":    return "bg-destructive/10 text-destructive";
+    default:          return "bg-muted text-muted-foreground";
+  }
+}
+
+// ── Transaction Detail Modal ───────────────────────────────────────────────────
+function TransactionDetailModal({ item, onClose }) {
+  const receiptRef = useRef(null);
+  const [copied, setCopied] = useState(false);
+
+  if (!item) return null;
+
+  const isTrade = item._source === "trade";
+  const isBuy = item.type === "BUY";
+  const isDeposit = item.type === "DEPOSIT";
+  const isTransfer = item.type === "TRANSFER";
+  const isIn = item.transfer_direction === "IN";
+
+  const txId = item.id || "—";
+  const dateStr = item._date ? format(item._date, "MMMM d, yyyy 'at' h:mm:ss a") : "—";
+
+  let title = "";
+  let amount = "";
+  let amountColor = "text-foreground";
+  let typeLabel = "";
+
+  if (isTrade) {
+    title = `${isBuy ? "Bought" : "Sold"} ${item.symbol}`;
+    amount = `${isBuy ? "+" : "-"}${Number(item.quantity).toLocaleString(undefined, { maximumFractionDigits: 6 })} ${item.symbol}`;
+    amountColor = isBuy ? "text-primary" : "text-destructive";
+    typeLabel = isBuy ? "Buy Order" : "Sell Order";
+  } else if (isTransfer) {
+    title = isIn ? "Received Transfer" : "Sent Transfer";
+    amount = `${isIn ? "+" : "−"}$${Number(item.total_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+    amountColor = isIn ? "text-primary" : "text-blue-400";
+    typeLabel = "Internal Transfer";
+  } else {
+    title = item.type === "WITHDRAWAL" ? "Withdrawal" : item.type === "DEPOSIT" ? "Deposit" : item.type;
+    amount = item.total_amount != null
+      ? `${isDeposit ? "+" : ""}$${Number(item.total_amount).toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+      : "—";
+    amountColor = isDeposit ? "text-primary" : "text-foreground";
+    typeLabel = item.type === "WITHDRAWAL" ? "Withdrawal" : "Deposit";
+  }
+
+  const copyId = () => {
+    navigator.clipboard.writeText(txId);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const saveReceipt = async () => {
+    try {
+      const { default: jsPDF } = await import("jspdf");
+      const doc = new jsPDF({ unit: "pt", format: "a5" });
+      const W = doc.internal.pageSize.getWidth();
+
+      const primaryColor = [16, 185, 129];
+      const darkColor = [15, 23, 42];
+      const mutedColor = [100, 116, 139];
+      const lightBg = [248, 250, 252];
+
+      doc.setFillColor(...darkColor);
+      doc.rect(0, 0, W, 110, "F");
+
+      doc.setFillColor(...primaryColor);
+      doc.rect(0, 100, W, 4, "F");
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(22);
+      doc.text("BlockTrade", 40, 45);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.setTextColor(160, 180, 200);
+      doc.text("Transaction Receipt", 40, 65);
+      doc.text("blocktrade.com", 40, 82);
+
+      doc.setFillColor(...lightBg);
+      doc.roundedRect(30, 120, W - 60, 80, 6, 6, "F");
+
+      doc.setTextColor(...darkColor);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(13);
+      doc.text(title, W / 2, 150, { align: "center" });
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(26);
+      doc.setTextColor(...primaryColor);
+      doc.text(amount, W / 2, 185, { align: "center" });
+
+      const rows = [];
+      rows.push(["Date", dateStr]);
+      rows.push(["Status", (item.status || "Completed").toUpperCase()]);
+      rows.push(["Type", typeLabel]);
+      rows.push(["Transaction ID", txId]);
+
+      if (isTrade) {
+        rows.push(["Asset", item.symbol]);
+        rows.push(["Quantity", Number(item.quantity).toLocaleString(undefined, { maximumFractionDigits: 8 })]);
+        rows.push(["Unit Price", `$${Number(item.unit_price).toLocaleString(undefined, { maximumFractionDigits: 6 })}`]);
+        const totalValue = Number(item.quantity) * Number(item.unit_price);
+        rows.push(["Total Value", `$${totalValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}`]);
+        if (item.fees > 0) rows.push(["Fees", `$${Number(item.fees).toFixed(4)}`]);
+      } else if (isTransfer) {
+        rows.push(["Direction", isIn ? "Received" : "Sent"]);
+        rows.push([isIn ? "From" : "To", `@${item.counterparty_username || item.counterparty_uid || "—"}`]);
+        rows.push(["Amount", `$${Number(item.total_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}`]);
+        rows.push(["Fee", "Free"]);
+      } else {
+        if (item.payment_method) rows.push(["Payment Method", METHOD_LABELS[item.payment_method] || item.payment_method]);
+        if (item.total_amount != null) rows.push(["Amount", `$${Number(item.total_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}`]);
+        if (item.notes) rows.push(["Notes", item.notes]);
+        if (item.admin_message) rows.push(["Team Message", item.admin_message]);
+      }
+
+      let y = 225;
+      const rowH = 28;
+      rows.forEach((row, i) => {
+        if (i % 2 === 0) {
+          doc.setFillColor(248, 250, 252);
+          doc.rect(30, y - 10, W - 60, rowH, "F");
+        }
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.setTextColor(...mutedColor);
+        doc.text(row[0], 40, y + 6);
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.setTextColor(...darkColor);
+        const val = String(row[1]);
+        doc.text(val.length > 38 ? val.slice(0, 35) + "..." : val, W - 40, y + 6, { align: "right" });
+        y += rowH;
+      });
+
+      y += 20;
+      doc.setFillColor(...primaryColor);
+      doc.rect(30, y, W - 60, 1, "F");
+      y += 20;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(...mutedColor);
+      doc.text("This is an official receipt from BlockTrade. For support, contact support@blocktrade.com", W / 2, y, { align: "center" });
+      y += 15;
+      doc.text(`Generated on ${format(new Date(), "MMMM d, yyyy 'at' h:mm a")}`, W / 2, y, { align: "center" });
+
+      const filename = `blocktrade-receipt-${txId.slice(0, 8)}-${format(new Date(), "yyyy-MM-dd")}.pdf`;
+      doc.save(filename);
+      toast.success("Receipt saved as PDF");
+    } catch (err) {
+      console.error("PDF generation failed:", err);
+      toast.error("Failed to generate receipt");
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+        onClick={(e) => e.target === e.currentTarget && onClose()}
+      >
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 20 }}
+          transition={{ type: "spring", duration: 0.35 }}
+          className="bg-card border border-border/60 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+          ref={receiptRef}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-4 border-b border-border/50">
+            <div className="flex items-center gap-2.5">
+              <Receipt className="w-4 h-4 text-primary" />
+              <span className="font-semibold text-foreground">Transaction Details</span>
+            </div>
+            <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors rounded-lg p-1 hover:bg-secondary/60">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Amount hero */}
+          <div className="px-5 py-6 text-center border-b border-border/30 bg-secondary/20">
+            <p className="text-xs text-muted-foreground uppercase tracking-widest mb-2 font-semibold">{typeLabel}</p>
+            <p className={`text-3xl font-bold ${amountColor} mb-1`}>{amount}</p>
+            <p className="text-sm text-muted-foreground">{title}</p>
+            <div className={`inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-full text-xs font-semibold ${getStatusColor(item.status || "completed")}`}>
+              {getStatusIcon(item.status || "completed", "w-3.5 h-3.5")}
+              <span className="capitalize">{(item.status || "completed")}</span>
+            </div>
+          </div>
+
+          {/* Details */}
+          <div className="px-5 py-4 space-y-3">
+            <DetailRow label="Date & Time" value={dateStr} />
+            <DetailRow label="Type" value={typeLabel} />
+
+            {isTrade && (
+              <>
+                <DetailRow label="Asset" value={item.symbol} />
+                <DetailRow label="Quantity" value={`${Number(item.quantity).toLocaleString(undefined, { maximumFractionDigits: 8 })} ${item.symbol}`} />
+                <DetailRow label="Unit Price" value={`$${Number(item.unit_price).toLocaleString(undefined, { maximumFractionDigits: 6 })}`} />
+                <DetailRow label="Total Value" value={`$${(Number(item.quantity) * Number(item.unit_price)).toLocaleString(undefined, { maximumFractionDigits: 2 })}`} />
+                {item.fees > 0 && <DetailRow label="Fees" value={`$${Number(item.fees).toFixed(4)}`} />}
+              </>
+            )}
+
+            {isTransfer && (
+              <>
+                <DetailRow label="Direction" value={isIn ? "Received" : "Sent"} />
+                <DetailRow label={isIn ? "From" : "To"} value={`@${item.counterparty_username || item.counterparty_uid || "—"}`} />
+                <DetailRow label="Amount" value={`$${Number(item.total_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}`} />
+                <DetailRow label="Fee" value="Free" />
+                {item.notes && <DetailRow label="Note" value={item.notes} />}
+              </>
+            )}
+
+            {!isTrade && !isTransfer && (
+              <>
+                {item.payment_method && <DetailRow label="Payment Method" value={METHOD_LABELS[item.payment_method] || item.payment_method} />}
+                {item.total_amount != null && <DetailRow label="Amount" value={`$${Number(item.total_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}`} />}
+                {item.notes && <DetailRow label="Notes" value={item.notes} />}
+                {item.admin_message && (
+                  <div className="bg-primary/5 border border-primary/20 rounded-xl px-3 py-2.5">
+                    <p className="text-xs font-semibold text-primary mb-0.5">Message from our team</p>
+                    <p className="text-xs text-foreground">{item.admin_message}</p>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Transaction ID */}
+            <div className="pt-1">
+              <p className="text-xs text-muted-foreground mb-1.5">Transaction ID</p>
+              <div className="flex items-center gap-2 bg-secondary/50 rounded-xl px-3 py-2">
+                <span className="text-xs font-mono text-foreground flex-1 truncate">{txId}</span>
+                <button onClick={copyId} className="text-muted-foreground hover:text-primary transition-colors shrink-0">
+                  {copied ? <CheckCheck className="w-3.5 h-3.5 text-primary" /> : <Copy className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="px-5 pb-5 pt-1 flex gap-2">
+            <Button
+              variant="outline"
+              className="flex-1 gap-2 border-border/50 text-sm"
+              onClick={onClose}
+            >
+              Close
+            </Button>
+            <Button
+              className="flex-1 gap-2 bg-primary hover:bg-primary/90 text-sm"
+              onClick={saveReceipt}
+            >
+              <Download className="w-4 h-4" />
+              Save Receipt
+            </Button>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+function DetailRow({ label, value }) {
+  return (
+    <div className="flex items-start justify-between gap-3 py-1.5 border-b border-border/20 last:border-0">
+      <span className="text-xs text-muted-foreground shrink-0 pt-0.5">{label}</span>
+      <span className="text-xs font-medium text-foreground text-right">{value}</span>
+    </div>
+  );
+}
+
+// ── Main Component ─────────────────────────────────────────────────────────────
 export default function Transactions() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [depositDialog, setDepositDialog] = useState(false);
   const [transferDialog, setTransferDialog] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
 
-  // Filters
   const [searchSymbol, setSearchSymbol] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [dateRange, setDateRange] = useState("all");
@@ -80,7 +377,6 @@ export default function Transactions() {
 
   const isLoading = txLoading || tradesLoading;
 
-  // Supabase Realtime — subscribe to new trades and transactions
   useEffect(() => {
     if (!portfolioId) return;
 
@@ -114,18 +410,17 @@ export default function Transactions() {
     };
   }, [portfolioId, queryClient]);
 
-  // Combine all activity — BUY/SELL come from trades table to avoid duplicates
   const allActivity = useMemo(() => {
     const combined = [
       ...transactions
         .filter((t) => t.type !== "BUY" && t.type !== "SELL")
         .map((t) => ({
-        ...t,
-        _source: "transaction",
-        _type: t.type,
-        _symbol: null,
-        _date: new Date(t.transaction_date),
-      })),
+          ...t,
+          _source: "transaction",
+          _type: t.type,
+          _symbol: null,
+          _date: new Date(t.transaction_date),
+        })),
       ...trades.map((t) => ({
         ...t,
         _source: "trade",
@@ -138,7 +433,6 @@ export default function Transactions() {
     return combined;
   }, [transactions, trades]);
 
-  // Apply filters
   const filtered = useMemo(() => {
     const cutoff = getDateCutoff(dateRange);
     return allActivity.filter((item) => {
@@ -153,25 +447,9 @@ export default function Transactions() {
     });
   }, [allActivity, typeFilter, dateRange, searchSymbol]);
 
-  const getStatusIcon = (status) => {
-    switch ((status || "").toLowerCase()) {
-      case "completed": return <CheckCircle2 className="w-5 h-5 text-primary" />;
-      case "pending":   return <Clock className="w-5 h-5 text-yellow-400" />;
-      case "failed":    return <XCircle className="w-5 h-5 text-destructive" />;
-      default:          return null;
-    }
-  };
-
-  const getStatusColor = (status) => {
-    switch ((status || "").toLowerCase()) {
-      case "completed": return "bg-primary/10 text-primary";
-      case "pending":   return "bg-yellow-400/10 text-yellow-400";
-      case "failed":    return "bg-destructive/10 text-destructive";
-      default:          return "bg-muted text-muted-foreground";
-    }
-  };
-
   const renderActivity = (item, index) => {
+    const handleClick = () => setSelectedItem(item);
+
     if (item._source === "trade") {
       const isBuy = item.type === "BUY";
       return (
@@ -180,11 +458,12 @@ export default function Transactions() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: Math.min(index * 0.03, 0.3) }}
-          className="bg-card rounded-lg border border-border/50 p-4 hover:border-primary/30 transition-colors"
+          onClick={handleClick}
+          className="bg-card rounded-lg border border-border/50 p-4 hover:border-primary/40 hover:shadow-md transition-all cursor-pointer group"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="p-2.5 rounded-lg bg-secondary/50">
+              <div className="p-2.5 rounded-lg bg-secondary/50 group-hover:bg-secondary transition-colors">
                 {isBuy
                   ? <ArrowDownLeft className="w-5 h-5 text-primary" />
                   : <ArrowUpRight className="w-5 h-5 text-destructive" />}
@@ -212,13 +491,13 @@ export default function Transactions() {
                 {getStatusIcon(item.status)}
                 <span className="text-xs font-medium capitalize">{item.status}</span>
               </div>
+              <ExternalLink className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-primary/60 transition-colors shrink-0" />
             </div>
           </div>
         </motion.div>
       );
     }
 
-    // Internal Transfer
     if (item.type === "TRANSFER") {
       const isIn = item.transfer_direction === "IN";
       return (
@@ -227,7 +506,8 @@ export default function Transactions() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: Math.min(index * 0.03, 0.3) }}
-          className="bg-card rounded-lg border border-border/50 p-4 hover:border-primary/30 transition-colors"
+          onClick={handleClick}
+          className="bg-card rounded-lg border border-border/50 p-4 hover:border-primary/40 hover:shadow-md transition-all cursor-pointer group"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -242,7 +522,6 @@ export default function Transactions() {
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {isIn ? "From" : "To"}: <span className="font-medium text-foreground/80">@{item.counterparty_username || "—"}</span>
-                  <span className="ml-1 font-mono text-muted-foreground/70">({item.counterparty_uid})</span>
                 </p>
                 <p className="text-xs text-muted-foreground">{format(item._date, "MMM d, yyyy • h:mm a")}</p>
               </div>
@@ -258,6 +537,7 @@ export default function Transactions() {
                 <CheckCircle2 className="w-4 h-4" />
                 <span className="text-xs font-medium">Completed</span>
               </div>
+              <ExternalLink className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-primary/60 transition-colors shrink-0" />
             </div>
           </div>
           {item.notes && (
@@ -267,7 +547,6 @@ export default function Transactions() {
       );
     }
 
-    // Withdrawal / Deposit
     const typeLabel = item.type === "WITHDRAWAL" ? "Withdrawal"
       : item.type === "DEPOSIT" ? "Deposit"
       : item.type;
@@ -279,11 +558,12 @@ export default function Transactions() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: Math.min(index * 0.03, 0.3) }}
-        className="bg-card rounded-lg border border-border/50 p-4 hover:border-primary/30 transition-colors"
+        onClick={handleClick}
+        className="bg-card rounded-lg border border-border/50 p-4 hover:border-primary/40 hover:shadow-md transition-all cursor-pointer group"
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="p-2.5 rounded-lg bg-secondary/50">
+            <div className="p-2.5 rounded-lg bg-secondary/50 group-hover:bg-secondary transition-colors">
               {isDeposit
                 ? <ArrowDownLeft className="w-5 h-5 text-primary" />
                 : <ArrowUpRight className="w-5 h-5 text-yellow-400" />}
@@ -312,6 +592,7 @@ export default function Transactions() {
               {getStatusIcon(item.status)}
               <span className="text-xs font-medium capitalize">{item.status}</span>
             </div>
+            <ExternalLink className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-primary/60 transition-colors shrink-0" />
           </div>
         </div>
         {item.notes && (
@@ -340,7 +621,7 @@ export default function Transactions() {
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground mb-1">Transactions</h1>
-            <p className="text-muted-foreground text-sm">All trades, deposits, and withdrawals</p>
+            <p className="text-muted-foreground text-sm">All trades, deposits, and withdrawals · Click any row to view details</p>
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -387,7 +668,6 @@ export default function Transactions() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {/* Symbol search */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
               <Input
@@ -398,7 +678,6 @@ export default function Transactions() {
               />
             </div>
 
-            {/* Type filter */}
             <Select value={typeFilter} onValueChange={setTypeFilter}>
               <SelectTrigger className="bg-secondary/50 border-border/50 h-9 text-sm">
                 <SelectValue placeholder="Type" />
@@ -410,7 +689,6 @@ export default function Transactions() {
               </SelectContent>
             </Select>
 
-            {/* Date range */}
             <div className="flex gap-1">
               {DATE_RANGES.map((r) => (
                 <button
@@ -458,6 +736,14 @@ export default function Transactions() {
 
         <DepositDialog open={depositDialog} onClose={() => setDepositDialog(false)} />
         <TransferDialog open={transferDialog} onClose={() => setTransferDialog(false)} />
+
+        {/* Transaction Detail Modal */}
+        {selectedItem && (
+          <TransactionDetailModal
+            item={selectedItem}
+            onClose={() => setSelectedItem(null)}
+          />
+        )}
       </div>
     </div>
   );

@@ -28,6 +28,8 @@ import AppearanceSettings from './pages/settings/Appearance';
 import NotificationPrefs from './pages/settings/NotificationPrefs';
 import PaymentsSettings from './pages/settings/Payments';
 import KycSettings from './pages/settings/Kyc';
+import TermsOfService from './pages/TermsOfService';
+import PrivacyPolicy from './pages/PrivacyPolicy';
 
 function App() {
   return (
@@ -62,6 +64,8 @@ function App() {
                 } />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/terms" element={<TermsOfService />} />
+                <Route path="/privacy" element={<PrivacyPolicy />} />
 
                 <Route element={<ProtectedRoute />}>
                   <Route element={<Layout />}>

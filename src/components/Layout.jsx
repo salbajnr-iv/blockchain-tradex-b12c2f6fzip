@@ -326,7 +326,7 @@ export default function Layout() {
 
   const { portfolioTotal, isLoading, lastUpdated, refetch, cryptoList } = useLivePrices();
   const { cashBalance, portfolioId } = usePortfolio();
-  const { user, signOut } = useAuth();
+  const { user, signOut, avatarUrl } = useAuth();
 
   const { data: alerts = [] } = useQuery({
     queryKey: ["alerts", portfolioId],
@@ -384,8 +384,12 @@ export default function Layout() {
         {/* User profile */}
         <div className="px-3 pt-4 pb-3 border-b border-border/50">
           <div className="flex items-center gap-3 px-2 py-2.5 rounded-xl bg-secondary/40">
-            <div className="w-9 h-9 rounded-full bg-primary/30 flex items-center justify-center shrink-0">
-              <span className="text-sm font-bold text-primary">{userInitial}</span>
+            <div className="w-9 h-9 rounded-full bg-primary/30 flex items-center justify-center shrink-0 overflow-hidden border border-border/40">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt={displayName} className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-sm font-bold text-primary">{userInitial}</span>
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-foreground truncate">{displayName}</p>
@@ -496,8 +500,12 @@ export default function Layout() {
               <RefreshCw className="w-4 h-4" />
             </Button>
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-primary/30 flex items-center justify-center">
-                <span className="text-xs font-bold text-primary">{userInitial}</span>
+              <div className="w-8 h-8 rounded-full bg-primary/30 flex items-center justify-center overflow-hidden border border-border/40">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt={displayName} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-xs font-bold text-primary">{userInitial}</span>
+                )}
               </div>
               <span className="hidden lg:block text-sm font-medium text-foreground max-w-[120px] truncate">
                 {displayName}

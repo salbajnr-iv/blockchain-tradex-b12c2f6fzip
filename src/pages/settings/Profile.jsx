@@ -26,7 +26,7 @@ const COUNTRIES = [
 ];
 
 export default function ProfileSettings() {
-  const { user } = useAuth();
+  const { user, refreshAvatar } = useAuth();
   const { portfolioId } = usePortfolio();
 
   const [fullName, setFullName] = useState(user?.user_metadata?.full_name || "");
@@ -95,6 +95,7 @@ export default function ProfileSettings() {
       });
 
       toast.success("Profile picture updated");
+      refreshAvatar();
     } catch (err) {
       toast.error(err.message || "Failed to upload avatar");
     } finally {
@@ -111,6 +112,7 @@ export default function ProfileSettings() {
       await supabase.storage.from("avatars").remove([storedPath]);
       await supabase.auth.updateUser({ data: { avatar_path: null } });
       setAvatarUrl(null);
+      refreshAvatar();
       toast.success("Profile picture removed");
     } catch (err) {
       toast.error(err.message || "Failed to remove avatar");
