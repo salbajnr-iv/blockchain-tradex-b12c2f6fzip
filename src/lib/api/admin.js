@@ -15,48 +15,87 @@ export const getAdminStatus = async () => {
   return data.is_admin === true
 }
 
+// ── Helper: fetch users by IDs ───────────────────────────────────────────────
+const fetchUsersByIds = async (userIds) => {
+  if (!userIds || userIds.length === 0) return {}
+  const unique = [...new Set(userIds)]
+  const { data, error } = await supabase
+    .from('users')
+    .select('id, email, full_name, username')
+    .in('id', unique)
+  if (error) throw error
+  const map = {}
+  ;(data ?? []).forEach(u => { map[u.id] = u })
+  return map
+}
+
+// ── Helper: fetch portfolios by IDs ──────────────────────────────────────────
+const fetchPortfoliosByIds = async (portfolioIds) => {
+  if (!portfolioIds || portfolioIds.length === 0) return {}
+  const unique = [...new Set(portfolioIds)]
+  const { data, error } = await supabase
+    .from('portfolios')
+    .select('id, user_id, cash_balance, total_value')
+    .in('id', unique)
+  if (error) throw error
+  const map = {}
+  ;(data ?? []).forEach(p => { map[p.id] = p })
+  return map
+}
+
 // ── Fetch all pending withdrawal transactions (admin only) ───────────────────
 export const getPendingWithdrawals = async () => {
-  const { data, error } = await supabase
+  const { data: txs, error } = await supabase
     .from('transactions')
-    .select(`
-      *,
-      portfolios!portfolio_id (
-        id,
-        user_id,
-        users!user_id ( id, email, full_name, username )
-      )
-    `)
+    .select('*')
     .eq('type', 'WITHDRAWAL')
     .eq('status', 'pending')
     .order('transaction_date', { ascending: false })
 
   if (error) throw error
-  return (data ?? []).map(tx => ({
-    ...tx,
-    portfolios: tx.portfolios
-      ? { ...tx.portfolios, users: tx.portfolios.users }
-      : null,
-  }))
+  if (!txs || txs.length === 0) return []
+
+  const portfolioIds = txs.map(t => t.portfolio_id).filter(Boolean)
+  const portfolioMap = await fetchPortfoliosByIds(portfolioIds)
+
+  const userIds = Object.values(portfolioMap).map(p => p.user_id).filter(Boolean)
+  const userMap = await fetchUsersByIds(userIds)
+
+  return txs.map(tx => {
+    const portfolio = portfolioMap[tx.portfolio_id] ?? null
+    const user = portfolio ? (userMap[portfolio.user_id] ?? null) : null
+    return {
+      ...tx,
+      portfolios: portfolio ? { ...portfolio, users: user } : null,
+    }
+  })
 }
 
 // ── Fetch ALL withdrawal transactions (admin only) ────────────────────────────
 export const getAllWithdrawals = async () => {
-  const { data, error } = await supabase
+  const { data: txs, error } = await supabase
     .from('transactions')
-    .select(`
-      *,
-      portfolios!portfolio_id (
-        id,
-        user_id,
-        users!user_id ( id, email, full_name, username )
-      )
-    `)
+    .select('*')
     .eq('type', 'WITHDRAWAL')
     .order('transaction_date', { ascending: false })
 
   if (error) throw error
-  return data ?? []
+  if (!txs || txs.length === 0) return []
+
+  const portfolioIds = txs.map(t => t.portfolio_id).filter(Boolean)
+  const portfolioMap = await fetchPortfoliosByIds(portfolioIds)
+
+  const userIds = Object.values(portfolioMap).map(p => p.user_id).filter(Boolean)
+  const userMap = await fetchUsersByIds(userIds)
+
+  return txs.map(tx => {
+    const portfolio = portfolioMap[tx.portfolio_id] ?? null
+    const user = portfolio ? (userMap[portfolio.user_id] ?? null) : null
+    return {
+      ...tx,
+      portfolios: portfolio ? { ...portfolio, users: user } : null,
+    }
+  })
 }
 
 // ── Call the existing fn_admin_update_withdrawal RPC ─────────────────────────
@@ -71,31 +110,41 @@ export const adminUpdateWithdrawal = async (transactionId, status, adminMessage 
 
 // ── Fetch all pending KYC submissions (admin only) ───────────────────────────
 export const getPendingKycSubmissions = async () => {
-  const { data, error } = await supabase
+  const { data: submissions, error } = await supabase
     .from('kyc_submissions')
-    .select(`
-      *,
-      users!user_id ( id, email, full_name, username )
-    `)
+    .select('*')
     .eq('status', 'pending')
     .order('submitted_at', { ascending: false })
 
   if (error) throw error
-  return data ?? []
+  if (!submissions || submissions.length === 0) return []
+
+  const userIds = submissions.map(s => s.user_id).filter(Boolean)
+  const userMap = await fetchUsersByIds(userIds)
+
+  return submissions.map(s => ({
+    ...s,
+    users: userMap[s.user_id] ?? null,
+  }))
 }
 
 // ── Fetch all KYC submissions (admin only) ────────────────────────────────────
 export const getAllKycSubmissions = async () => {
-  const { data, error } = await supabase
+  const { data: submissions, error } = await supabase
     .from('kyc_submissions')
-    .select(`
-      *,
-      users!user_id ( id, email, full_name, username )
-    `)
+    .select('*')
     .order('submitted_at', { ascending: false })
 
   if (error) throw error
-  return data ?? []
+  if (!submissions || submissions.length === 0) return []
+
+  const userIds = submissions.map(s => s.user_id).filter(Boolean)
+  const userMap = await fetchUsersByIds(userIds)
+
+  return submissions.map(s => ({
+    ...s,
+    users: userMap[s.user_id] ?? null,
+  }))
 }
 
 // ── Get signed URLs for KYC document files ────────────────────────────────────
@@ -164,7 +213,6 @@ export const setUserStatus = async (userId, status) => {
 
 // ── List all users WITH their portfolio balance ───────────────────────────────
 export const getAllUsersWithBalances = async () => {
-  // Step 1: fetch users
   const { data: users, error: usersError } = await supabase
     .from('users')
     .select('id, email, full_name, username, kyc_tier, kyc_verified, status, is_admin, created_at, last_login')
@@ -173,7 +221,6 @@ export const getAllUsersWithBalances = async () => {
   if (usersError) throw usersError
   if (!users || users.length === 0) return []
 
-  // Step 2: fetch portfolios for those users (avoids ambiguous FK join)
   const userIds = users.map(u => u.id)
   const { data: portfolios, error: portfoliosError } = await supabase
     .from('portfolios')
@@ -215,38 +262,61 @@ export const adminLockBalance = async (portfolioId, locked, reason = null) => {
 
 // ── Admin dashboard stats ─────────────────────────────────────────────────────
 export const getAdminDashboardStats = async () => {
-  const [
-    { count: pendingWithdrawals },
-    { count: pendingKyc },
-    { count: totalUsers },
-    { data: portfolioSum },
-  ] = await Promise.all([
-    supabase
-      .from('transactions')
-      .select('id', { count: 'exact', head: true })
-      .eq('type', 'WITHDRAWAL')
-      .eq('status', 'pending'),
-    supabase
-      .from('kyc_submissions')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'pending'),
-    supabase
-      .from('users')
-      .select('id', { count: 'exact', head: true }),
-    supabase
-      .from('portfolios')
-      .select('cash_balance, total_value'),
+  const safeCount = async (query) => {
+    try {
+      const { count, error } = await query
+      if (error) return 0
+      return count ?? 0
+    } catch {
+      return 0
+    }
+  }
+
+  const safeData = async (query) => {
+    try {
+      const { data, error } = await query
+      if (error) return []
+      return data ?? []
+    } catch {
+      return []
+    }
+  }
+
+  const [pendingWithdrawals, pendingKyc, totalUsers, portfolioSum] = await Promise.all([
+    safeCount(
+      supabase
+        .from('transactions')
+        .select('id', { count: 'exact', head: true })
+        .eq('type', 'WITHDRAWAL')
+        .eq('status', 'pending')
+    ),
+    safeCount(
+      supabase
+        .from('kyc_submissions')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'pending')
+    ),
+    safeCount(
+      supabase
+        .from('users')
+        .select('id', { count: 'exact', head: true })
+    ),
+    safeData(
+      supabase
+        .from('portfolios')
+        .select('cash_balance, total_value')
+    ),
   ])
 
-  const totalPlatformValue = (portfolioSum ?? []).reduce(
+  const totalPlatformValue = portfolioSum.reduce(
     (sum, p) => sum + (Number(p.cash_balance) || 0) + (Number(p.total_value) || 0),
     0
   )
 
   return {
-    pendingWithdrawals: pendingWithdrawals ?? 0,
-    pendingKyc: pendingKyc ?? 0,
-    totalUsers: totalUsers ?? 0,
+    pendingWithdrawals,
+    pendingKyc,
+    totalUsers,
     totalPlatformValue,
   }
 }
