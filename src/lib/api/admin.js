@@ -157,7 +157,7 @@ export const adminUpdateWithdrawal = async (transactionId, status, adminMessage 
 
   // Fallback: direct table update (works via the admin RLS policy)
   const { data: { user } } = await supabase.auth.getUser()
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from('transactions')
     .update({
       status,
@@ -167,8 +167,17 @@ export const adminUpdateWithdrawal = async (transactionId, status, adminMessage 
     })
     .eq('id', transactionId)
     .eq('type', 'WITHDRAWAL')
+    .select('id')
 
   if (error) throw new Error(`Could not update withdrawal: ${error.message}`)
+
+  // If RLS silently blocked the update, updated will be an empty array
+  if (!updated || updated.length === 0) {
+    throw new Error(
+      'Permission denied — 0 rows updated. Run sql/withdrawal-migration.sql in your Supabase SQL Editor ' +
+      'and ensure your account has is_admin = true.'
+    )
+  }
 
   await logAdminAction(
     status === 'completed' ? 'withdrawal_approved' : 'withdrawal_rejected',

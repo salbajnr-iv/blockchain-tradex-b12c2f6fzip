@@ -1,17 +1,21 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { listTransactions } from "@/lib/api/transactions";
 import { listTrades } from "@/lib/api/portfolio";
+import { writePortfolioSnapshot, getPortfolioHistory } from "@/lib/api/portfolioSnapshots";
 import { usePortfolio } from "@/contexts/PortfolioContext";
 import { useLivePrices } from "@/hooks/useLivePrices";
 import { format, parseISO, startOfMonth } from "date-fns";
 import { groupBy, sumBy } from "lodash";
 import {
-  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, LineChart, Line,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
 import { motion } from "framer-motion";
-import { Loader2, TrendingUp, ArrowUpRight, Wallet, BarChart3, PieChart as PieIcon } from "lucide-react";
+import {
+  Loader2, TrendingUp, ArrowUpRight, Wallet, BarChart3,
+  PieChart as PieIcon, TrendingDown, DollarSign,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 
 const WITHDRAWAL_COLORS = {
@@ -32,6 +36,8 @@ const METHOD_LABELS = {
   other: "Other",
 };
 
+const HISTORY_RANGES = ["1W", "1M", "3M", "1Y", "ALL"];
+
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   return (
@@ -48,6 +54,16 @@ const CustomTooltip = ({ active, payload, label }) => {
   );
 };
 
+const HistoryTooltip = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-card border border-border/50 rounded-lg px-4 py-3 shadow-xl text-xs">
+      <p className="font-semibold text-foreground mb-1">{label}</p>
+      <p className="text-primary font-medium">${Number(payload[0]?.value || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+    </div>
+  );
+};
+
 const PieTooltip = ({ active, payload }) => {
   if (!active || !payload?.length) return null;
   const { name, value, percent } = payload[0];
@@ -60,8 +76,10 @@ const PieTooltip = ({ active, payload }) => {
 };
 
 export default function Analytics() {
-  const { portfolioId, cashBalance } = usePortfolio();
+  const { portfolioId, cashBalance, holdings, holdingsMap } = usePortfolio();
   const { cryptoList, isLoading: pricesLoading, portfolioTotal, cryptoPortfolioValue } = useLivePrices();
+  const [historyRange, setHistoryRange] = useState("1M");
+  const [snapshotWritten, setSnapshotWritten] = useState(false);
 
   const { data: transactions = [], isLoading: txLoading } = useQuery({
     queryKey: ["transactions-analytics", portfolioId],
@@ -77,9 +95,79 @@ export default function Analytics() {
     initialData: [],
   });
 
+  const { data: snapshots = [], isLoading: snapshotsLoading } = useQuery({
+    queryKey: ["portfolio-snapshots", portfolioId, historyRange],
+    queryFn: () => getPortfolioHistory(portfolioId, historyRange),
+    enabled: !!portfolioId,
+    initialData: [],
+  });
+
+  // Write a daily snapshot on mount (once per session, non-blocking)
+  useEffect(() => {
+    if (!portfolioId || snapshotWritten || pricesLoading || portfolioTotal === 0) return;
+    setSnapshotWritten(true);
+    writePortfolioSnapshot(portfolioId, {
+      totalValue:  portfolioTotal,
+      cashBalance: cashBalance,
+      cryptoValue: cryptoPortfolioValue || 0,
+    }).catch(() => {}); // table might not exist — ignore
+  }, [portfolioId, portfolioTotal, cashBalance, cryptoPortfolioValue, pricesLoading, snapshotWritten]);
+
   const isLoading = txLoading || tradesLoading || pricesLoading;
 
-  // Monthly bar chart: withdrawals vs trading volume (from trades table)
+  // ── Portfolio history chart data ──────────────────────────────────────────
+  const historyData = useMemo(() => {
+    if (snapshots.length > 0) {
+      return snapshots.map((s) => ({
+        date: format(parseISO(s.snapshot_date), "MMM d"),
+        Value: parseFloat(s.total_value || 0),
+      }));
+    }
+    // Fallback: reconstruct cash-flow history from transactions
+    let runningCash = 0;
+    const sorted = [...transactions]
+      .sort((a, b) => new Date(a.transaction_date) - new Date(b.transaction_date));
+    const daily = {};
+    for (const tx of sorted) {
+      if (tx.type === "DEPOSIT")    runningCash += tx.total_amount || 0;
+      if (tx.type === "WITHDRAWAL") runningCash -= tx.total_amount || 0;
+      const day = format(parseISO(tx.transaction_date), "MMM d");
+      daily[day] = parseFloat(runningCash.toFixed(2));
+    }
+    return Object.entries(daily).map(([date, Value]) => ({ date, Value }));
+  }, [snapshots, transactions]);
+
+  // ── Cost Basis & P&L ─────────────────────────────────────────────────────
+  const plData = useMemo(() => {
+    return holdings
+      .filter((h) => h.amount > 0)
+      .map((h) => {
+        const liveEntry = cryptoList.find((c) => c.symbol === h.symbol);
+        const currentPrice = liveEntry?.price ?? h.current_price ?? 0;
+        const currentValue = h.amount * currentPrice;
+        const costBasis = h.amount * (h.average_cost || 0);
+        const unrealizedPnl = currentValue - costBasis;
+        const pnlPct = costBasis > 0 ? (unrealizedPnl / costBasis) * 100 : 0;
+        return {
+          symbol: h.symbol,
+          name: h.name || h.symbol,
+          quantity: h.amount,
+          avgCost: h.average_cost || 0,
+          currentPrice,
+          currentValue,
+          costBasis,
+          unrealizedPnl,
+          pnlPct,
+        };
+      })
+      .sort((a, b) => b.currentValue - a.currentValue);
+  }, [holdings, cryptoList]);
+
+  const totalUnrealizedPnl = sumBy(plData, "unrealizedPnl");
+  const totalCostBasis     = sumBy(plData, "costBasis");
+  const totalPnlPct        = totalCostBasis > 0 ? (totalUnrealizedPnl / totalCostBasis) * 100 : 0;
+
+  // ── Monthly activity data ─────────────────────────────────────────────────
   const monthlyData = useMemo(() => {
     const tradesByMonth = groupBy(trades, (t) =>
       format(startOfMonth(parseISO(t.trade_date)), "MMM yyyy")
@@ -101,7 +189,7 @@ export default function Analytics() {
       .slice(-12);
   }, [trades, transactions]);
 
-  // Withdrawal methods pie
+  // ── Withdrawal method pie ─────────────────────────────────────────────────
   const pieData = useMemo(() => {
     const withdrawals = transactions.filter((t) => t.type === "WITHDRAWAL");
     const methodGroups = groupBy(withdrawals, (tx) => {
@@ -122,10 +210,10 @@ export default function Analytics() {
       .filter((d) => d.value > 0);
   }, [transactions]);
 
-  // Asset allocation pie from live holdings
+  // ── Asset allocation pie ──────────────────────────────────────────────────
   const assetAllocationData = useMemo(() => {
-    const holdings = cryptoList.filter((c) => c.holdings > 0);
-    const data = holdings.map((c, i) => ({
+    const held = cryptoList.filter((c) => c.holdings > 0);
+    const data = held.map((c, i) => ({
       name: c.symbol,
       fullName: c.name,
       value: parseFloat((c.holdings * c.price).toFixed(2)),
@@ -137,7 +225,7 @@ export default function Analytics() {
     return data.filter((d) => d.value > 0).sort((a, b) => b.value - a.value);
   }, [cryptoList, cashBalance]);
 
-  // Cumulative withdrawals
+  // ── Cumulative withdrawals ────────────────────────────────────────────────
   const cumulativeData = useMemo(() => {
     let running = 0;
     return transactions
@@ -145,10 +233,7 @@ export default function Analytics() {
       .sort((a, b) => new Date(a.transaction_date) - new Date(b.transaction_date))
       .map((tx) => {
         running += tx.total_amount || 0;
-        return {
-          date: format(parseISO(tx.transaction_date), "MMM d"),
-          Total: Math.round(running),
-        };
+        return { date: format(parseISO(tx.transaction_date), "MMM d"), Total: Math.round(running) };
       });
   }, [transactions]);
 
@@ -167,10 +252,11 @@ export default function Analytics() {
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-6xl mx-auto space-y-8">
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground">Analytics</h1>
-            <p className="text-muted-foreground mt-1">Portfolio breakdown, trading activity & withdrawal history</p>
+            <p className="text-muted-foreground mt-1">Portfolio breakdown, P&L, trading activity & withdrawal history</p>
           </div>
           <Link to="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
             ← Dashboard
@@ -203,7 +289,138 @@ export default function Analytics() {
           ))}
         </div>
 
-        {/* Asset Allocation */}
+        {/* ── Portfolio History Chart ────────────────────────────────────────── */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="bg-card border border-border/50 rounded-xl p-6"
+        >
+          <div className="flex items-center justify-between mb-1 flex-wrap gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Portfolio History</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Total portfolio value over time</p>
+            </div>
+            <div className="flex items-center gap-1 bg-secondary/50 rounded-lg p-1">
+              {HISTORY_RANGES.map((r) => (
+                <button
+                  key={r}
+                  onClick={() => setHistoryRange(r)}
+                  className={`text-xs px-3 py-1.5 rounded-md font-medium transition-colors ${
+                    historyRange === r
+                      ? "bg-card text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {historyData.length < 2 ? (
+            <div className="text-center py-12 text-muted-foreground text-sm">
+              <p>Portfolio history builds up over time.</p>
+              <p className="mt-1 text-xs">Run <code className="bg-secondary/50 px-1.5 py-0.5 rounded text-[10px]">sql/recurring-dca-migration.sql</code> in Supabase to enable persistent snapshots.</p>
+            </div>
+          ) : (
+            <div className="mt-4">
+              <ResponsiveContainer width="100%" height={280}>
+                <AreaChart data={historyData}>
+                  <defs>
+                    <linearGradient id="histGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor="hsl(var(--primary))" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                  <XAxis dataKey="date" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v >= 1000 ? (v / 1000).toFixed(0) + "k" : v}`} />
+                  <Tooltip content={<HistoryTooltip />} />
+                  <Area type="monotone" dataKey="Value" stroke="hsl(var(--primary))" strokeWidth={2.5} fill="url(#histGrad)" name="Portfolio Value" dot={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </motion.div>
+
+        {/* ── Cost Basis & P&L ─────────────────────────────────────────────── */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.12 }}
+          className="bg-card border border-border/50 rounded-xl p-6"
+        >
+          <div className="flex items-center justify-between mb-1 flex-wrap gap-3">
+            <div className="flex items-center gap-2">
+              <DollarSign className="w-4 h-4 text-primary" />
+              <h2 className="text-lg font-semibold text-foreground">Cost Basis & Unrealised P&L</h2>
+            </div>
+            {totalCostBasis > 0 && (
+              <div className={`flex items-center gap-1.5 text-sm font-semibold ${totalUnrealizedPnl >= 0 ? "text-primary" : "text-destructive"}`}>
+                {totalUnrealizedPnl >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                {totalUnrealizedPnl >= 0 ? "+" : ""}${Math.abs(totalUnrealizedPnl).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                <span className="text-muted-foreground font-normal text-xs">({totalPnlPct >= 0 ? "+" : ""}{totalPnlPct.toFixed(2)}% overall)</span>
+              </div>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground mb-5">Average purchase price vs. current market price per asset</p>
+
+          {plData.length === 0 ? (
+            <p className="text-muted-foreground text-sm text-center py-12">No holdings yet. Start trading to see your P&L here.</p>
+          ) : (
+            <div className="overflow-x-auto -mx-6 px-6">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border/30">
+                    {["Asset", "Qty", "Avg Cost", "Current Price", "Cost Basis", "Current Value", "Unreal. P&L", "%"].map((h) => (
+                      <th key={h} className="text-left text-[11px] text-muted-foreground font-medium pb-3 pr-4 whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/20">
+                  {plData.map((row) => (
+                    <tr key={row.symbol} className="hover:bg-secondary/20 transition-colors">
+                      <td className="py-3 pr-4">
+                        <div>
+                          <p className="font-semibold text-foreground">{row.symbol}</p>
+                          <p className="text-[11px] text-muted-foreground truncate max-w-[120px]">{row.name}</p>
+                        </div>
+                      </td>
+                      <td className="py-3 pr-4 tabular-nums text-foreground">
+                        {row.quantity < 0.001
+                          ? row.quantity.toExponential(3)
+                          : row.quantity.toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                      </td>
+                      <td className="py-3 pr-4 tabular-nums text-muted-foreground">
+                        ${row.avgCost.toLocaleString(undefined, { maximumFractionDigits: row.avgCost < 1 ? 6 : 2 })}
+                      </td>
+                      <td className="py-3 pr-4 tabular-nums text-foreground">
+                        ${row.currentPrice.toLocaleString(undefined, { maximumFractionDigits: row.currentPrice < 1 ? 6 : 2 })}
+                      </td>
+                      <td className="py-3 pr-4 tabular-nums text-muted-foreground">
+                        ${row.costBasis.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="py-3 pr-4 tabular-nums text-foreground font-medium">
+                        ${row.currentValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                      </td>
+                      <td className={`py-3 pr-4 tabular-nums font-semibold ${row.unrealizedPnl >= 0 ? "text-primary" : "text-destructive"}`}>
+                        {row.unrealizedPnl >= 0 ? "+" : ""}${row.unrealizedPnl.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                      </td>
+                      <td className={`py-3 tabular-nums font-semibold text-xs ${row.pnlPct >= 0 ? "text-primary" : "text-destructive"}`}>
+                        <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-semibold ${row.pnlPct >= 0 ? "bg-primary/10" : "bg-destructive/10"}`}>
+                          {row.pnlPct >= 0 ? "+" : ""}{row.pnlPct.toFixed(2)}%
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </motion.div>
+
+        {/* ── Asset Allocation ─────────────────────────────────────────────── */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -267,7 +484,7 @@ export default function Analytics() {
           )}
         </motion.div>
 
-        {/* Monthly Activity */}
+        {/* ── Monthly Activity ─────────────────────────────────────────────── */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

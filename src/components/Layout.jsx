@@ -19,6 +19,7 @@ import { listAlerts } from "@/lib/api/alerts";
 import { useSystemNotifications } from "@/hooks/useSystemNotifications";
 import { useAlertEngine } from "@/hooks/useAlertEngine";
 import { usePendingOrderEngine } from "@/hooks/usePendingOrderEngine";
+import { useRecurringOrderEngine } from "@/hooks/useRecurringOrderEngine";
 import { motion, AnimatePresence } from "framer-motion";
 
 const NAV_SECTIONS = [
@@ -40,6 +41,7 @@ const NAV_SECTIONS = [
       { label: "Markets",       icon: BarChart3,      path: "/markets" },
       { label: "Trade",         icon: ArrowUpDown,    path: "/trade" },
       { label: "Open Orders",   icon: ClipboardList,  path: "/orders" },
+      { label: "Recurring/DCA", icon: RefreshCw,      path: "/recurring" },
       { label: "Notifications", icon: Bell,           path: "/alerts" },
     ],
   },
@@ -342,9 +344,10 @@ export default function Layout() {
   const cryptoPrices = cryptoList.reduce((acc, c) => { acc[c.symbol] = c.price; return acc; }, {});
   const cryptoChanges = cryptoList.reduce((acc, c) => { acc[c.symbol] = c.change24h; return acc; }, {});
 
-  // Background engines — wire live prices into alert checking and limit order filling
+  // Background engines — wire live prices into alert checking, limit order filling, and DCA execution
   useAlertEngine(cryptoPrices);
   usePendingOrderEngine(cryptoPrices);
+  useRecurringOrderEngine(cryptoPrices);
 
   const handleLogout = async () => {
     try { await signOut(); } catch (err) { console.error("Logout error:", err); }

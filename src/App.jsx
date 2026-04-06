@@ -42,6 +42,7 @@ import AdminKyc from './pages/admin/AdminKyc';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminSettings from './pages/admin/AdminSettings';
 import AdminAuditLog from './pages/admin/AdminAuditLog';
+import Recurring from './pages/Recurring';
 
 function App() {
   return (
@@ -92,6 +93,7 @@ function App() {
                     <Route path="/transactions" element={<Transactions />} />
                     <Route path="/analytics" element={<Analytics />} />
                     <Route path="/withdrawal" element={<Withdrawal />} />
+                    <Route path="/recurring" element={<Recurring />} />
 
                     <Route path="/settings" element={<SettingsLayout />}>
                       <Route index element={<ProfileSettings />} />
