@@ -6,7 +6,7 @@
 -- is automatically filled by the client-side order engine.
 --
 -- Run this in your Supabase SQL Editor ONCE after the base schema is applied.
--- ============================================================================
+-- ===========================================================================
 
 -- ── 1. TABLE ─────────────────────────────────────────────────────────────────
 
@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS public.pending_orders (
   cancelled_at  timestamp with time zone,
   CONSTRAINT pending_qty_positive    CHECK (quantity    > 0),
   CONSTRAINT pending_price_positive  CHECK (limit_price > 0)
-);
+);                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
 
 CREATE INDEX IF NOT EXISTS idx_pending_orders_portfolio_id ON public.pending_orders(portfolio_id);
 CREATE INDEX IF NOT EXISTS idx_pending_orders_symbol       ON public.pending_orders(symbol);
@@ -44,7 +44,7 @@ CREATE POLICY "Users can view own pending orders"
     portfolio_id IN (
       SELECT id FROM public.portfolios WHERE user_id = auth.uid()
     )
-  );
+  );                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
 
 -- Users can create pending orders in their own portfolio
 CREATE POLICY "Users can create pending orders"
@@ -53,7 +53,7 @@ CREATE POLICY "Users can create pending orders"
     portfolio_id IN (
       SELECT id FROM public.portfolios WHERE user_id = auth.uid()
     )
-  );
+  );                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
 
 -- Users can update (fill / cancel) their own pending orders
 CREATE POLICY "Users can update own pending orders"
@@ -67,7 +67,7 @@ CREATE POLICY "Users can update own pending orders"
     portfolio_id IN (
       SELECT id FROM public.portfolios WHERE user_id = auth.uid()
     )
-  );
+  );                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              
 
 -- Users can delete their own pending orders
 CREATE POLICY "Users can delete own pending orders"
@@ -76,7 +76,7 @@ CREATE POLICY "Users can delete own pending orders"
     portfolio_id IN (
       SELECT id FROM public.portfolios WHERE user_id = auth.uid()
     )
-  );
+  );                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
 
 -- ── 3. REALTIME ───────────────────────────────────────────────────────────────
 -- Enable realtime publications so the client gets instant updates when an
