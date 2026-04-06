@@ -131,16 +131,16 @@ export default function NotificationCenter({ alerts, cryptoPrices, cryptoChanges
     if (item.source === "system") {
       switch (item.type) {
         case "market_mover": return item.message?.includes("up") || item.message?.includes("surging")
-          ? "border-emerald-500/30 bg-emerald-500/5"
-          : "border-red-500/30 bg-red-500/5";
-        default: return "border-primary/30 bg-primary/5";
+          ? "border-l-4 border-l-emerald-500 border-border/30"
+          : "border-l-4 border-l-red-500 border-border/30";
+        default: return "border-l-4 border-l-primary border-border/30";
       }
     }
     switch (item.type) {
-      case "price_above": return "border-primary/40 bg-primary/5";
-      case "price_below": return "border-destructive/40 bg-destructive/5";
-      case "volatility":  return "border-yellow-400/40 bg-yellow-400/5";
-      default:            return "border-border/50 bg-card";
+      case "price_above": return "border-l-4 border-l-primary border-border/30";
+      case "price_below": return "border-l-4 border-l-destructive border-border/30";
+      case "volatility":  return "border-l-4 border-l-yellow-400 border-border/30";
+      default:            return "border-border/30";
     }
   };
 

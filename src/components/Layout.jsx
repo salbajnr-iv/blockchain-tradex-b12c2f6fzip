@@ -294,8 +294,8 @@ function NavSection({ section, location, onNavigate, isOpen, onToggle, searchAct
                 key={path}
                 to={path}
                 onClick={onNavigate}
-                className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                  active ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                  active ? "bg-primary/15 text-primary" : "text-foreground/70 hover:text-foreground hover:bg-secondary/60"
                 }`}
               >
                 <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
@@ -477,7 +477,7 @@ export default function Layout() {
         <div className="px-3 pb-4 pt-1 border-t border-border/30">
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition-all"
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-foreground/60 hover:text-destructive hover:bg-destructive/5 transition-all"
           >
             <div className="w-7 h-7 rounded-lg bg-secondary/60 flex items-center justify-center">
               <LogOut className="w-3.5 h-3.5" />
