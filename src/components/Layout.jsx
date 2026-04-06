@@ -4,7 +4,7 @@ import {
   LayoutDashboard, BarChart3, ArrowUpDown, Bell, CreditCard, History,
   ArrowUpRight, Menu, X, RefreshCw, LogOut, PlusCircle, LineChart, Search,
   ChevronDown, Wallet, TrendingUp, ShieldCheck, Settings, ChevronRight,
-  Info, BarChart2, Zap, TrendingDown, CheckCheck,
+  Info, BarChart2, Zap, TrendingDown, CheckCheck, ClipboardList,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import DepositDialog from "@/components/crypto/DepositDialog";
@@ -37,9 +37,10 @@ const NAV_SECTIONS = [
   {
     title: "Markets",
     items: [
-      { label: "Markets",       icon: BarChart3,   path: "/markets" },
-      { label: "Trade",         icon: ArrowUpDown, path: "/trade" },
-      { label: "Notifications", icon: Bell,        path: "/alerts" },
+      { label: "Markets",       icon: BarChart3,      path: "/markets" },
+      { label: "Trade",         icon: ArrowUpDown,    path: "/trade" },
+      { label: "Open Orders",   icon: ClipboardList,  path: "/orders" },
+      { label: "Notifications", icon: Bell,           path: "/alerts" },
     ],
   },
   {

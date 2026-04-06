@@ -17,6 +17,8 @@ import ResetPassword from './pages/auth/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import Trade from './pages/Trade';
 import Markets from './pages/Markets';
+import Asset from './pages/Asset';
+import Orders from './pages/Orders';
 import Alerts from './pages/Alerts';
 import Card from './pages/Card';
 import Transactions from './pages/Transactions';
@@ -81,6 +83,8 @@ function App() {
                     <Route path="/" element={<Dashboard />} />
                     <Route path="/trade" element={<Trade />} />
                     <Route path="/markets" element={<Markets />} />
+                    <Route path="/asset/:coinId" element={<Asset />} />
+                    <Route path="/orders" element={<Orders />} />
                     <Route path="/alerts" element={<Alerts />} />
                     <Route path="/card" element={<Card />} />
                     <Route path="/transactions" element={<Transactions />} />

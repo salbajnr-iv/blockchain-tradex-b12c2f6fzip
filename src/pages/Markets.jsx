@@ -248,7 +248,7 @@ export default function Markets() {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         transition={{ delay: i * 0.01 }}
-                        onClick={() => navigate(`/trade?coin=${coin.symbol}`)}
+                        onClick={() => navigate(`/asset/${coin.id}`)}
                         className="border-b border-border/20 hover:bg-secondary/30 transition-colors cursor-pointer group"
                       >
                         {/* Watchlist star */}
