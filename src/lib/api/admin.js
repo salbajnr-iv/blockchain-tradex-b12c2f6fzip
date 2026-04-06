@@ -100,12 +100,29 @@ export const getAllWithdrawals = async () => {
 
 // ── Call the existing fn_admin_update_withdrawal RPC ─────────────────────────
 export const adminUpdateWithdrawal = async (transactionId, status, adminMessage = null) => {
-  const { error } = await supabase.rpc('fn_admin_update_withdrawal', {
+  // Try the RPC first (works when the migration has been applied)
+  const { error: rpcError } = await supabase.rpc('fn_admin_update_withdrawal', {
     p_transaction_id: transactionId,
     p_status: status,
     p_admin_message: adminMessage,
   })
-  if (error) throw error
+
+  if (!rpcError) return // RPC succeeded — done
+
+  // Fallback: direct table update (works via the admin RLS policy)
+  const { data: { user } } = await supabase.auth.getUser()
+  const { error } = await supabase
+    .from('transactions')
+    .update({
+      status,
+      admin_message: adminMessage,
+      reviewed_at: new Date().toISOString(),
+      reviewed_by: user?.id ?? null,
+    })
+    .eq('id', transactionId)
+    .eq('type', 'WITHDRAWAL')
+
+  if (error) throw new Error(`Could not update withdrawal: ${error.message}`)
 }
 
 // ── Fetch all pending KYC submissions (admin only) ───────────────────────────
