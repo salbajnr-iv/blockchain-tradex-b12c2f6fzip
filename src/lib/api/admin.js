@@ -258,8 +258,12 @@ export const adminReviewKyc = async (submissionId, status, reviewerNotes = null)
   })
   if (error) throw error
 
+  const actionType =
+    status === 'approved' ? 'kyc_approved' :
+    status === 'more_info_needed' ? 'kyc_more_info_needed' :
+    'kyc_rejected'
   await logAdminAction(
-    status === 'approved' ? 'kyc_approved' : 'kyc_rejected',
+    actionType,
     'kyc_submission',
     submissionId,
     { status, reviewer_notes: reviewerNotes }

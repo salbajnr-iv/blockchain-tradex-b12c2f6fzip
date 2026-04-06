@@ -199,8 +199,9 @@ function SubmissionStatus({ submission, onResubmit }) {
         </div>
       </div>
 
-      {/* Reviewer notes */}
-      {liveNotes && (
+      {/* Reviewer notes — only show for non-terminal statuses, since for rejected/more_info_needed
+          the reviewer_notes IS the rejection reason and we show it in the red box below */}
+      {liveNotes && !["rejected", "more_info_needed"].includes(liveStatus) && (
         <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-4 flex gap-3">
           <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
           <div>
@@ -210,16 +211,20 @@ function SubmissionStatus({ submission, onResubmit }) {
         </div>
       )}
 
-      {/* Rejection reason */}
+      {/* Rejection reason — use reviewer_notes as the rejection reason since that is where
+          the admin stores the rejection message via the fn_admin_review_kyc RPC */}
       {(liveStatus === "rejected" || liveStatus === "more_info_needed") && (
-        <div className="bg-destructive/5 border border-destructive/20 rounded-xl p-4 space-y-3">
+        <div className={`border rounded-xl p-4 space-y-3 ${liveStatus === "rejected" ? "bg-destructive/5 border-destructive/20" : "bg-orange-500/5 border-orange-500/20"}`}>
           <div className="flex gap-3">
-            <ShieldX className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+            <ShieldX className={`w-4 h-4 shrink-0 mt-0.5 ${liveStatus === "rejected" ? "text-destructive" : "text-orange-500"}`} />
             <div>
               <p className="text-sm font-semibold text-foreground">
                 {liveStatus === "rejected" ? "Application Rejected" : "Additional Information Required"}
               </p>
-              {liveReason && <p className="text-sm text-muted-foreground mt-1">{liveReason}</p>}
+              {/* Display rejection reason — stored in reviewer_notes by the admin */}
+              {(liveReason || liveNotes) && (
+                <p className="text-sm text-muted-foreground mt-1">{liveReason || liveNotes}</p>
+              )}
             </div>
           </div>
           <Button

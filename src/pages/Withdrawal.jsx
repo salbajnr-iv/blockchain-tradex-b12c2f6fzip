@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
@@ -258,23 +258,26 @@ function StatusTracker({ transaction, onDone }) {
     return unsubscribe;
   }, [txn?.id]);
 
+  const FINAL_STATUSES = ["completed", "failed", "cancelled", "rejected"];
+
   const steps = [
     { key: "submitted", label: "Request Submitted", done: true },
     { key: "pending",   label: "Pending Admin Review", done: txn?.status !== null },
-    { key: "reviewed",  label: "Under Review", done: ["completed","failed","cancelled"].includes(txn?.status) },
-    { key: "final",     label: txn?.status === "completed" ? "Approved & Processed" : txn?.status === "failed" ? "Declined" : txn?.status === "cancelled" ? "Cancelled" : "Final Decision", done: ["completed","failed","cancelled"].includes(txn?.status) },
+    { key: "reviewed",  label: "Under Review", done: FINAL_STATUSES.includes(txn?.status) },
+    { key: "final",     label: txn?.status === "completed" ? "Approved & Processed" : txn?.status === "rejected" ? "Rejected" : txn?.status === "failed" ? "Declined" : txn?.status === "cancelled" ? "Cancelled" : "Final Decision", done: FINAL_STATUSES.includes(txn?.status) },
   ];
 
   const statusMap = {
     pending:   { label: "Pending Review", color: "text-yellow-500", bg: "bg-yellow-500/10 border-yellow-500/20", icon: Clock },
     completed: { label: "Approved", color: "text-green-500", bg: "bg-green-500/10 border-green-500/20", icon: CheckCircle2 },
+    rejected:  { label: "Rejected", color: "text-destructive", bg: "bg-destructive/10 border-destructive/20", icon: XCircle },
     failed:    { label: "Declined", color: "text-destructive", bg: "bg-destructive/10 border-destructive/20", icon: XCircle },
     cancelled: { label: "Cancelled", color: "text-muted-foreground", bg: "bg-secondary border-border", icon: XCircle },
   };
 
   const current = statusMap[txn?.status] || statusMap.pending;
   const StatusIcon = current.icon;
-  const isDone = ["completed","failed","cancelled"].includes(txn?.status);
+  const isDone = FINAL_STATUSES.includes(txn?.status);
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
@@ -284,7 +287,13 @@ function StatusTracker({ transaction, onDone }) {
           {current.label}
         </div>
         <p className="text-muted-foreground text-sm">
-          {!isDone ? "Your withdrawal request is being reviewed by our team." : txn?.status === "completed" ? "Your withdrawal has been approved and is being processed." : "Please contact support if you have any questions."}
+          {!isDone
+            ? "Your withdrawal request is being reviewed by our team."
+            : txn?.status === "completed"
+            ? "Your withdrawal has been approved and is being processed."
+            : txn?.status === "rejected"
+            ? "Your withdrawal request was rejected. Please review the message below and contact support if needed."
+            : "Please contact support if you have any questions."}
         </p>
       </div>
 
@@ -406,9 +415,10 @@ function validateMethodDetails(method, details) {
 
 export default function WithdrawalPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const { cashBalance, portfolioId } = usePortfolio();
-  const [method, setMethod] = useState("");
+  const [method, setMethod] = useState(searchParams.get("method") || "");
   const [amount, setAmount] = useState("");
   const [details, setDetails] = useState({});
   const [submitting, setSubmitting] = useState(false);

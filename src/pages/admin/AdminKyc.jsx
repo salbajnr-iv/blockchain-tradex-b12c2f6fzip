@@ -33,12 +33,14 @@ function DocImage({ label, url }) {
   );
 }
 
-function KycDetailModal({ submission, onApprove, onReject, onClose }) {
+function KycDetailModal({ submission, onApprove, onReject, onMoreInfo, onClose }) {
   const [docUrls, setDocUrls] = useState({});
   const [loadingUrls, setLoadingUrls] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
+  const [moreInfoReason, setMoreInfoReason] = useState('');
   const [showRejectForm, setShowRejectForm] = useState(false);
+  const [showMoreInfoForm, setShowMoreInfoForm] = useState(false);
 
   useEffect(() => {
     getKycDocumentUrls(submission)
@@ -57,6 +59,14 @@ function KycDetailModal({ submission, onApprove, onReject, onClose }) {
     if (!rejectReason.trim()) return;
     setActionLoading(true);
     await onReject(submission.id, rejectReason.trim());
+    setActionLoading(false);
+  };
+
+  const handleMoreInfo = async (e) => {
+    e.preventDefault();
+    if (!moreInfoReason.trim()) return;
+    setActionLoading(true);
+    await onMoreInfo(submission.id, moreInfoReason.trim());
     setActionLoading(false);
   };
 
@@ -145,7 +155,7 @@ function KycDetailModal({ submission, onApprove, onReject, onClose }) {
           {/* Actions */}
           {isPending && (
             <section className="border-t border-gray-200 dark:border-gray-800 pt-4">
-              {!showRejectForm ? (
+              {!showRejectForm && !showMoreInfoForm ? (
                 <div className="flex gap-3 flex-wrap">
                   <button
                     onClick={handleApprove}
@@ -163,8 +173,15 @@ function KycDetailModal({ submission, onApprove, onReject, onClose }) {
                     <XCircle size={15} />
                     Reject
                   </button>
+                  <button
+                    onClick={() => setShowMoreInfoForm(true)}
+                    disabled={actionLoading}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-sm rounded-lg transition-colors"
+                  >
+                    More Info Needed
+                  </button>
                 </div>
-              ) : (
+              ) : showRejectForm ? (
                 <form onSubmit={handleReject} className="space-y-3">
                   <label className="block text-sm text-gray-600 dark:text-gray-400">
                     Rejection reason <span className="text-red-500">*</span>
@@ -188,6 +205,36 @@ function KycDetailModal({ submission, onApprove, onReject, onClose }) {
                     <button
                       type="button"
                       onClick={() => setShowRejectForm(false)}
+                      className="px-5 py-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-sm transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <form onSubmit={handleMoreInfo} className="space-y-3">
+                  <label className="block text-sm text-gray-600 dark:text-gray-400">
+                    What information is needed? <span className="text-orange-500">*</span>
+                  </label>
+                  <textarea
+                    value={moreInfoReason}
+                    onChange={(e) => setMoreInfoReason(e.target.value)}
+                    rows={3}
+                    required
+                    placeholder="Specify what additional information or documents are required..."
+                    className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-orange-500 resize-none"
+                  />
+                  <div className="flex gap-3 flex-wrap">
+                    <button
+                      type="submit"
+                      disabled={!moreInfoReason.trim() || actionLoading}
+                      className="px-5 py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-sm rounded-lg transition-colors"
+                    >
+                      {actionLoading ? 'Sending...' : 'Request More Info'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowMoreInfoForm(false)}
                       className="px-5 py-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-sm transition-colors"
                     >
                       Cancel
@@ -280,6 +327,20 @@ export default function AdminKyc() {
       await loadSubmissions();
     } catch (err) {
       toast.error(err.message || 'Failed to reject');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleMoreInfo = async (submissionId, notes) => {
+    setActionLoading(submissionId);
+    try {
+      await adminReviewKyc(submissionId, 'more_info_needed', notes);
+      toast.success('More information requested from user');
+      setSelected(null);
+      await loadSubmissions();
+    } catch (err) {
+      toast.error(err.message || 'Failed to update submission');
     } finally {
       setActionLoading(null);
     }
@@ -428,6 +489,7 @@ export default function AdminKyc() {
           submission={selected}
           onApprove={handleApprove}
           onReject={handleReject}
+          onMoreInfo={handleMoreInfo}
           onClose={() => setSelected(null)}
         />
       )}
