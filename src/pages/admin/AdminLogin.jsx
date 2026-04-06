@@ -4,6 +4,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { getAdminStatus } from '@/lib/api/admin';
 import { toast } from 'sonner';
 import { Eye, EyeOff, Lock, Mail, Shield } from 'lucide-react';
+import ThemeToggle from '@/components/ThemeToggle';
 
 export default function AdminLogin() {
   const { signIn, signOut, isAuthenticated, isLoadingAuth } = useAuth();
@@ -14,7 +15,6 @@ export default function AdminLogin() {
   const [loading, setLoading] = useState(false);
   const [checkingExisting, setCheckingExisting] = useState(false);
 
-  // If already authenticated, check if they're admin and redirect accordingly
   useEffect(() => {
     if (isLoadingAuth) return;
     if (!isAuthenticated) return;
@@ -25,7 +25,6 @@ export default function AdminLogin() {
         if (isAdmin) {
           navigate('/admin', { replace: true });
         } else {
-          // Logged in as non-admin — sign them out silently and stay on this page
           signOut().catch(() => {});
           setCheckingExisting(false);
         }
@@ -63,31 +62,31 @@ export default function AdminLogin() {
 
   if (isLoadingAuth || checkingExisting) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-gray-950">
-        <div className="w-8 h-8 border-4 border-gray-700 border-t-emerald-500 rounded-full animate-spin" />
+      <div className="fixed inset-0 flex items-center justify-center bg-white dark:bg-gray-950">
+        <div className="w-8 h-8 border-4 border-gray-200 dark:border-gray-700 border-t-emerald-500 rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 flex">
+    <div className="min-h-screen bg-white dark:bg-gray-950 flex">
       {/* Left panel — branding */}
-      <div className="hidden lg:flex w-[420px] flex-shrink-0 flex-col justify-between bg-gray-900 border-r border-gray-800 px-10 py-12">
+      <div className="hidden lg:flex w-[420px] flex-shrink-0 flex-col justify-between bg-gray-50 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 px-10 py-12">
         <div>
           <div className="flex items-center gap-3 mb-12">
-            <div className="w-9 h-9 rounded-lg bg-emerald-500 flex items-center justify-center text-gray-950 font-black text-base select-none">
+            <div className="w-9 h-9 rounded-lg bg-emerald-500 flex items-center justify-center text-white font-black text-base select-none">
               BT
             </div>
             <div>
-              <p className="text-white font-semibold text-sm leading-tight">BlockTrade</p>
-              <p className="text-emerald-400 text-xs font-medium tracking-widest uppercase">Admin Console</p>
+              <p className="text-gray-900 dark:text-white font-semibold text-sm leading-tight">BlockTrade</p>
+              <p className="text-emerald-600 dark:text-emerald-400 text-xs font-medium tracking-widest uppercase">Admin Console</p>
             </div>
           </div>
 
-          <h1 className="text-3xl font-bold text-white leading-tight mb-4">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white leading-tight mb-4">
             Platform<br />Administration
           </h1>
-          <p className="text-gray-400 text-sm leading-relaxed">
+          <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed">
             Restricted access. This portal is for authorised administrators only. Unauthorised access attempts are logged.
           </p>
 
@@ -100,14 +99,14 @@ export default function AdminLogin() {
             ].map((item) => (
               <div key={item} className="flex items-center gap-3">
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
-                <p className="text-gray-400 text-sm">{item}</p>
+                <p className="text-gray-500 dark:text-gray-400 text-sm">{item}</p>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="border-t border-gray-800 pt-6">
-          <div className="flex items-center gap-2 text-gray-600 text-xs">
+        <div className="border-t border-gray-200 dark:border-gray-800 pt-6">
+          <div className="flex items-center gap-2 text-gray-400 dark:text-gray-600 text-xs">
             <Lock size={12} />
             <span>256-bit TLS encrypted · Admin access only</span>
           </div>
@@ -115,30 +114,35 @@ export default function AdminLogin() {
       </div>
 
       {/* Right panel — login form */}
-      <div className="flex-1 flex items-center justify-center px-6 py-12">
+      <div className="flex-1 flex items-center justify-center px-6 py-12 relative">
+        {/* Theme toggle top-right */}
+        <div className="absolute top-6 right-6">
+          <ThemeToggle />
+        </div>
+
         <div className="w-full max-w-sm">
           {/* Mobile brand */}
           <div className="flex items-center gap-2 mb-10 lg:hidden">
-            <div className="w-8 h-8 rounded-md bg-emerald-500 flex items-center justify-center text-gray-950 font-black text-sm">
+            <div className="w-8 h-8 rounded-md bg-emerald-500 flex items-center justify-center text-white font-black text-sm">
               BT
             </div>
-            <span className="text-white font-semibold text-sm">BlockTrade Admin</span>
+            <span className="text-gray-900 dark:text-white font-semibold text-sm">BlockTrade Admin</span>
           </div>
 
           <div className="mb-8">
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full mb-4">
-              <Shield size={12} className="text-emerald-400" />
-              <span className="text-emerald-400 text-xs font-medium">Admin Access Required</span>
+              <Shield size={12} className="text-emerald-500 dark:text-emerald-400" />
+              <span className="text-emerald-600 dark:text-emerald-400 text-xs font-medium">Admin Access Required</span>
             </div>
-            <h2 className="text-2xl font-bold text-white">Sign in to Admin</h2>
-            <p className="text-gray-400 text-sm mt-1">Use your administrator credentials</p>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Sign in to Admin</h2>
+            <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Use your administrator credentials</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm text-gray-400 mb-1.5">Email address</label>
+              <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1.5">Email address</label>
               <div className="relative">
-                <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" />
+                <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                 <input
                   type="email"
                   value={email}
@@ -146,15 +150,15 @@ export default function AdminLogin() {
                   placeholder="admin@yourdomain.com"
                   required
                   autoComplete="email"
-                  className="w-full bg-gray-900 border border-gray-700 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-colors"
+                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl pl-10 pr-4 py-3 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-colors"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm text-gray-400 mb-1.5">Password</label>
+              <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1.5">Password</label>
               <div className="relative">
-                <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" />
+                <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
@@ -162,12 +166,12 @@ export default function AdminLogin() {
                   placeholder="••••••••••"
                   required
                   autoComplete="current-password"
-                  className="w-full bg-gray-900 border border-gray-700 rounded-xl pl-10 pr-11 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-colors"
+                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl pl-10 pr-11 py-3 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-colors"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
                   tabIndex={-1}
                 >
                   {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
@@ -191,9 +195,9 @@ export default function AdminLogin() {
             </button>
           </form>
 
-          <p className="text-center text-xs text-gray-600 mt-8">
+          <p className="text-center text-xs text-gray-400 dark:text-gray-600 mt-8">
             Not an admin?{' '}
-            <a href="/login" className="text-gray-400 hover:text-white transition-colors">
+            <a href="/login" className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
               Go to user login
             </a>
           </p>

@@ -9,6 +9,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import ThemeToggle from '@/components/ThemeToggle';
 
 const navItems = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -31,19 +32,22 @@ export default function AdminLayout() {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-950 text-gray-100">
+    <div className="flex min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100">
       {/* Sidebar */}
-      <aside className="w-64 flex-shrink-0 bg-gray-900 border-r border-gray-800 flex flex-col">
+      <aside className="w-64 flex-shrink-0 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col">
         {/* Brand */}
-        <div className="px-6 py-5 border-b border-gray-800">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-md bg-emerald-500 flex items-center justify-center text-gray-950 font-bold text-sm select-none">
-              A
+        <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-800">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-md bg-emerald-500 flex items-center justify-center text-white font-bold text-sm select-none">
+                A
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white leading-tight">BlockTrade</p>
+                <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium tracking-wide">Admin Panel</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-semibold text-white leading-tight">BlockTrade</p>
-              <p className="text-xs text-emerald-400 font-medium tracking-wide">Admin Panel</p>
-            </div>
+            <ThemeToggle size="sm" />
           </div>
         </div>
 
@@ -57,8 +61,8 @@ export default function AdminLayout() {
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   isActive
-                    ? 'bg-emerald-500/10 text-emerald-400'
-                    : 'text-gray-400 hover:text-gray-100 hover:bg-gray-800'
+                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800'
                 }`
               }
             >
@@ -74,10 +78,10 @@ export default function AdminLayout() {
         </nav>
 
         {/* Sign out */}
-        <div className="px-3 py-4 border-t border-gray-800">
+        <div className="px-3 py-4 border-t border-gray-200 dark:border-gray-800">
           <button
             onClick={handleSignOut}
-            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
           >
             <LogOut size={16} />
             Sign out

@@ -4,18 +4,18 @@ import { toast } from 'sonner';
 import { CheckCircle, XCircle, RefreshCw, Search, Eye, X } from 'lucide-react';
 
 const STATUS_COLORS = {
-  pending: 'bg-yellow-500/15 text-yellow-400',
-  under_review: 'bg-blue-500/15 text-blue-400',
-  approved: 'bg-emerald-500/15 text-emerald-400',
-  rejected: 'bg-red-500/15 text-red-400',
-  more_info_needed: 'bg-orange-500/15 text-orange-400',
+  pending: 'bg-yellow-500/15 text-yellow-600 dark:text-yellow-400',
+  under_review: 'bg-blue-500/15 text-blue-600 dark:text-blue-400',
+  approved: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
+  rejected: 'bg-red-500/15 text-red-600 dark:text-red-400',
+  more_info_needed: 'bg-orange-500/15 text-orange-600 dark:text-orange-400',
 };
 
 function DocImage({ label, url }) {
   if (!url) return (
-    <div className="bg-gray-800 rounded-lg p-3 text-center">
-      <p className="text-xs text-gray-500">{label}</p>
-      <p className="text-xs text-gray-600 mt-1">Not provided</p>
+    <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 text-center">
+      <p className="text-xs text-gray-500 dark:text-gray-500">{label}</p>
+      <p className="text-xs text-gray-400 dark:text-gray-600 mt-1">Not provided</p>
     </div>
   );
   return (
@@ -25,7 +25,7 @@ function DocImage({ label, url }) {
         <img
           src={url}
           alt={label}
-          className="w-full rounded-lg border border-gray-700 object-cover max-h-36 hover:opacity-90 transition-opacity"
+          className="w-full rounded-lg border border-gray-200 dark:border-gray-700 object-cover max-h-36 hover:opacity-90 transition-opacity"
           onError={(e) => { e.currentTarget.style.display = 'none'; }}
         />
       </a>
@@ -64,14 +64,14 @@ function KycDetailModal({ submission, onApprove, onReject, onClose }) {
   const isPending = ['pending', 'under_review'].includes(submission.status);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="bg-gray-900 border border-gray-800 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800 sticky top-0 bg-gray-900 z-10">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 dark:bg-black/70 p-4">
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-xl">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900 z-10">
           <div>
-            <h3 className="text-lg font-semibold text-white">KYC Submission</h3>
-            <p className="text-sm text-gray-400">{user?.full_name || user?.email}</p>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">KYC Submission</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">{user?.full_name || user?.email}</p>
           </div>
-          <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
+          <button onClick={onClose} className="text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors">
             <X size={20} />
           </button>
         </div>
@@ -79,7 +79,7 @@ function KycDetailModal({ submission, onApprove, onReject, onClose }) {
         <div className="p-6 space-y-6">
           {/* Personal Info */}
           <section>
-            <h4 className="text-sm font-semibold text-gray-300 mb-3 uppercase tracking-wide">Personal Details</h4>
+            <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wide">Personal Details</h4>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
               {[
                 ['Full Name', `${submission.legal_first_name || ''} ${submission.legal_last_name || ''}`.trim()],
@@ -90,8 +90,8 @@ function KycDetailModal({ submission, onApprove, onReject, onClose }) {
                 ['Tier', submission.tier || '—'],
               ].map(([k, v]) => (
                 <div key={k}>
-                  <p className="text-gray-500 text-xs">{k}</p>
-                  <p className="text-white mt-0.5">{v}</p>
+                  <p className="text-gray-400 dark:text-gray-500 text-xs">{k}</p>
+                  <p className="text-gray-900 dark:text-white mt-0.5">{v}</p>
                 </div>
               ))}
             </div>
@@ -99,7 +99,7 @@ function KycDetailModal({ submission, onApprove, onReject, onClose }) {
 
           {/* Document Info */}
           <section>
-            <h4 className="text-sm font-semibold text-gray-300 mb-3 uppercase tracking-wide">Document</h4>
+            <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wide">Document</h4>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
               {[
                 ['Type', submission.document_type || '—'],
@@ -108,8 +108,8 @@ function KycDetailModal({ submission, onApprove, onReject, onClose }) {
                 ['Expiry', submission.document_expiry || '—'],
               ].map(([k, v]) => (
                 <div key={k}>
-                  <p className="text-gray-500 text-xs">{k}</p>
-                  <p className="text-white mt-0.5">{v}</p>
+                  <p className="text-gray-400 dark:text-gray-500 text-xs">{k}</p>
+                  <p className="text-gray-900 dark:text-white mt-0.5">{v}</p>
                 </div>
               ))}
             </div>
@@ -117,11 +117,11 @@ function KycDetailModal({ submission, onApprove, onReject, onClose }) {
 
           {/* Documents */}
           <section>
-            <h4 className="text-sm font-semibold text-gray-300 mb-3 uppercase tracking-wide">Uploaded Documents</h4>
+            <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wide">Uploaded Documents</h4>
             {loadingUrls ? (
               <div className="grid grid-cols-2 gap-3">
                 {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="h-32 bg-gray-800 rounded-lg animate-pulse" />
+                  <div key={i} className="h-32 bg-gray-200 dark:bg-gray-800 rounded-lg animate-pulse" />
                 ))}
               </div>
             ) : (
@@ -137,14 +137,14 @@ function KycDetailModal({ submission, onApprove, onReject, onClose }) {
           {/* Reviewer Notes */}
           {submission.reviewer_notes && (
             <section>
-              <h4 className="text-sm font-semibold text-gray-300 mb-2 uppercase tracking-wide">Reviewer Notes</h4>
-              <p className="text-sm text-gray-400 bg-gray-800 rounded-lg p-3">{submission.reviewer_notes}</p>
+              <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wide">Reviewer Notes</h4>
+              <p className="text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded-lg p-3">{submission.reviewer_notes}</p>
             </section>
           )}
 
           {/* Actions */}
           {isPending && (
-            <section className="border-t border-gray-800 pt-4">
+            <section className="border-t border-gray-200 dark:border-gray-800 pt-4">
               {!showRejectForm ? (
                 <div className="flex gap-3">
                   <button
@@ -166,8 +166,8 @@ function KycDetailModal({ submission, onApprove, onReject, onClose }) {
                 </div>
               ) : (
                 <form onSubmit={handleReject} className="space-y-3">
-                  <label className="block text-sm text-gray-400">
-                    Rejection reason <span className="text-red-400">*</span>
+                  <label className="block text-sm text-gray-600 dark:text-gray-400">
+                    Rejection reason <span className="text-red-500">*</span>
                   </label>
                   <textarea
                     value={rejectReason}
@@ -175,7 +175,7 @@ function KycDetailModal({ submission, onApprove, onReject, onClose }) {
                     rows={3}
                     required
                     placeholder="Explain the reason for rejection..."
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-red-500 resize-none"
+                    className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-red-500 resize-none"
                   />
                   <div className="flex gap-3">
                     <button
@@ -188,7 +188,7 @@ function KycDetailModal({ submission, onApprove, onReject, onClose }) {
                     <button
                       type="button"
                       onClick={() => setShowRejectForm(false)}
-                      className="px-5 py-2 text-gray-400 hover:text-white text-sm transition-colors"
+                      className="px-5 py-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-sm transition-colors"
                     >
                       Cancel
                     </button>
@@ -269,13 +269,13 @@ export default function AdminKyc() {
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-white">KYC Review</h1>
-          <p className="text-gray-400 text-sm mt-1">Review identity verification submissions</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">KYC Review</h1>
+          <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Review identity verification submissions</p>
         </div>
         <button
           onClick={loadSubmissions}
           disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm rounded-lg transition-colors disabled:opacity-50"
+          className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm rounded-lg transition-colors disabled:opacity-50"
         >
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           Refresh
@@ -284,19 +284,19 @@ export default function AdminKyc() {
 
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1 max-w-sm">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
           <input
             type="text"
             placeholder="Search by email or name..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-gray-900 border border-gray-700 rounded-lg pl-9 pr-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg pl-9 pr-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
           />
         </div>
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-sm text-gray-300 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+          className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-2 text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-emerald-500"
         >
           <option value="all">All statuses</option>
           <option value="pending">Pending</option>
@@ -308,57 +308,57 @@ export default function AdminKyc() {
       </div>
 
       {error && (
-        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">{error}</div>
+        <div className="mb-6 p-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-lg text-red-600 dark:text-red-400 text-sm">{error}</div>
       )}
 
-      <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-800">
+              <tr className="border-b border-gray-200 dark:border-gray-800">
                 {['Submitted', 'User', 'Tier', 'Document', 'Status', 'Actions'].map((h) => (
                   <th key={h} className="px-5 py-3.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-800">
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {loading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr key={i}>
                     {Array.from({ length: 6 }).map((_, j) => (
                       <td key={j} className="px-5 py-4">
-                        <div className="h-4 bg-gray-800 rounded animate-pulse w-24" />
+                        <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded animate-pulse w-24" />
                       </td>
                     ))}
                   </tr>
                 ))
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-12 text-center text-gray-500">No KYC submissions found.</td>
+                  <td colSpan={6} className="px-5 py-12 text-center text-gray-400 dark:text-gray-500">No KYC submissions found.</td>
                 </tr>
               ) : (
                 filtered.map((s) => {
                   const user = s.users;
                   return (
-                    <tr key={s.id} className="hover:bg-gray-800/40 transition-colors">
-                      <td className="px-5 py-4 text-gray-400 whitespace-nowrap">
+                    <tr key={s.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
+                      <td className="px-5 py-4 text-gray-500 dark:text-gray-400 whitespace-nowrap">
                         {new Date(s.submitted_at).toLocaleDateString()}
                       </td>
                       <td className="px-5 py-4">
-                        <p className="text-white font-medium">{user?.full_name || user?.username || '—'}</p>
-                        <p className="text-gray-500 text-xs">{user?.email || '—'}</p>
+                        <p className="text-gray-900 dark:text-white font-medium">{user?.full_name || user?.username || '—'}</p>
+                        <p className="text-gray-400 dark:text-gray-500 text-xs">{user?.email || '—'}</p>
                       </td>
-                      <td className="px-5 py-4 text-gray-400 capitalize">{s.tier || '—'}</td>
-                      <td className="px-5 py-4 text-gray-400 capitalize">{s.document_type || '—'}</td>
+                      <td className="px-5 py-4 text-gray-500 dark:text-gray-400 capitalize">{s.tier || '—'}</td>
+                      <td className="px-5 py-4 text-gray-500 dark:text-gray-400 capitalize">{s.document_type || '—'}</td>
                       <td className="px-5 py-4">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium capitalize ${STATUS_COLORS[s.status] || 'bg-gray-800 text-gray-400'}`}>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium capitalize ${STATUS_COLORS[s.status] || 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'}`}>
                           {(s.status || '').replace(/_/g, ' ')}
                         </span>
                       </td>
                       <td className="px-5 py-4">
                         <button
                           onClick={() => setSelected(s)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs rounded-lg transition-colors"
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs rounded-lg transition-colors"
                         >
                           <Eye size={12} />
                           Review
