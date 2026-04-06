@@ -42,10 +42,27 @@ Full admin panel at `/admin` with login at `/admin/login`.
 2. `UPDATE public.users SET is_admin = true WHERE email = 'admin@yourdomain.com';`
 
 **Admin panel pages:**
-- `/admin` — Dashboard with platform stats (pending withdrawals, pending KYC, total users, platform AUM)
+- `/admin` — Dashboard with 4 stat cards + 4 recharts time-series charts (signups/day, volume/day, revenue/day, withdrawal trends)
 - `/admin/withdrawals` — Approve/reject withdrawals, with rejection reason form
 - `/admin/kyc` — Review KYC submissions with document viewer, approve/reject
 - `/admin/users` — User management: cash balance adjust/set/deduct, balance lock/unlock, admin flag toggle, suspend/reactivate
+- `/admin/settings` — Fee & Limit Management: trading fee %, deposit min, withdrawal min/max/daily limit (persisted in `platform_settings` table)
+- `/admin/audit-log` — Audit Log: chronological log of every admin action with admin name, email, action type, target, and details; searchable + filterable + paginated
+
+**New SQL migration (`sql/admin-features-migration.sql`):**
+- `platform_settings` table — key/value store for fee and limit configuration
+- `admin_audit_log` table — append-only log of every admin action with full details
+- RLS policies for both tables (admin-only read/write)
+- Default seeds: trading_fee_percent=0.25, deposit_minimum_usd=10, withdrawal_minimum/maximum/daily limits
+
+**Audit logging:** Every admin action in `src/lib/api/admin.js` now calls `logAdminAction()` automatically:
+- withdrawal_approved / withdrawal_rejected (adminUpdateWithdrawal)
+- kyc_approved / kyc_rejected (adminReviewKyc)
+- balance_adjusted (adminAdjustBalance)
+- balance_locked / balance_unlocked (adminLockBalance)
+- user_status_changed (setUserStatus)
+- user_promoted_to_admin / user_demoted_from_admin (setUserAdminFlag)
+- setting_updated (updatePlatformSetting)
 
 **RPCs required (from SQL migration files):**
 - `fn_admin_update_withdrawal(p_transaction_id, p_status, p_admin_message)`

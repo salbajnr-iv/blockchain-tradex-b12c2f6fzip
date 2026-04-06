@@ -10,15 +10,19 @@ import {
   ChevronRight,
   Menu,
   X,
+  Settings,
+  ScrollText,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import ThemeToggle from '@/components/ThemeToggle';
 
 const navItems = [
-  { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/admin/withdrawals', label: 'Withdrawals', icon: ArrowDownToLine },
-  { to: '/admin/kyc', label: 'KYC Review', icon: ShieldCheck },
-  { to: '/admin/users', label: 'Users', icon: Users },
+  { to: '/admin',            label: 'Dashboard',  icon: LayoutDashboard, end: true },
+  { to: '/admin/withdrawals',label: 'Withdrawals', icon: ArrowDownToLine },
+  { to: '/admin/kyc',        label: 'KYC Review',  icon: ShieldCheck },
+  { to: '/admin/users',      label: 'Users',       icon: Users },
+  { to: '/admin/settings',   label: 'Settings',    icon: Settings },
+  { to: '/admin/audit-log',  label: 'Audit Log',   icon: ScrollText },
 ];
 
 function Sidebar({ onClose }) {
@@ -63,7 +67,7 @@ function Sidebar({ onClose }) {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
         {navItems.map(({ to, label, icon: Icon, end }) => (
           <NavLink
             key={to}

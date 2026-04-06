@@ -40,6 +40,8 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminWithdrawals from './pages/admin/AdminWithdrawals';
 import AdminKyc from './pages/admin/AdminKyc';
 import AdminUsers from './pages/admin/AdminUsers';
+import AdminSettings from './pages/admin/AdminSettings';
+import AdminAuditLog from './pages/admin/AdminAuditLog';
 
 function App() {
   return (
@@ -112,6 +114,8 @@ function App() {
                     <Route path="withdrawals" element={<AdminWithdrawals />} />
                     <Route path="kyc" element={<AdminKyc />} />
                     <Route path="users" element={<AdminUsers />} />
+                    <Route path="settings" element={<AdminSettings />} />
+                    <Route path="audit-log" element={<AdminAuditLog />} />
                   </Route>
                 </Route>
 

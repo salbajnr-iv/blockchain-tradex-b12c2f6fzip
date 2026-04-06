@@ -43,6 +43,44 @@ const fetchPortfoliosByIds = async (portfolioIds) => {
   return map
 }
 
+// ── Audit log: write an entry (fire-and-forget, never throws) ─────────────────
+export const logAdminAction = async (action, targetType, targetId, details = null) => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const { data: adminUser } = await supabase
+      .from('users')
+      .select('email, full_name, username')
+      .eq('id', user.id)
+      .single()
+
+    await supabase.from('admin_audit_log').insert({
+      admin_id:    user.id,
+      admin_email: adminUser?.email ?? user.email ?? null,
+      admin_name:  adminUser?.full_name ?? adminUser?.username ?? null,
+      action,
+      target_type: targetType,
+      target_id:   targetId ? String(targetId) : null,
+      details,
+    })
+  } catch {
+    // Never let audit logging break the main flow
+  }
+}
+
+// ── Fetch audit log (admin only) ──────────────────────────────────────────────
+export const getAuditLog = async (limit = 100, offset = 0) => {
+  const { data, error, count } = await supabase
+    .from('admin_audit_log')
+    .select('*', { count: 'exact' })
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1)
+
+  if (error) throw error
+  return { logs: data ?? [], total: count ?? 0 }
+}
+
 // ── Fetch all pending withdrawal transactions (admin only) ───────────────────
 export const getPendingWithdrawals = async () => {
   const { data: txs, error } = await supabase
@@ -98,7 +136,7 @@ export const getAllWithdrawals = async () => {
   })
 }
 
-// ── Call the existing fn_admin_update_withdrawal RPC ─────────────────────────
+// ── Approve or reject a withdrawal ───────────────────────────────────────────
 export const adminUpdateWithdrawal = async (transactionId, status, adminMessage = null) => {
   // Try the RPC first (works when the migration has been applied)
   const { error: rpcError } = await supabase.rpc('fn_admin_update_withdrawal', {
@@ -107,7 +145,15 @@ export const adminUpdateWithdrawal = async (transactionId, status, adminMessage 
     p_admin_message: adminMessage,
   })
 
-  if (!rpcError) return // RPC succeeded — done
+  if (!rpcError) {
+    await logAdminAction(
+      status === 'completed' ? 'withdrawal_approved' : 'withdrawal_rejected',
+      'withdrawal',
+      transactionId,
+      { status, admin_message: adminMessage }
+    )
+    return
+  }
 
   // Fallback: direct table update (works via the admin RLS policy)
   const { data: { user } } = await supabase.auth.getUser()
@@ -123,6 +169,13 @@ export const adminUpdateWithdrawal = async (transactionId, status, adminMessage 
     .eq('type', 'WITHDRAWAL')
 
   if (error) throw new Error(`Could not update withdrawal: ${error.message}`)
+
+  await logAdminAction(
+    status === 'completed' ? 'withdrawal_approved' : 'withdrawal_rejected',
+    'withdrawal',
+    transactionId,
+    { status, admin_message: adminMessage, fallback: true }
+  )
 }
 
 // ── Fetch all pending KYC submissions (admin only) ───────────────────────────
@@ -167,10 +220,10 @@ export const getAllKycSubmissions = async () => {
 // ── Get signed URLs for KYC document files ────────────────────────────────────
 export const getKycDocumentUrls = async (submission) => {
   const bucketMap = {
-    id_document_path: 'kyc-documents',
-    id_back_path: 'kyc-documents',
+    id_document_path:      'kyc-documents',
+    id_back_path:          'kyc-documents',
     proof_of_address_path: 'kyc-documents',
-    selfie_path: 'kyc-selfies',
+    selfie_path:           'kyc-selfies',
   }
 
   const urls = {}
@@ -195,6 +248,13 @@ export const adminReviewKyc = async (submissionId, status, reviewerNotes = null)
     p_reviewer_notes: reviewerNotes,
   })
   if (error) throw error
+
+  await logAdminAction(
+    status === 'approved' ? 'kyc_approved' : 'kyc_rejected',
+    'kyc_submission',
+    submissionId,
+    { status, reviewer_notes: reviewerNotes }
+  )
 }
 
 // ── List all registered users (admin only) ───────────────────────────────────
@@ -216,6 +276,13 @@ export const setUserAdminFlag = async (userId, isAdmin) => {
     .eq('id', userId)
 
   if (error) throw error
+
+  await logAdminAction(
+    isAdmin ? 'user_promoted_to_admin' : 'user_demoted_from_admin',
+    'user',
+    userId,
+    { is_admin: isAdmin }
+  )
 }
 
 // ── Update user status (active / suspended) ───────────────────────────────────
@@ -226,6 +293,8 @@ export const setUserStatus = async (userId, status) => {
     .eq('id', userId)
 
   if (error) throw error
+
+  await logAdminAction('user_status_changed', 'user', userId, { status })
 }
 
 // ── List all users WITH their portfolio balance ───────────────────────────────
@@ -264,6 +333,13 @@ export const adminAdjustBalance = async (portfolioId, operation, amount, note) =
     p_note: note,
   })
   if (error) throw error
+
+  await logAdminAction('balance_adjusted', 'portfolio', portfolioId, {
+    operation,
+    amount: Number(amount),
+    note,
+  })
+
   return data
 }
 
@@ -275,6 +351,13 @@ export const adminLockBalance = async (portfolioId, locked, reason = null) => {
     p_reason: reason,
   })
   if (error) throw error
+
+  await logAdminAction(
+    locked ? 'balance_locked' : 'balance_unlocked',
+    'portfolio',
+    portfolioId,
+    { locked, reason }
+  )
 }
 
 // ── Admin dashboard stats ─────────────────────────────────────────────────────
@@ -336,4 +419,132 @@ export const getAdminDashboardStats = async () => {
     totalUsers,
     totalPlatformValue,
   }
+}
+
+// ── Admin analytics: time-series data for charts (last 30 days) ───────────────
+const groupByDay = (items, dateField, valueField = null) => {
+  const result = {}
+  items.forEach(item => {
+    const raw = item[dateField]
+    if (!raw) return
+    const day = raw.split('T')[0]
+    if (!result[day]) result[day] = 0
+    result[day] += valueField ? (Number(item[valueField]) || 0) : 1
+  })
+  return result
+}
+
+const fillDays = (dataMap, days = 30) => {
+  const result = []
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date()
+    d.setDate(d.getDate() - i)
+    const key = d.toISOString().split('T')[0]
+    result.push({ date: key, label: key.slice(5), value: dataMap[key] || 0 })
+  }
+  return result
+}
+
+export const getAdminAnalytics = async () => {
+  const thirtyDaysAgo = new Date()
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+  const since = thirtyDaysAgo.toISOString()
+
+  const safe = async (fn) => {
+    try { return await fn() } catch { return [] }
+  }
+
+  const [signups, trades, withdrawals] = await Promise.all([
+    safe(() =>
+      supabase
+        .from('users')
+        .select('created_at')
+        .gte('created_at', since)
+        .then(r => r.data ?? [])
+    ),
+    safe(() =>
+      supabase
+        .from('transactions')
+        .select('transaction_date, total_amount, fee_amount, type')
+        .in('type', ['BUY', 'SELL'])
+        .gte('transaction_date', since)
+        .then(r => r.data ?? [])
+    ),
+    safe(() =>
+      supabase
+        .from('transactions')
+        .select('transaction_date, total_amount, status')
+        .eq('type', 'WITHDRAWAL')
+        .gte('transaction_date', since)
+        .then(r => r.data ?? [])
+    ),
+  ])
+
+  const signupsByDay  = groupByDay(signups,  'created_at')
+  const volumeByDay   = groupByDay(trades,   'transaction_date', 'total_amount')
+  const revenueByDay  = groupByDay(trades,   'transaction_date', 'fee_amount')
+
+  const withdrawalsByDay = {}
+  const withdrawalsPendingByDay = {}
+  withdrawals.forEach(w => {
+    const day = (w.transaction_date || '').split('T')[0]
+    if (!day) return
+    withdrawalsByDay[day] = (withdrawalsByDay[day] || 0) + 1
+    if (w.status === 'pending') {
+      withdrawalsPendingByDay[day] = (withdrawalsPendingByDay[day] || 0) + 1
+    }
+  })
+
+  const signupsSeries      = fillDays(signupsByDay)
+  const volumeSeries       = fillDays(volumeByDay)
+  const revenueSeries      = fillDays(revenueByDay)
+  const withdrawalsSeries  = fillDays(withdrawalsByDay).map((d, i) => ({
+    ...d,
+    pending: withdrawalsPendingByDay[d.date] || 0,
+  }))
+
+  const totalVolume  = volumeSeries.reduce((s, d) => s + d.value, 0)
+  const totalRevenue = revenueSeries.reduce((s, d) => s + d.value, 0)
+  const totalSignups = signupsSeries.reduce((s, d) => s + d.value, 0)
+  const totalWithdrawals = withdrawalsSeries.reduce((s, d) => s + d.value, 0)
+
+  return {
+    signups: signupsSeries,
+    volume: volumeSeries,
+    revenue: revenueSeries,
+    withdrawals: withdrawalsSeries,
+    totals: { totalVolume, totalRevenue, totalSignups, totalWithdrawals },
+  }
+}
+
+// ── Platform settings: read all ───────────────────────────────────────────────
+export const getPlatformSettings = async () => {
+  const { data, error } = await supabase
+    .from('platform_settings')
+    .select('*')
+    .order('key')
+
+  if (error) throw error
+
+  const map = {}
+  ;(data ?? []).forEach(row => { map[row.key] = row })
+  return map
+}
+
+// ── Platform settings: update one key ─────────────────────────────────────────
+export const updatePlatformSetting = async (key, value) => {
+  const { data: { user } } = await supabase.auth.getUser()
+
+  const { error } = await supabase
+    .from('platform_settings')
+    .upsert({
+      key,
+      value: typeof value === 'string' ? value : JSON.stringify(value),
+      updated_at: new Date().toISOString(),
+      updated_by: user?.id ?? null,
+    }, { onConflict: 'key' })
+
+  if (error) throw new Error(`Could not update setting "${key}": ${error.message}`)
+
+  await logAdminAction('setting_updated', 'platform_setting', key, { key, value })
 }
