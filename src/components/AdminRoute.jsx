@@ -7,11 +7,14 @@ import { toast } from 'sonner';
 export default function AdminRoute() {
   const { isAuthenticated, isLoadingAuth } = useAuth();
   const [isAdmin, setIsAdmin] = useState(null);
-  const [isChecking, setIsChecking] = useState(true);
+  const [isChecking, setIsChecking] = useState(false);
 
   useEffect(() => {
-    if (!isAuthenticated || isLoadingAuth) return;
+    // Only run the admin check once auth has resolved and the user is logged in
+    if (isLoadingAuth) return;
+    if (!isAuthenticated) return; // redirect handled below
 
+    setIsChecking(true);
     getAdminStatus()
       .then((adminFlag) => {
         setIsAdmin(adminFlag);
@@ -26,7 +29,8 @@ export default function AdminRoute() {
       .finally(() => setIsChecking(false));
   }, [isAuthenticated, isLoadingAuth]);
 
-  if (isLoadingAuth || isChecking) {
+  // Still loading auth session
+  if (isLoadingAuth) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-gray-950">
         <div className="w-8 h-8 border-4 border-gray-700 border-t-emerald-500 rounded-full animate-spin" />
@@ -34,10 +38,21 @@ export default function AdminRoute() {
     );
   }
 
+  // Not logged in — send to login immediately
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
+  // Logged in but still checking admin flag
+  if (isChecking || isAdmin === null) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-gray-950">
+        <div className="w-8 h-8 border-4 border-gray-700 border-t-emerald-500 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Logged in but not admin
   if (!isAdmin) {
     return <Navigate to="/" replace />;
   }

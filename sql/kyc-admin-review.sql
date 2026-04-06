@@ -142,9 +142,36 @@ CREATE POLICY IF NOT EXISTS "Admins can view all portfolios"
 --    (Run only if you haven't done this already)
 
 ALTER TABLE public.kyc_submissions
-  ADD COLUMN IF NOT EXISTS reviewed_at  timestamp with time zone DEFAULT NULL,
-  ADD COLUMN IF NOT EXISTS reviewed_by  uuid DEFAULT NULL REFERENCES public.users(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS reviewed_at   timestamp with time zone DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS reviewed_by   uuid DEFAULT NULL REFERENCES public.users(id) ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS reviewer_notes text DEFAULT NULL;
+
+-- ── 5. Expand transactions.status constraint to include 'rejected' ────────────
+--    The default schema only allows: pending, completed, failed, cancelled.
+--    Admin withdrawal rejection requires 'rejected' as a distinct status.
+
+ALTER TABLE public.transactions
+  DROP CONSTRAINT IF EXISTS transactions_status_check;
+
+ALTER TABLE public.transactions
+  ADD CONSTRAINT transactions_status_check
+  CHECK (status IN ('pending', 'completed', 'failed', 'cancelled', 'rejected'));
+
+-- ── 6. Admin storage policies for KYC document buckets ───────────────────────
+--    Without these, createSignedUrl for other users' files returns 403.
+--    Admins must be able to read objects from kyc-documents and kyc-selfies.
+
+CREATE POLICY IF NOT EXISTS "Admins can read all kyc documents"
+  ON storage.objects
+  FOR SELECT
+  TO authenticated
+  USING (
+    bucket_id IN ('kyc-documents', 'kyc-selfies')
+    AND EXISTS (
+      SELECT 1 FROM public.users
+      WHERE id = auth.uid() AND is_admin = true
+    )
+  );
 
 -- ============================================================================
 -- HOW TO MAKE A USER AN ADMIN (if not already done via withdrawal-migration.sql):
