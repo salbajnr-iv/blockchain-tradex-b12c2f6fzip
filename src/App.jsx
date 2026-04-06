@@ -31,6 +31,12 @@ import PaymentsSettings from './pages/settings/Payments';
 import KycSettings from './pages/settings/Kyc';
 import TermsOfService from './pages/TermsOfService';
 import PrivacyPolicy from './pages/PrivacyPolicy';
+import AdminRoute from './components/AdminRoute';
+import AdminLayout from './pages/admin/AdminLayout';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminWithdrawals from './pages/admin/AdminWithdrawals';
+import AdminKyc from './pages/admin/AdminKyc';
+import AdminUsers from './pages/admin/AdminUsers';
 
 function App() {
   return (
@@ -88,6 +94,16 @@ function App() {
                       <Route path="payments" element={<PaymentsSettings />} />
                       <Route path="kyc" element={<KycSettings />} />
                     </Route>
+                  </Route>
+                </Route>
+
+                {/* Admin routes — gated behind AdminRoute */}
+                <Route element={<AdminRoute />}>
+                  <Route path="/admin" element={<AdminLayout />}>
+                    <Route index element={<AdminDashboard />} />
+                    <Route path="withdrawals" element={<AdminWithdrawals />} />
+                    <Route path="kyc" element={<AdminKyc />} />
+                    <Route path="users" element={<AdminUsers />} />
                   </Route>
                 </Route>
 
