@@ -34,11 +34,42 @@ Run this script in Supabase SQL Editor to enable the new withdrawal system:
 - RLS policies for admin to view and update all transactions
 - `fn_admin_update_withdrawal(transaction_id, status, message)` RPC function for admin console
 
-### Admin Console (Pending)
-Not yet developed. To use admin features:
-1. Run `withdrawal-migration.sql`
+### Admin Console (Built)
+Full admin panel at `/admin` with login at `/admin/login`.
+
+**To enable admin access:**
+1. Run `database.sql`, `withdrawal-migration.sql`, `sql/admin-balance-management.sql` in Supabase
 2. `UPDATE public.users SET is_admin = true WHERE email = 'admin@yourdomain.com';`
-3. Admin can call `fn_admin_update_withdrawal` via Supabase client to update status + send message
+
+**Admin panel pages:**
+- `/admin` — Dashboard with platform stats (pending withdrawals, pending KYC, total users, platform AUM)
+- `/admin/withdrawals` — Approve/reject withdrawals, with rejection reason form
+- `/admin/kyc` — Review KYC submissions with document viewer, approve/reject
+- `/admin/users` — User management: cash balance adjust/set/deduct, balance lock/unlock, admin flag toggle, suspend/reactivate
+
+**RPCs required (from SQL migration files):**
+- `fn_admin_update_withdrawal(p_transaction_id, p_status, p_admin_message)`
+- `fn_admin_review_kyc(p_submission_id, p_status, p_reviewer_notes)`
+- `fn_admin_adjust_balance(p_portfolio_id, p_operation, p_amount, p_note)`
+- `fn_admin_lock_balance(p_portfolio_id, p_locked, p_reason)`
+
+**Key technical note:** The Supabase queries in `src/lib/api/admin.js` use explicit FK column hints (e.g. `portfolios!portfolio_id`, `users!user_id`) to avoid "ambiguous relationship" errors when tables have multiple FK paths.
+
+### Mobile Responsiveness (Admin + User)
+All admin pages (AdminLayout, AdminDashboard, AdminUsers, AdminKyc, AdminWithdrawals) are fully responsive:
+- AdminLayout: hamburger menu with overlay sidebar for mobile; static sidebar for lg+
+- AdminDashboard: responsive stat cards grid (1→2→4 columns)
+- AdminUsers/AdminKyc/AdminWithdrawals: mobile card view (`lg:hidden`) + desktop table (`hidden lg:block`)
+- All modals are bottom-sheets on mobile (`items-end` + `rounded-t-2xl`)
+
+### KYC Draft Saving
+Per-step progress is saved to `localStorage` under key `kyc_draft_${userId}`:
+- `saveKycDraft(userId, draft)` / `loadKycDraft(userId)` / `clearKycDraft(userId)` in `src/lib/api/kyc.js`
+- Draft stores: `step`, `personal`, `docInfo`, `savedAt`
+- File uploads (idFront, idBack, selfie, address) are NOT saved (File objects can't be serialized)
+- Draft banner shown on page load with "Continue" (restores step + data) and "Start over" (clears draft)
+- "Save & Exit" button available on steps 1+
+- Draft auto-cleared on successful submission
 
 ### Transaction List Enhancements
 - `admin_message` field now displayed in Transactions page under withdrawal entries

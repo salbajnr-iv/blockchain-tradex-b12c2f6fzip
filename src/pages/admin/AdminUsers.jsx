@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import {
   RefreshCw, Search, Shield, ShieldOff, X,
   PlusCircle, MinusCircle, SlidersHorizontal, Lock, Unlock,
-  DollarSign,
+  DollarSign, User, MoreVertical, ChevronDown, ChevronUp,
 } from 'lucide-react';
 
 const STATUS_COLORS = {
@@ -102,15 +102,15 @@ function BalanceModal({ user, onClose, onSuccess }) {
   const op = OPERATIONS.find((o) => o.key === operation);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-lg">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 p-0 sm:p-4">
+      <div className="bg-gray-900 border border-gray-800 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
           <div>
             <h3 className="text-lg font-semibold text-white">Manage Balance</h3>
             <p className="text-sm text-gray-400">{user.full_name || user.username} · {user.email}</p>
           </div>
-          <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
+          <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors p-1">
             <X size={20} />
           </button>
         </div>
@@ -136,7 +136,7 @@ function BalanceModal({ user, onClose, onSuccess }) {
                 </span>
               )}
               {isLocked && portfolio?.balance_locked_reason && (
-                <p className="text-xs text-gray-500 max-w-[160px] text-right">{portfolio.balance_locked_reason}</p>
+                <p className="text-xs text-gray-500 max-w-[140px] text-right">{portfolio.balance_locked_reason}</p>
               )}
             </div>
           </div>
@@ -273,6 +273,96 @@ function BalanceModal({ user, onClose, onSuccess }) {
   );
 }
 
+// Mobile user card
+function UserCard({ u, onBalanceClick, onAdminToggle, onStatusToggle, actionLoading }) {
+  const [expanded, setExpanded] = useState(false);
+  const bal = u.portfolio?.cash_balance;
+  const isLocked = u.portfolio?.balance_locked;
+
+  return (
+    <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 space-y-3">
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
+            <User size={16} className="text-emerald-400" />
+          </div>
+          <div>
+            <p className="text-white font-medium text-sm">{u.full_name || u.username || '—'}</p>
+            <p className="text-gray-500 text-xs">{u.email}</p>
+          </div>
+        </div>
+        <button onClick={() => setExpanded(!expanded)} className="text-gray-500 p-1">
+          {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        </button>
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium capitalize ${STATUS_COLORS[u.status] || 'bg-gray-800 text-gray-400'}`}>
+          {u.status || 'active'}
+        </span>
+        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium capitalize ${KYC_TIER_COLORS[u.kyc_tier] || 'bg-gray-800 text-gray-400'}`}>
+          {u.kyc_tier || 'basic'}{u.kyc_verified && ' ✓'}
+        </span>
+        {u.is_admin && (
+          <span className="inline-flex items-center gap-1 text-xs text-emerald-400 font-medium">
+            <Shield size={11} /> Admin
+          </span>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs text-gray-500">Balance</p>
+          <div className="flex items-center gap-1.5">
+            <span className="text-white font-semibold text-sm">{bal !== undefined ? fmt(bal) : '—'}</span>
+            {isLocked && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-red-500/15 text-red-400 text-[10px] rounded">
+                <Lock size={9} /> Locked
+              </span>
+            )}
+          </div>
+        </div>
+        <p className="text-xs text-gray-600">{u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}</p>
+      </div>
+
+      {expanded && (
+        <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-gray-800">
+          <button
+            onClick={() => onBalanceClick(u)}
+            disabled={!u.portfolio}
+            className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 disabled:opacity-40 rounded-lg text-xs transition-colors"
+          >
+            <DollarSign size={12} /> Balance
+          </button>
+          <button
+            onClick={() => onAdminToggle(u.id, u.is_admin)}
+            disabled={actionLoading === u.id + '-admin'}
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs transition-colors disabled:opacity-50 ${
+              u.is_admin
+                ? 'bg-emerald-500/10 text-emerald-400 hover:bg-red-500/10 hover:text-red-400'
+                : 'bg-gray-800 text-gray-400 hover:bg-emerald-500/10 hover:text-emerald-400'
+            }`}
+          >
+            {u.is_admin ? <ShieldOff size={12} /> : <Shield size={12} />}
+            {u.is_admin ? 'Revoke' : 'Admin'}
+          </button>
+          <button
+            onClick={() => onStatusToggle(u.id, u.status)}
+            disabled={actionLoading === u.id + '-status'}
+            className={`px-2.5 py-1.5 rounded-lg text-xs transition-colors disabled:opacity-50 ${
+              u.status === 'suspended'
+                ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'
+                : 'bg-gray-800 text-gray-400 hover:bg-red-500/10 hover:text-red-400'
+            }`}
+          >
+            {u.status === 'suspended' ? 'Reactivate' : 'Suspend'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminUsers() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -331,7 +421,6 @@ export default function AdminUsers() {
     setUsers((prev) =>
       prev.map((u) => u.id === userId ? { ...u, portfolio: updatedPortfolio } : u)
     );
-    // Update the balance target so the modal reflects the new balance immediately
     setBalanceTarget((prev) => prev ? { ...prev, portfolio: updatedPortfolio } : null);
   };
 
@@ -346,19 +435,19 @@ export default function AdminUsers() {
   });
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-8">
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div className="flex items-center justify-between mb-6 sm:mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-white">Users</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-white">Users</h1>
           <p className="text-gray-400 text-sm mt-1">Manage accounts, balances, and permissions</p>
         </div>
         <button
           onClick={loadUsers}
           disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm rounded-lg transition-colors disabled:opacity-50"
+          className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm rounded-lg transition-colors disabled:opacity-50"
         >
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-          Refresh
+          <span className="hidden sm:inline">Refresh</span>
         </button>
       </div>
 
@@ -377,7 +466,38 @@ export default function AdminUsers() {
         <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">{error}</div>
       )}
 
-      <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+      {/* Mobile cards */}
+      <div className="lg:hidden space-y-3">
+        {loading ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="bg-gray-900 border border-gray-800 rounded-xl p-4 animate-pulse">
+              <div className="flex gap-3">
+                <div className="w-9 h-9 bg-gray-800 rounded-full" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 bg-gray-800 rounded w-32" />
+                  <div className="h-3 bg-gray-800 rounded w-48" />
+                </div>
+              </div>
+            </div>
+          ))
+        ) : filtered.length === 0 ? (
+          <div className="text-center py-12 text-gray-500">No users found.</div>
+        ) : (
+          filtered.map((u) => (
+            <UserCard
+              key={u.id}
+              u={u}
+              onBalanceClick={setBalanceTarget}
+              onAdminToggle={handleAdminToggle}
+              onStatusToggle={handleStatusToggle}
+              actionLoading={actionLoading}
+            />
+          ))
+        )}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden lg:block bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -447,7 +567,6 @@ export default function AdminUsers() {
                       </td>
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          {/* Balance management */}
                           <button
                             onClick={() => setBalanceTarget(u)}
                             disabled={!u.portfolio}
@@ -457,7 +576,6 @@ export default function AdminUsers() {
                             <DollarSign size={12} />
                             Balance
                           </button>
-                          {/* Admin toggle */}
                           <button
                             onClick={() => handleAdminToggle(u.id, u.is_admin)}
                             disabled={actionLoading === u.id + '-admin'}
@@ -471,7 +589,6 @@ export default function AdminUsers() {
                             {u.is_admin ? <ShieldOff size={12} /> : <Shield size={12} />}
                             {u.is_admin ? 'Revoke' : 'Admin'}
                           </button>
-                          {/* Suspend / reactivate */}
                           <button
                             onClick={() => handleStatusToggle(u.id, u.status)}
                             disabled={actionLoading === u.id + '-status'}

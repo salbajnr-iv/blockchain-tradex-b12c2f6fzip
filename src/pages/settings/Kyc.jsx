@@ -6,6 +6,9 @@ import {
   uploadKycFile,
   submitKycApplication,
   subscribeToKycStatus,
+  saveKycDraft,
+  loadKycDraft,
+  clearKycDraft,
 } from "@/lib/api/kyc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +18,7 @@ import {
   ShieldCheck, ShieldAlert, ShieldX, Clock, Upload, ChevronRight,
   ChevronLeft, CheckCircle2, Loader2, FileText, Camera, User,
   Globe, MapPin, Calendar, CreditCard, AlertCircle, Zap, Info,
+  Save,
 } from "lucide-react";
 
 const STEPS = ["Personal Info", "Document Info", "Upload ID", "Selfie", "Review"];
@@ -253,12 +257,37 @@ function SubmissionStatus({ submission, onResubmit }) {
   );
 }
 
+// ── Draft banner ─────────────────────────────────────────────────────────────
+function DraftBanner({ step, onContinue, onDiscard }) {
+  return (
+    <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+      <div className="flex items-center gap-3 flex-1">
+        <Save className="w-4 h-4 text-primary shrink-0" />
+        <div>
+          <p className="text-sm font-semibold text-foreground">Draft saved</p>
+          <p className="text-xs text-muted-foreground">You previously stopped at step {step + 1} of {STEPS.length}. Continue from where you left off.</p>
+        </div>
+      </div>
+      <div className="flex gap-2 shrink-0">
+        <Button size="sm" onClick={onContinue} className="bg-primary hover:bg-primary/90 text-xs h-8">
+          Continue
+        </Button>
+        <Button size="sm" variant="ghost" onClick={onDiscard} className="text-xs h-8 text-muted-foreground">
+          Start over
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 // ── Main KYC page ────────────────────────────────────────────────────────────
 export default function KycSettings() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [submission, setSubmission] = useState(null);
   const [forceNew, setForceNew] = useState(false);
+  const [hasDraft, setHasDraft] = useState(false);
+  const [draftStep, setDraftStep] = useState(0);
 
   // Form state
   const [step, setStep] = useState(0);
@@ -275,12 +304,23 @@ export default function KycSettings() {
     idFront: null, idBack: null, selfie: null, address: null,
   });
 
+  // Load draft on mount
   useEffect(() => {
     getLatestKycSubmission()
       .then(setSubmission)
       .catch(() => setSubmission(null))
       .finally(() => setLoading(false));
   }, []);
+
+  // Check for saved draft after user is available
+  useEffect(() => {
+    if (!user?.id) return;
+    const draft = loadKycDraft(user.id);
+    if (draft && draft.step > 0) {
+      setHasDraft(true);
+      setDraftStep(draft.step);
+    }
+  }, [user?.id]);
 
   const showForm = forceNew || !submission || ["rejected", "more_info_needed"].includes(submission?.status);
   const showExisting = submission && !forceNew;
@@ -289,12 +329,51 @@ export default function KycSettings() {
   const updateDoc = (k, v) => setDocInfo(d => ({ ...d, [k]: v }));
   const updateFile = (k, v) => setFiles(f => ({ ...f, [k]: v }));
 
+  // Save draft whenever step/form data changes
+  const persistDraft = (nextStep, personalData, docData) => {
+    if (!user?.id) return;
+    saveKycDraft(user.id, {
+      step: nextStep,
+      personal: personalData,
+      docInfo: docData,
+      savedAt: new Date().toISOString(),
+    });
+  };
+
+  const handleContinueDraft = () => {
+    if (!user?.id) return;
+    const draft = loadKycDraft(user.id);
+    if (draft) {
+      if (draft.personal) setPersonal(draft.personal);
+      if (draft.docInfo) setDocInfo(draft.docInfo);
+      setStep(draft.step);
+    }
+    setHasDraft(false);
+  };
+
+  const handleDiscardDraft = () => {
+    if (user?.id) clearKycDraft(user.id);
+    setHasDraft(false);
+  };
+
   const canProceed = () => {
     if (step === 0) return personal.firstName && personal.lastName && personal.dateOfBirth && personal.nationality && personal.country && personal.addressLine1 && personal.city && personal.postalCode;
     if (step === 1) return docInfo.type && docInfo.number && docInfo.country;
     if (step === 2) return files.idFront;
     if (step === 3) return files.selfie;
     return true;
+  };
+
+  const handleNext = () => {
+    const nextStep = step + 1;
+    setStep(nextStep);
+    persistDraft(nextStep, personal, docInfo);
+  };
+
+  const handleBack = () => {
+    const prevStep = step - 1;
+    setStep(prevStep);
+    persistDraft(prevStep, personal, docInfo);
   };
 
   const handleSubmit = async () => {
@@ -315,8 +394,10 @@ export default function KycSettings() {
         filePaths: uploaded,
       });
 
+      clearKycDraft(uid);
       setSubmission(result);
       setForceNew(false);
+      setHasDraft(false);
       toast.success("KYC application submitted! We'll review it within 1-3 business days.");
     } catch (err) {
       toast.error(err.message || "Submission failed. Please try again.");
@@ -363,17 +444,26 @@ export default function KycSettings() {
         </div>
       </div>
 
+      {/* Draft banner */}
+      {showForm && hasDraft && (
+        <DraftBanner
+          step={draftStep}
+          onContinue={handleContinueDraft}
+          onDiscard={handleDiscardDraft}
+        />
+      )}
+
       {/* Existing submission */}
       {showExisting && (
         <SubmissionStatus
           submission={submission}
-          onResubmit={() => setForceNew(true)}
+          onResubmit={() => { setForceNew(true); setHasDraft(false); }}
         />
       )}
 
       {/* New application form */}
       {showForm && (
-        <div className="bg-card border border-border/50 rounded-xl p-6">
+        <div className="bg-card border border-border/50 rounded-xl p-4 sm:p-6">
           <StepIndicator current={step} steps={STEPS} />
 
           <AnimatePresence mode="wait">
@@ -470,8 +560,7 @@ export default function KycSettings() {
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-muted-foreground">Expiry Date</label>
-                    <Input type="date" value={docInfo.expiry} onChange={e => updateDoc("expiry", e.target.value)}
-                      min={new Date().toISOString().split("T")[0]} className="bg-secondary/50 border-border/50" />
+                    <Input type="date" value={docInfo.expiry} onChange={e => updateDoc("expiry", e.target.value)} className="bg-secondary/50 border-border/50" />
                   </div>
                   <div className="sm:col-span-2 space-y-1.5">
                     <label className="text-xs font-medium text-muted-foreground flex items-center gap-1"><Globe className="w-3 h-3" /> Issuing Country *</label>
@@ -482,13 +571,6 @@ export default function KycSettings() {
                     </select>
                   </div>
                 </div>
-                <div className="bg-secondary/30 rounded-lg p-4 flex gap-3">
-                  <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                  <p className="text-xs text-muted-foreground">
-                    Make sure all document details match exactly as they appear on your ID. Mismatches may cause rejection.
-                    All data is encrypted at rest with AES-256.
-                  </p>
-                </div>
               </motion.div>
             )}
 
@@ -496,48 +578,38 @@ export default function KycSettings() {
             {step === 2 && (
               <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                  <FileText className="w-4 h-4" /> Upload Identity Documents
+                  <FileText className="w-4 h-4" /> Upload ID Document
                 </h3>
-                <p className="text-sm text-muted-foreground">
-                  Upload clear, well-lit photos of your {DOC_TYPES.find(d => d.value === docInfo.type)?.label}.
-                  Accepted formats: JPG, PNG, PDF — max 10MB each.
-                </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FileDropZone
                     label="ID Front *"
                     icon={FileText}
-                    accept="image/jpeg,image/png,image/webp,application/pdf"
+                    accept="image/*,.pdf"
                     file={files.idFront}
-                    onChange={(f) => updateFile("idFront", f)}
-                    hint="Clear photo of the front side"
+                    onChange={f => updateFile("idFront", f)}
+                    hint="Clear photo of front side"
                   />
-                  {docInfo.type !== "passport" && (
-                    <FileDropZone
-                      label="ID Back"
-                      icon={FileText}
-                      accept="image/jpeg,image/png,image/webp,application/pdf"
-                      file={files.idBack}
-                      onChange={(f) => updateFile("idBack", f)}
-                      hint="Clear photo of the back side"
-                    />
-                  )}
                   <FileDropZone
-                    label="Proof of Address (optional)"
-                    icon={MapPin}
-                    accept="image/jpeg,image/png,image/webp,application/pdf"
-                    file={files.address}
-                    onChange={(f) => updateFile("address", f)}
-                    hint="Utility bill or bank statement (last 3 months)"
+                    label="ID Back"
+                    icon={FileText}
+                    accept="image/*,.pdf"
+                    file={files.idBack}
+                    onChange={f => updateFile("idBack", f)}
+                    hint="Clear photo of back side"
                   />
+                  <div className="sm:col-span-2">
+                    <FileDropZone
+                      label="Proof of Address"
+                      icon={MapPin}
+                      accept="image/*,.pdf"
+                      file={files.address}
+                      onChange={f => updateFile("address", f)}
+                      hint="Bank statement or utility bill (last 3 months)"
+                    />
+                  </div>
                 </div>
-                <div className="bg-secondary/30 rounded-lg p-4">
-                  <p className="text-xs font-semibold text-foreground mb-2">Tips for a successful submission:</p>
-                  <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
-                    <li>Ensure all four corners of the document are visible</li>
-                    <li>Make sure text is readable and not blurry</li>
-                    <li>Avoid glare, shadows, and reflections</li>
-                    <li>Do not edit or crop the image</li>
-                  </ul>
+                <div className="bg-secondary/40 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground">Accepted formats: JPG, PNG, PDF · Max size: 10MB per file</p>
                 </div>
               </motion.div>
             )}
@@ -546,30 +618,32 @@ export default function KycSettings() {
             {step === 3 && (
               <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                  <Camera className="w-4 h-4" /> Liveness Selfie
+                  <Camera className="w-4 h-4" /> Selfie Verification
                 </h3>
-                <p className="text-sm text-muted-foreground">
-                  Take or upload a clear selfie to confirm you are the owner of the document.
-                  Max file size: 5MB.
-                </p>
-                <div className="max-w-sm mx-auto">
+                <div className="max-w-sm">
                   <FileDropZone
-                    label="Upload Selfie *"
+                    label="Selfie with ID *"
                     icon={Camera}
-                    accept="image/jpeg,image/png,image/webp"
+                    accept="image/*"
                     file={files.selfie}
-                    onChange={(f) => updateFile("selfie", f)}
-                    hint="Face clearly visible, good lighting"
+                    onChange={f => updateFile("selfie", f)}
+                    hint="Hold your ID next to your face"
                   />
                 </div>
-                <div className="bg-secondary/30 rounded-lg p-4">
-                  <p className="text-xs font-semibold text-foreground mb-2">Selfie requirements:</p>
-                  <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
-                    <li>Face fully visible and centered</li>
-                    <li>No sunglasses or face coverings</li>
-                    <li>Good, even lighting — no harsh shadows</li>
-                    <li>Plain or neutral background preferred</li>
-                    <li>Photo should be recent (taken today)</li>
+                <div className="bg-secondary/40 rounded-lg p-4 space-y-2">
+                  <p className="text-xs font-semibold text-foreground">Tips for a good selfie:</p>
+                  <ul className="text-xs text-muted-foreground space-y-1">
+                    {[
+                      "Good lighting — avoid harsh shadows",
+                      "Face and ID clearly visible",
+                      "No glasses or hats",
+                      "Look directly at the camera",
+                    ].map(tip => (
+                      <li key={tip} className="flex items-center gap-2">
+                        <CheckCircle2 className="w-3 h-3 text-primary shrink-0" />
+                        {tip}
+                      </li>
+                    ))}
                   </ul>
                 </div>
               </motion.div>
@@ -581,94 +655,117 @@ export default function KycSettings() {
                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4" /> Review & Submit
                 </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="bg-secondary/30 rounded-xl p-4 space-y-3">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Personal</p>
-                    {[
-                      { label: "Name",      value: `${personal.firstName} ${personal.lastName}` },
-                      { label: "DOB",       value: personal.dateOfBirth },
-                      { label: "Nationality", value: personal.nationality },
-                      { label: "Country",   value: personal.country },
-                    ].map(({ label, value }) => (
-                      <div key={label} className="flex justify-between text-xs">
-                        <span className="text-muted-foreground">{label}</span>
-                        <span className="font-medium text-foreground">{value || "—"}</span>
-                      </div>
-                    ))}
+                <div className="space-y-4">
+                  <div className="bg-secondary/40 rounded-xl p-4 space-y-3">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Personal Information</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                      <div><span className="text-muted-foreground">Name: </span><span className="font-medium">{personal.firstName} {personal.lastName}</span></div>
+                      <div><span className="text-muted-foreground">DOB: </span><span className="font-medium">{personal.dateOfBirth || "—"}</span></div>
+                      <div><span className="text-muted-foreground">Nationality: </span><span className="font-medium">{personal.nationality || "—"}</span></div>
+                      <div><span className="text-muted-foreground">Country: </span><span className="font-medium">{personal.country || "—"}</span></div>
+                      <div className="sm:col-span-2"><span className="text-muted-foreground">Address: </span><span className="font-medium">{[personal.addressLine1, personal.city, personal.postalCode].filter(Boolean).join(", ") || "—"}</span></div>
+                    </div>
                   </div>
-                  <div className="bg-secondary/30 rounded-xl p-4 space-y-3">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Document</p>
-                    {[
-                      { label: "Type",    value: DOC_TYPES.find(d => d.value === docInfo.type)?.label },
-                      { label: "Number",  value: docInfo.number ? `****${docInfo.number.slice(-4)}` : "—" },
-                      { label: "Expiry",  value: docInfo.expiry || "—" },
-                      { label: "Country", value: docInfo.country || "—" },
-                    ].map(({ label, value }) => (
-                      <div key={label} className="flex justify-between text-xs">
-                        <span className="text-muted-foreground">{label}</span>
-                        <span className="font-medium text-foreground">{value}</span>
-                      </div>
-                    ))}
+                  <div className="bg-secondary/40 rounded-xl p-4 space-y-3">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Document</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                      <div><span className="text-muted-foreground">Type: </span><span className="font-medium capitalize">{docInfo.type.replace("_", " ")}</span></div>
+                      <div><span className="text-muted-foreground">Number: </span><span className="font-medium">{docInfo.number ? `****${docInfo.number.slice(-4)}` : "—"}</span></div>
+                      <div><span className="text-muted-foreground">Country: </span><span className="font-medium">{docInfo.country || "—"}</span></div>
+                      <div><span className="text-muted-foreground">Expiry: </span><span className="font-medium">{docInfo.expiry || "—"}</span></div>
+                    </div>
                   </div>
-                  <div className="sm:col-span-2 bg-secondary/30 rounded-xl p-4 space-y-2">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Uploaded Files</p>
-                    {[
-                      { label: "ID Front",         file: files.idFront,  required: true },
-                      { label: "ID Back",          file: files.idBack,   required: false },
-                      { label: "Selfie",           file: files.selfie,   required: true },
-                      { label: "Proof of Address", file: files.address,  required: false },
-                    ].map(({ label, file, required }) => (
-                      <div key={label} className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">{label}{required && " *"}</span>
-                        {file
-                          ? <span className="text-green-500 font-medium flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> {file.name}</span>
-                          : <span className="text-muted-foreground">{required ? "Missing" : "Not provided"}</span>
-                        }
-                      </div>
-                    ))}
+                  <div className="bg-secondary/40 rounded-xl p-4 space-y-3">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Uploaded Files</p>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      {[
+                        ["ID Front", files.idFront],
+                        ["ID Back", files.idBack],
+                        ["Selfie", files.selfie],
+                        ["Proof of Address", files.address],
+                      ].map(([label, file]) => (
+                        <div key={label} className="flex items-center gap-1.5">
+                          {file
+                            ? <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                            : <div className="w-3.5 h-3.5 rounded-full border border-border shrink-0" />}
+                          <span className={file ? "text-foreground font-medium" : "text-muted-foreground"}>{label}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-                <div className="bg-primary/5 border border-primary/15 rounded-lg p-4 flex gap-3">
-                  <ShieldCheck className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                  <p className="text-xs text-muted-foreground">
-                    By submitting, you confirm that all information is accurate and the documents are genuine.
-                    False submissions may result in permanent account suspension. Review takes 1–3 business days.
-                  </p>
+                  <div className="bg-primary/5 border border-primary/10 rounded-xl p-4">
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      By submitting, you confirm all information is accurate and authentic. False information may result in permanent account suspension.
+                    </p>
+                  </div>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
 
           {/* Navigation */}
-          <div className="flex items-center justify-between mt-8 pt-4 border-t border-border/30">
+          <div className="flex items-center justify-between mt-8 pt-6 border-t border-border/40">
             <Button
               variant="outline"
-              onClick={() => step > 0 ? setStep(s => s - 1) : setForceNew(false)}
-              className="border-border/50 text-muted-foreground hover:text-foreground"
+              onClick={handleBack}
+              disabled={step === 0 || submitting}
+              className="gap-2"
             >
-              <ChevronLeft className="w-4 h-4 mr-1" />
-              {step === 0 ? "Cancel" : "Back"}
+              <ChevronLeft className="w-4 h-4" />
+              Back
             </Button>
-            {step < STEPS.length - 1 ? (
-              <Button
-                onClick={() => setStep(s => s + 1)}
-                disabled={!canProceed()}
-                className="bg-primary hover:bg-primary/90"
-              >
-                Next
-                <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
-            ) : (
-              <Button
-                onClick={handleSubmit}
-                disabled={submitting}
-                className="bg-primary hover:bg-primary/90 min-w-32"
-              >
-                {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ShieldCheck className="w-4 h-4 mr-2" />}
-                {submitting ? "Submitting…" : "Submit Application"}
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              {step < STEPS.length - 1 ? (
+                <>
+                  {step > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        persistDraft(step, personal, docInfo);
+                        toast.success("Progress saved. You can continue later.");
+                      }}
+                      className="gap-1.5 text-muted-foreground text-xs hidden sm:flex"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      Save & Exit
+                    </Button>
+                  )}
+                  <Button
+                    onClick={handleNext}
+                    disabled={!canProceed()}
+                    className="bg-primary hover:bg-primary/90 gap-2"
+                  >
+                    Next
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  onClick={handleSubmit}
+                  disabled={submitting}
+                  className="bg-primary hover:bg-primary/90 gap-2"
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck className="w-4 h-4" />
+                      Submit Application
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
           </div>
+
+          {/* Step counter */}
+          <p className="text-center text-xs text-muted-foreground mt-4">
+            Step {step + 1} of {STEPS.length} — {STEPS[step]}
+          </p>
         </div>
       )}
     </div>

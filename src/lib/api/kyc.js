@@ -1,5 +1,29 @@
 import { supabase } from '@/lib/supabaseClient'
 
+// ── Draft key helpers ─────────────────────────────────────────────────────────
+const draftKey = (userId) => `kyc_draft_${userId}`
+
+export const saveKycDraft = (userId, draft) => {
+  try {
+    localStorage.setItem(draftKey(userId), JSON.stringify(draft))
+  } catch { /* ignore storage errors */ }
+}
+
+export const loadKycDraft = (userId) => {
+  try {
+    const raw = localStorage.getItem(draftKey(userId))
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+export const clearKycDraft = (userId) => {
+  try {
+    localStorage.removeItem(draftKey(userId))
+  } catch { /* ignore */ }
+}
+
 // ── fetch the user's latest KYC submission ──────────────────────────────────
 export const getLatestKycSubmission = async () => {
   const { data: { user } } = await supabase.auth.getUser()

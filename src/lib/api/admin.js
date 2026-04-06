@@ -21,10 +21,10 @@ export const getPendingWithdrawals = async () => {
     .from('transactions')
     .select(`
       *,
-      portfolios (
+      portfolios!portfolio_id (
         id,
         user_id,
-        users ( id, email, full_name, username )
+        users!user_id ( id, email, full_name, username )
       )
     `)
     .eq('type', 'WITHDRAWAL')
@@ -32,7 +32,12 @@ export const getPendingWithdrawals = async () => {
     .order('transaction_date', { ascending: false })
 
   if (error) throw error
-  return data ?? []
+  return (data ?? []).map(tx => ({
+    ...tx,
+    portfolios: tx.portfolios
+      ? { ...tx.portfolios, users: tx.portfolios.users }
+      : null,
+  }))
 }
 
 // ── Fetch ALL withdrawal transactions (admin only) ────────────────────────────
@@ -41,10 +46,10 @@ export const getAllWithdrawals = async () => {
     .from('transactions')
     .select(`
       *,
-      portfolios (
+      portfolios!portfolio_id (
         id,
         user_id,
-        users ( id, email, full_name, username )
+        users!user_id ( id, email, full_name, username )
       )
     `)
     .eq('type', 'WITHDRAWAL')
@@ -70,7 +75,7 @@ export const getPendingKycSubmissions = async () => {
     .from('kyc_submissions')
     .select(`
       *,
-      users ( id, email, full_name, username )
+      users!user_id ( id, email, full_name, username )
     `)
     .eq('status', 'pending')
     .order('submitted_at', { ascending: false })
@@ -85,7 +90,7 @@ export const getAllKycSubmissions = async () => {
     .from('kyc_submissions')
     .select(`
       *,
-      users ( id, email, full_name, username )
+      users!user_id ( id, email, full_name, username )
     `)
     .order('submitted_at', { ascending: false })
 
@@ -159,19 +164,30 @@ export const setUserStatus = async (userId, status) => {
 
 // ── List all users WITH their portfolio balance ───────────────────────────────
 export const getAllUsersWithBalances = async () => {
-  const { data, error } = await supabase
+  // Step 1: fetch users
+  const { data: users, error: usersError } = await supabase
     .from('users')
-    .select(`
-      id, email, full_name, username, kyc_tier, kyc_verified,
-      status, is_admin, created_at, last_login,
-      portfolios ( id, cash_balance, total_value, balance_locked, balance_locked_reason, balance_locked_at )
-    `)
+    .select('id, email, full_name, username, kyc_tier, kyc_verified, status, is_admin, created_at, last_login')
     .order('created_at', { ascending: false })
 
-  if (error) throw error
-  return (data ?? []).map((u) => ({
+  if (usersError) throw usersError
+  if (!users || users.length === 0) return []
+
+  // Step 2: fetch portfolios for those users (avoids ambiguous FK join)
+  const userIds = users.map(u => u.id)
+  const { data: portfolios, error: portfoliosError } = await supabase
+    .from('portfolios')
+    .select('id, user_id, cash_balance, total_value, balance_locked, balance_locked_reason, balance_locked_at')
+    .in('user_id', userIds)
+
+  if (portfoliosError) throw portfoliosError
+
+  const portfolioByUserId = {}
+  ;(portfolios ?? []).forEach(p => { portfolioByUserId[p.user_id] = p })
+
+  return users.map(u => ({
     ...u,
-    portfolio: u.portfolios?.[0] ?? null,
+    portfolio: portfolioByUserId[u.id] ?? null,
   }))
 }
 
