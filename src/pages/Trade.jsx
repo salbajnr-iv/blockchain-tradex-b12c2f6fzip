@@ -2,16 +2,18 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useLivePrices } from "@/hooks/useLivePrices";
 import { usePortfolio } from "@/contexts/PortfolioContext";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { executeTrade, listTrades } from "@/lib/api/portfolio";
+import { createPendingOrder, listPendingOrders, cancelPendingOrder } from "@/lib/api/pendingOrders";
 import { supabase } from "@/lib/supabaseClient";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import DepositDialog from "@/components/crypto/DepositDialog";
+import TradeConfirmModal from "@/components/crypto/TradeConfirmModal";
 import {
   TrendingUp, TrendingDown, Loader2, Wallet, PlusCircle, ArrowUpRight,
   ArrowDownLeft, Zap, RefreshCw, BarChart2, Clock, ChevronDown, Info,
-  Activity,
+  Activity, X, AlertCircle,
 } from "lucide-react";
 
 // ── small helpers ─────────────────────────────────────────────────────────────
@@ -95,12 +97,103 @@ function OrderBook({ coin }) {
   );
 }
 
+// ── pending orders list ───────────────────────────────────────────────────────
+function PendingOrdersList({ portfolioId }) {
+  const queryClient = useQueryClient();
+  const { data: orders = [], isLoading } = useQuery({
+    queryKey: ["pending-orders", portfolioId],
+    queryFn: () => listPendingOrders(portfolioId, "pending"),
+    enabled: !!portfolioId,
+    refetchInterval: 15000,
+    initialData: [],
+  });
+
+  // Realtime updates
+  useEffect(() => {
+    if (!portfolioId) return;
+    const ch = supabase
+      .channel(`pending-orders:${portfolioId}`)
+      .on("postgres_changes", {
+        event: "*", schema: "public", table: "pending_orders",
+        filter: `portfolio_id=eq.${portfolioId}`,
+      }, () => queryClient.invalidateQueries({ queryKey: ["pending-orders", portfolioId] }))
+      .subscribe();
+    return () => supabase.removeChannel(ch);
+  }, [portfolioId, queryClient]);
+
+  const handleCancel = async (orderId) => {
+    try {
+      await cancelPendingOrder(orderId);
+      queryClient.invalidateQueries({ queryKey: ["pending-orders", portfolioId] });
+      toast.success("Order cancelled");
+    } catch (err) {
+      toast.error(err.message || "Failed to cancel order");
+    }
+  };
+
+  if (isLoading) return null;
+  if (orders.length === 0) return null;
+
+  return (
+    <div className="bg-card border border-border/50 rounded-xl p-4">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+          <Clock className="w-3.5 h-3.5" /> Pending Orders
+        </span>
+        <span className="text-[10px] bg-amber-500/15 text-amber-500 font-semibold px-2 py-0.5 rounded-full">
+          {orders.length} open
+        </span>
+      </div>
+      <div className="space-y-2">
+        {orders.map((order) => {
+          const isBuy = order.side === "BUY";
+          const fees = order.quantity * order.limit_price * 0.001;
+          const net = isBuy
+            ? order.quantity * order.limit_price + fees
+            : order.quantity * order.limit_price - fees;
+          return (
+            <div key={order.id} className="flex items-center gap-3 py-2 border-b border-border/20 last:border-0">
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${isBuy ? "bg-primary/10" : "bg-destructive/10"}`}>
+                <Clock className={`w-3.5 h-3.5 ${isBuy ? "text-primary" : "text-destructive"}`} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold">{isBuy ? "Limit Buy" : "Limit Sell"} {order.symbol}</span>
+                  <span className={`text-xs font-semibold tabular-nums ${isBuy ? "text-primary" : "text-destructive"}`}>
+                    {fmt(order.quantity, 6)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-muted-foreground">
+                    {isBuy ? "Fills when price ≤" : "Fills when price ≥"} ${fmt(order.limit_price)}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground tabular-nums">
+                    ~${fmt(net)}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => handleCancel(order.id)}
+                className="text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                title="Cancel order"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── trade panel ───────────────────────────────────────────────────────────────
 function TradePanel({ coin, side, setSide, portfolioId, cashBalance, holdingsMap, refetch, onDeposit }) {
   const [orderType, setOrderType] = useState("market");
   const [amount, setAmount] = useState("");
   const [limitPrice, setLimitPrice] = useState("");
   const [isPending, setIsPending] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const price = orderType === "limit" && limitPrice ? parseFloat(limitPrice) : (coin?.price || 0);
@@ -117,34 +210,62 @@ function TradePanel({ coin, side, setSide, portfolioId, cashBalance, holdingsMap
     if (!coin) return;
     if (side === "buy") {
       const spendable = cashBalance * pct;
-      const qty = spendable / price / 1.001;
-      setAmount(qty > 0 ? qty.toFixed(6) : "");
+      const q = spendable / price / 1.001;
+      setAmount(q > 0 ? q.toFixed(6) : "");
     } else {
       setAmount((currentHolding * pct).toFixed(6));
     }
   };
 
-  const handleTrade = async () => {
+  const handleSubmitClick = () => {
     if (!qty || qty <= 0) { toast.error("Enter a valid amount"); return; }
     if (!portfolioId)       { toast.error("Portfolio not loaded"); return; }
     if (!coin)              { toast.error("No coin selected"); return; }
+    setConfirmOpen(true);
+  };
+
+  const handleConfirm = async () => {
     setIsPending(true);
     try {
-      await executeTrade(portfolioId, cashBalance, {
-        symbol: coin.symbol, name: coin.name,
-        type: side === "buy" ? "BUY" : "SELL",
-        quantity: qty, unitPrice: price,
-      });
-      await refetch();
-      queryClient.invalidateQueries({ queryKey: ["trades", portfolioId] });
-      toast.success(`${side === "buy" ? "Bought" : "Sold"} ${fmt(qty, 6)} ${coin.symbol}`);
+      if (orderType === "limit") {
+        // Queue a real pending limit order — it will be filled automatically
+        // by usePendingOrderEngine when the market price reaches the limit.
+        await createPendingOrder(portfolioId, {
+          symbol: coin.symbol,
+          name: coin.name,
+          side: side === "buy" ? "BUY" : "SELL",
+          quantity: qty,
+          limitPrice: price,
+          notes: `Limit ${side.toUpperCase()} placed at $${fmt(price)}`,
+        });
+        queryClient.invalidateQueries({ queryKey: ["pending-orders", portfolioId] });
+        toast.success(`Limit order placed`, {
+          description: `${side === "buy" ? "Buy" : "Sell"} ${fmt(qty, 6)} ${coin.symbol} when price ${side === "buy" ? "≤" : "≥"} $${fmt(price)}`,
+        });
+      } else {
+        await executeTrade(portfolioId, cashBalance, {
+          symbol: coin.symbol, name: coin.name,
+          type: side === "buy" ? "BUY" : "SELL",
+          quantity: qty, unitPrice: price,
+        });
+        await refetch();
+        queryClient.invalidateQueries({ queryKey: ["trades", portfolioId] });
+        toast.success(`${side === "buy" ? "Bought" : "Sold"} ${fmt(qty, 6)} ${coin.symbol}`);
+      }
       setAmount("");
+      setLimitPrice("");
+      setConfirmOpen(false);
     } catch (err) {
       toast.error(err.message || "Trade failed");
     } finally {
       setIsPending(false);
     }
   };
+
+  const confirmData = coin ? {
+    side, orderType, symbol: coin.symbol, name: coin.name,
+    quantity: qty, price, fee, total, cashBalance,
+  } : null;
 
   return (
     <div className="space-y-4">
@@ -190,6 +311,16 @@ function TradePanel({ coin, side, setSide, portfolioId, cashBalance, holdingsMap
           </button>
         </div>
       </div>
+
+      {/* Limit order info banner */}
+      {orderType === "limit" && (
+        <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2.5">
+          <AlertCircle className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />
+          <p className="text-[11px] text-amber-600 dark:text-amber-400 leading-relaxed">
+            Limit orders are queued and filled automatically when the market price reaches your target.
+          </p>
+        </div>
+      )}
 
       {/* Limit price input */}
       {orderType === "limit" && (
@@ -288,19 +419,29 @@ function TradePanel({ coin, side, setSide, portfolioId, cashBalance, holdingsMap
 
       {/* Submit */}
       <button
-        onClick={handleTrade}
-        disabled={isPending || !qty || !portfolioId || !coin || insufficientFunds || insufficientHoldings}
+        onClick={handleSubmitClick}
+        disabled={!qty || !portfolioId || !coin || insufficientFunds || insufficientHoldings}
         className={`w-full h-11 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
           side === "buy"
             ? "bg-primary hover:bg-primary/90 text-primary-foreground"
             : "bg-destructive hover:bg-destructive/90 text-destructive-foreground"
         }`}
       >
-        {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
         {insufficientFunds ? "Insufficient Funds"
           : insufficientHoldings ? "Insufficient Holdings"
+          : orderType === "limit"
+          ? `Place ${side === "buy" ? "Buy" : "Sell"} Limit Order`
           : `${side === "buy" ? "Buy" : "Sell"} ${coin?.symbol || ""}`}
       </button>
+
+      {/* Confirmation modal */}
+      <TradeConfirmModal
+        open={confirmOpen}
+        onConfirm={handleConfirm}
+        onCancel={() => setConfirmOpen(false)}
+        isLoading={isPending}
+        data={confirmData}
+      />
     </div>
   );
 }
@@ -578,6 +719,9 @@ export default function Trade() {
               />
             )}
           </div>
+
+          {/* Pending orders */}
+          <PendingOrdersList portfolioId={portfolioId} />
 
           {/* Position card */}
           {coin && holdingsMap[coin.symbol] && (

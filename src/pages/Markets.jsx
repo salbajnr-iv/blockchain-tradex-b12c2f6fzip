@@ -1,6 +1,8 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { useMarketCoins } from "@/hooks/useMarketCoins";
 import { usePortfolio } from "@/contexts/PortfolioContext";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { getWatchlist, addToWatchlist, removeFromWatchlist } from "@/lib/api/watchlist";
 import { TrendingUp, TrendingDown, Loader2, Search, RefreshCw, ArrowUpDown, ArrowUp, ArrowDown, Star, ExternalLink } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -47,7 +49,7 @@ function SortIcon({ active, direction }) {
 
 export default function Markets() {
   const { coins, isLoading, error, lastUpdated, refetch } = useMarketCoins();
-  const { holdingsMap } = usePortfolio();
+  const { holdingsMap, portfolioId } = usePortfolio();
   const navigate = useNavigate();
 
   const [search, setSearch] = useState("");
@@ -55,22 +57,38 @@ export default function Markets() {
   const [sortKey, setSortKey] = useState("rank");
   const [sortDir, setSortDir] = useState("asc");
   const [page, setPage] = useState(1);
-  const [watchlist, setWatchlist] = useState(() => {
-    try { return new Set(JSON.parse(localStorage.getItem("bt-watchlist") || "[]")); }
-    catch { return new Set(); }
+  const queryClient = useQueryClient();
+
+  const { data: watchlistSymbols = [] } = useQuery({
+    queryKey: ["watchlist", portfolioId],
+    queryFn: () => getWatchlist(portfolioId),
+    enabled: !!portfolioId,
+    initialData: [],
   });
+
+  const watchlist = new Set(watchlistSymbols);
 
   const PER_PAGE = 25;
 
-  const toggleWatch = (symbol, e) => {
+  const toggleWatch = useCallback(async (symbol, coinName, e) => {
     e.stopPropagation();
-    setWatchlist((prev) => {
-      const next = new Set(prev);
-      next.has(symbol) ? next.delete(symbol) : next.add(symbol);
-      try { localStorage.setItem("bt-watchlist", JSON.stringify([...next])); } catch {}
-      return next;
-    });
-  };
+    if (!portfolioId) return;
+    const isWatched = watchlistSymbols.includes(symbol);
+    // Optimistic update
+    queryClient.setQueryData(["watchlist", portfolioId], (prev = []) =>
+      isWatched ? prev.filter((s) => s !== symbol) : [...prev, symbol]
+    );
+    try {
+      if (isWatched) {
+        await removeFromWatchlist(portfolioId, symbol);
+      } else {
+        await addToWatchlist(portfolioId, symbol, coinName);
+      }
+    } catch {
+      // Revert on failure
+      queryClient.invalidateQueries({ queryKey: ["watchlist", portfolioId] });
+    }
+  }, [portfolioId, watchlistSymbols, queryClient]);
 
   const handleSort = (key) => {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -236,7 +254,7 @@ export default function Markets() {
                         {/* Watchlist star */}
                         <td className="pl-4 py-3 w-8">
                           <button
-                            onClick={(e) => toggleWatch(coin.symbol, e)}
+                            onClick={(e) => toggleWatch(coin.symbol, coin.name, e)}
                             className={`transition-colors ${isWatched ? "text-yellow-400" : "text-transparent group-hover:text-muted-foreground/40 hover:text-yellow-400"}`}
                           >
                             <Star className={`w-3.5 h-3.5 ${isWatched ? "fill-yellow-400" : ""}`} />

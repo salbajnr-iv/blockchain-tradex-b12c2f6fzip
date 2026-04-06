@@ -17,6 +17,8 @@ import { usePortfolio } from "@/contexts/PortfolioContext";
 import { useQuery } from "@tanstack/react-query";
 import { listAlerts } from "@/lib/api/alerts";
 import { useSystemNotifications } from "@/hooks/useSystemNotifications";
+import { useAlertEngine } from "@/hooks/useAlertEngine";
+import { usePendingOrderEngine } from "@/hooks/usePendingOrderEngine";
 import { motion, AnimatePresence } from "framer-motion";
 
 const NAV_SECTIONS = [
@@ -338,6 +340,10 @@ export default function Layout() {
 
   const cryptoPrices = cryptoList.reduce((acc, c) => { acc[c.symbol] = c.price; return acc; }, {});
   const cryptoChanges = cryptoList.reduce((acc, c) => { acc[c.symbol] = c.change24h; return acc; }, {});
+
+  // Background engines — wire live prices into alert checking and limit order filling
+  useAlertEngine(cryptoPrices);
+  usePendingOrderEngine(cryptoPrices);
 
   const handleLogout = async () => {
     try { await signOut(); } catch (err) { console.error("Logout error:", err); }
