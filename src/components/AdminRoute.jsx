@@ -38,9 +38,9 @@ export default function AdminRoute() {
     );
   }
 
-  // Not logged in — send to login immediately
+  // Not logged in — send to admin login
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/admin/login" replace />;
   }
 
   // Logged in but still checking admin flag

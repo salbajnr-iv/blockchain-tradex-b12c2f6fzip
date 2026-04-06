@@ -279,5 +279,29 @@ npm run dev   # Runs on port 5000
 - `src/pages/settings/Payments.jsx` — saved payment methods manager
 - `supabase-updates.sql` — `user_preferences` table (optional, for future cloud sync)
 
+## Admin Panel (April 2026)
+
+### Separate Admin Login (`/admin/login`)
+- Completely isolated from the regular user login at `/login`
+- Dark split-panel design: left brand panel lists admin capabilities, right panel has the form
+- After sign-in, checks `is_admin` from the `users` table; if not admin, signs the user out immediately with an error toast
+- If already authenticated as an admin, redirects directly to `/admin`
+- `AdminRoute` now redirects unauthenticated users to `/admin/login` (not `/login`)
+- Admin sign-out also returns to `/admin/login`
+
+### Balance Management (`/admin/users`)
+- Users table now includes a **Cash Balance** column with live lock indicator
+- **Manage Balance** button opens a modal for each user with:
+  - Current balance + holdings overview + lock status
+  - Three operation modes: **Add Funds**, **Deduct Funds**, **Set Balance**
+  - Live preview of resulting balance (red warning if it goes negative)
+  - Required reason/note field — all operations are logged to the `transactions` table
+  - **Lock / Unlock Balance** section: locking prevents user transactions, stores reason + timestamp
+- New SQL migration: `sql/admin-balance-management.sql`
+  - `balance_locked`, `balance_locked_reason`, `balance_locked_at`, `balance_locked_by` columns on `portfolios`
+  - `fn_admin_adjust_balance(portfolio_id, operation, amount, note)` — SECURITY DEFINER RPC
+  - `fn_admin_lock_balance(portfolio_id, locked, reason)` — SECURITY DEFINER RPC
+  - Admin RLS policies for `portfolios` UPDATE and `transactions` INSERT
+
 ## Last Updated
-April 3, 2026
+April 6, 2026

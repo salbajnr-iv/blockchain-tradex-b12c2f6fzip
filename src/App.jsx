@@ -32,6 +32,7 @@ import KycSettings from './pages/settings/Kyc';
 import TermsOfService from './pages/TermsOfService';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import AdminRoute from './components/AdminRoute';
+import AdminLogin from './pages/admin/AdminLogin';
 import AdminLayout from './pages/admin/AdminLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminWithdrawals from './pages/admin/AdminWithdrawals';
@@ -96,6 +97,9 @@ function App() {
                     </Route>
                   </Route>
                 </Route>
+
+                {/* Admin login — public, no auth required */}
+                <Route path="/admin/login" element={<AdminLogin />} />
 
                 {/* Admin routes — gated behind AdminRoute */}
                 <Route element={<AdminRoute />}>

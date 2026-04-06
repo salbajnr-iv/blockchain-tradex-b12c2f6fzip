@@ -24,7 +24,7 @@ export default function AdminLayout() {
   const handleSignOut = async () => {
     try {
       await signOut();
-      navigate('/login');
+      navigate('/admin/login');
     } catch {
       toast.error('Sign out failed');
     }

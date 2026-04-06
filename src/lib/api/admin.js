@@ -157,6 +157,46 @@ export const setUserStatus = async (userId, status) => {
   if (error) throw error
 }
 
+// ── List all users WITH their portfolio balance ───────────────────────────────
+export const getAllUsersWithBalances = async () => {
+  const { data, error } = await supabase
+    .from('users')
+    .select(`
+      id, email, full_name, username, kyc_tier, kyc_verified,
+      status, is_admin, created_at, last_login,
+      portfolios ( id, cash_balance, total_value, balance_locked, balance_locked_reason, balance_locked_at )
+    `)
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+  return (data ?? []).map((u) => ({
+    ...u,
+    portfolio: u.portfolios?.[0] ?? null,
+  }))
+}
+
+// ── Admin: add, deduct, or set a user's cash balance via RPC ─────────────────
+export const adminAdjustBalance = async (portfolioId, operation, amount, note) => {
+  const { data, error } = await supabase.rpc('fn_admin_adjust_balance', {
+    p_portfolio_id: portfolioId,
+    p_operation: operation,
+    p_amount: Number(amount),
+    p_note: note,
+  })
+  if (error) throw error
+  return data
+}
+
+// ── Admin: lock or unlock a user's balance ────────────────────────────────────
+export const adminLockBalance = async (portfolioId, locked, reason = null) => {
+  const { error } = await supabase.rpc('fn_admin_lock_balance', {
+    p_portfolio_id: portfolioId,
+    p_locked: locked,
+    p_reason: reason,
+  })
+  if (error) throw error
+}
+
 // ── Admin dashboard stats ─────────────────────────────────────────────────────
 export const getAdminDashboardStats = async () => {
   const [
