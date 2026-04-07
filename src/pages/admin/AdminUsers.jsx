@@ -5,18 +5,18 @@ import {
   setUserStatus,
   adminAdjustBalance,
   adminLockBalance,
+  logAdminAction,
 } from '@/lib/api/admin';
 import {
   adminGetUserCryptoBalances,
   adminAdjustCryptoBalance,
 } from '@/lib/api/cryptoDeposits';
-import { logAdminAction } from '@/lib/api/admin';
 import { toast } from 'sonner';
 import {
   RefreshCw, Search, Shield, ShieldOff, X,
   PlusCircle, MinusCircle, SlidersHorizontal, Lock, Unlock,
-  DollarSign, User, MoreVertical, ChevronDown, ChevronUp,
-  Trash2, Plus, Bitcoin, Loader2,
+  DollarSign, User, ChevronDown, ChevronUp,
+  Trash2, Plus, Loader2,
 } from 'lucide-react';
 
 const CRYPTO_ASSETS = ['BTC', 'ETH', 'SOL', 'BNB', 'USDT', 'USDC'];
