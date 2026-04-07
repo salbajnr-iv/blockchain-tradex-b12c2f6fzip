@@ -1,0 +1,160 @@
+import { supabase } from '@/lib/supabaseClient';
+
+// ── Master Wallets ───────────────────────────────────────────────────────────
+
+export const getMasterWallets = async () => {
+  const { data, error } = await supabase
+    .from('master_wallets')
+    .select('*')
+    .eq('is_active', true)
+    .order('asset');
+  if (error) throw error;
+  return data ?? [];
+};
+
+// ── User Balances ────────────────────────────────────────────────────────────
+
+export const getUserCryptoBalances = async (userId) => {
+  if (!userId) return [];
+  const { data, error } = await supabase
+    .from('user_balances')
+    .select('*')
+    .eq('user_id', userId)
+    .order('asset');
+  if (error) throw error;
+  return data ?? [];
+};
+
+// ── Deposit Submission ───────────────────────────────────────────────────────
+
+export const uploadDepositProof = async (userId, file) => {
+  const ext = file.name.split('.').pop();
+  const path = `${userId}/${Date.now()}.${ext}`;
+
+  const { error } = await supabase.storage
+    .from('deposit-proofs')
+    .upload(path, file, { upsert: false });
+
+  if (error) throw error;
+  return path;
+};
+
+export const getDepositProofUrl = async (path) => {
+  const { data, error } = await supabase.storage
+    .from('deposit-proofs')
+    .createSignedUrl(path, 60 * 60); // 1 hour
+  if (error) throw error;
+  return data.signedUrl;
+};
+
+export const submitCryptoDeposit = async ({
+  userId,
+  asset,
+  network,
+  amount,
+  txHash,
+  proofFile,
+}) => {
+  if (!userId) throw new Error('User not authenticated');
+  if (!asset || !network) throw new Error('Asset and network are required');
+  if (!amount || parseFloat(amount) <= 0) throw new Error('Amount must be greater than 0');
+
+  let proofUrl = null;
+  if (proofFile) {
+    proofUrl = await uploadDepositProof(userId, proofFile);
+  }
+
+  const { data, error } = await supabase
+    .from('deposits')
+    .insert({
+      user_id:   userId,
+      asset,
+      network,
+      amount:    parseFloat(amount),
+      tx_hash:   txHash?.trim() || null,
+      proof_url: proofUrl,
+      status:    'pending',
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+// ── User Deposit History ─────────────────────────────────────────────────────
+
+export const getUserDeposits = async (userId, limit = 50) => {
+  if (!userId) return [];
+  const { data, error } = await supabase
+    .from('deposits')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data ?? [];
+};
+
+// ── Admin: All Deposits ──────────────────────────────────────────────────────
+
+export const adminGetAllDeposits = async ({ status = null, limit = 100 } = {}) => {
+  let query = supabase
+    .from('deposits')
+    .select(`
+      *,
+      user:user_id (
+        id,
+        email,
+        full_name,
+        username
+      )
+    `)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (status) {
+    query = query.eq('status', status);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+};
+
+// ── Admin: Approve Deposit ───────────────────────────────────────────────────
+
+export const adminApproveDeposit = async (depositId, adminNote = null) => {
+  const { data, error } = await supabase
+    .rpc('fn_approve_deposit', {
+      p_deposit_id:  depositId,
+      p_admin_note:  adminNote,
+    });
+  if (error) throw error;
+  if (!data.success) throw new Error(data.error || 'Approval failed');
+  return data;
+};
+
+// ── Admin: Reject Deposit ────────────────────────────────────────────────────
+
+export const adminRejectDeposit = async (depositId, adminNote) => {
+  if (!adminNote?.trim()) throw new Error('Rejection reason is required');
+  const { data, error } = await supabase
+    .rpc('fn_reject_deposit', {
+      p_deposit_id:  depositId,
+      p_admin_note:  adminNote.trim(),
+    });
+  if (error) throw error;
+  if (!data.success) throw new Error(data.error || 'Rejection failed');
+  return data;
+};
+
+// ── Admin: Mark Under Review ─────────────────────────────────────────────────
+
+export const adminSetUnderReview = async (depositId) => {
+  const { data, error } = await supabase
+    .rpc('fn_set_deposit_under_review', { p_deposit_id: depositId });
+  if (error) throw error;
+  if (!data.success) throw new Error(data.error || 'Failed to mark under review');
+  return data;
+};

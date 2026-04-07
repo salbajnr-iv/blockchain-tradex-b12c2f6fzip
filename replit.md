@@ -4,7 +4,57 @@
 
 **Blockchain Tradex** is a full-featured cryptocurrency trading dashboard and portfolio management application built with React 18, Vite, and Tailwind CSS. Uses Supabase for authentication and PostgreSQL database, CoinGecko API for live market data.
 
-## Withdrawal System (Latest)
+## Crypto Deposit System (Latest)
+
+### Assets Page (`/assets`)
+- **Route**: `/assets` — full-page, protected route inside the Layout
+- **Navigation**: Sidebar "Assets" item under the Portfolio section
+- **Features**:
+  - Displays all active master wallet addresses (BTC, ETH, SOL, BNB, USDT, USDC)
+  - Each asset card shows the deposit address with a one-click copy button
+  - User crypto balances (from `user_balances` table) shown per asset
+  - "Submit Deposit Proof" flow: enter amount, optional TX hash, upload proof file (image/PDF)
+  - Proof files uploaded to Supabase Storage bucket `deposit-proofs` under `<user_id>/` path
+  - Deposit History tab: shows all deposits with status badges, admin notes, proof viewer
+  - Status filter: all / pending / under_review / completed / rejected
+
+### Admin Deposits Page (`/admin/deposits`)
+- **Route**: `/admin/deposits` — inside AdminLayout, linked in admin sidebar
+- **Features**:
+  - Lists all deposits across all users with search (email, asset, tx hash)
+  - Status filter tabs with pending count badge
+  - Summary stats (total, pending, under review, completed)
+  - Detail modal per deposit: view user info, tx hash, proof file (signed URL), admin note input
+  - Mark Under Review → Approve & Credit Balance → Reject (with reason) actions
+  - Approval calls `fn_approve_deposit` RPC (atomic, double-credit protected)
+  - Rejection calls `fn_reject_deposit` RPC
+  - All actions logged to `admin_audit_log` via `logAdminAction`
+
+### SQL Migration (`sql/master_wallet_deposit_system.sql`)
+Run this script in Supabase SQL Editor to create the full deposit system:
+- `master_wallets` table — global wallet addresses per asset/network
+- `user_balances` table — per-user, per-asset crypto balances
+- `deposits` table — manual deposit submissions with status enum
+- RLS policies for all three tables
+- Storage RLS for `deposit-proofs` bucket
+- `fn_approve_deposit(deposit_id, admin_note)` — atomic approval + balance credit
+- `fn_reject_deposit(deposit_id, admin_note)` — rejection without balance change
+- `fn_set_deposit_under_review(deposit_id)` — marks pending → under_review
+
+### API Layer (`src/lib/api/cryptoDeposits.js`)
+- `getMasterWallets()` — fetch active wallet addresses
+- `getUserCryptoBalances(userId)` — fetch user's per-asset balances
+- `submitCryptoDeposit({userId, asset, network, amount, txHash, proofFile})` — upload proof + insert deposit
+- `getUserDeposits(userId)` — user's deposit history
+- `adminGetAllDeposits({status, limit})` — admin: all deposits with user info
+- `adminApproveDeposit(id, note)` — calls fn_approve_deposit RPC
+- `adminRejectDeposit(id, note)` — calls fn_reject_deposit RPC
+- `adminSetUnderReview(id)` — calls fn_set_deposit_under_review RPC
+- `getDepositProofUrl(path)` — generate signed URL for proof file
+
+---
+
+## Withdrawal System
 
 ### Professional Withdrawal Page (`/withdrawal`)
 - **Route**: `/withdrawal` — full-page, protected route inside the Layout

@@ -31,7 +31,8 @@ const NAV_SECTIONS = [
   {
     title: "Portfolio",
     items: [
-      { label: "Transactions", icon: History,   path: "/transactions" },
+      { label: "Assets",       icon: Wallet,     path: "/assets" },
+      { label: "Transactions", icon: History,    path: "/transactions" },
       { label: "Analytics",    icon: LineChart,  path: "/analytics" },
       { label: "Card",         icon: CreditCard, path: "/card" },
     ],

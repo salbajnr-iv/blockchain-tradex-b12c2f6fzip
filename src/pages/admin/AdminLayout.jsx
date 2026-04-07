@@ -12,12 +12,14 @@ import {
   X,
   Settings,
   ScrollText,
+  ArrowUpToLine,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import ThemeToggle from '@/components/ThemeToggle';
 
 const navItems = [
   { to: '/admin',            label: 'Dashboard',  icon: LayoutDashboard, end: true },
+  { to: '/admin/deposits',   label: 'Deposits',   icon: ArrowUpToLine },
   { to: '/admin/withdrawals',label: 'Withdrawals', icon: ArrowDownToLine },
   { to: '/admin/kyc',        label: 'KYC Review',  icon: ShieldCheck },
   { to: '/admin/users',      label: 'Users',       icon: Users },
