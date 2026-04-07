@@ -158,3 +158,54 @@ export const adminSetUnderReview = async (depositId) => {
   if (!data.success) throw new Error(data.error || 'Failed to mark under review');
   return data;
 };
+
+// ── Admin: Fetch a single user's crypto balances ─────────────────────────────
+
+export const adminGetUserCryptoBalances = async (userId) => {
+  if (!userId) return [];
+  const { data, error } = await supabase
+    .from('user_balances')
+    .select('*')
+    .eq('user_id', userId)
+    .order('asset');
+  if (error) throw error;
+  return data ?? [];
+};
+
+// ── Admin: Adjust a user's crypto balance (add / deduct / set / delete) ──────
+
+export const adminAdjustCryptoBalance = async (userId, asset, operation, amount, note) => {
+  const { data, error } = await supabase.rpc('fn_admin_adjust_crypto_balance', {
+    p_user_id:   userId,
+    p_asset:     asset,
+    p_operation: operation,
+    p_amount:    operation === 'delete' ? 0 : Number(amount),
+    p_note:      note || null,
+  });
+  if (error) throw error;
+  if (!data.success) throw new Error(data.error || 'Balance adjustment failed');
+  return data;
+};
+
+// ── Admin: Insert/upsert a fresh crypto balance row ──────────────────────────
+// (used when creating a balance for an asset the user doesn't have yet)
+
+export const adminSetCryptoBalance = async (userId, asset, amount) => {
+  if (!userId || !asset) throw new Error('userId and asset required');
+  const { error } = await supabase
+    .from('user_balances')
+    .upsert({ user_id: userId, asset, balance: Number(amount), updated_at: new Date().toISOString() },
+      { onConflict: 'user_id,asset' });
+  if (error) throw error;
+};
+
+// ── Admin: Delete a specific crypto balance row ───────────────────────────────
+
+export const adminDeleteCryptoBalance = async (userId, asset) => {
+  const { error } = await supabase
+    .from('user_balances')
+    .delete()
+    .eq('user_id', userId)
+    .eq('asset', asset);
+  if (error) throw error;
+};

@@ -6,12 +6,35 @@ import {
   adminAdjustBalance,
   adminLockBalance,
 } from '@/lib/api/admin';
+import {
+  adminGetUserCryptoBalances,
+  adminAdjustCryptoBalance,
+} from '@/lib/api/cryptoDeposits';
+import { logAdminAction } from '@/lib/api/admin';
 import { toast } from 'sonner';
 import {
   RefreshCw, Search, Shield, ShieldOff, X,
   PlusCircle, MinusCircle, SlidersHorizontal, Lock, Unlock,
   DollarSign, User, MoreVertical, ChevronDown, ChevronUp,
+  Trash2, Plus, Bitcoin, Loader2,
 } from 'lucide-react';
+
+const CRYPTO_ASSETS = ['BTC', 'ETH', 'SOL', 'BNB', 'USDT', 'USDC'];
+
+const ASSET_META = {
+  BTC:  { icon: '₿', color: 'text-orange-400' },
+  ETH:  { icon: 'Ξ', color: 'text-blue-400' },
+  SOL:  { icon: '◎', color: 'text-purple-400' },
+  BNB:  { icon: 'B', color: 'text-yellow-400' },
+  USDT: { icon: '₮', color: 'text-emerald-400' },
+  USDC: { icon: '$', color: 'text-sky-400' },
+};
+
+const CRYPTO_OPS = [
+  { key: 'add',    label: 'Add',    icon: PlusCircle,        color: 'text-emerald-400', btnColor: 'bg-emerald-600 hover:bg-emerald-500' },
+  { key: 'deduct', label: 'Deduct', icon: MinusCircle,       color: 'text-red-400',     btnColor: 'bg-red-600 hover:bg-red-500' },
+  { key: 'set',    label: 'Set',    icon: SlidersHorizontal, color: 'text-blue-400',    btnColor: 'bg-blue-600 hover:bg-blue-500' },
+];
 
 const STATUS_COLORS = {
   active: 'bg-emerald-500/15 text-emerald-400',
@@ -34,11 +57,258 @@ const OPERATIONS = [
 const fmt = (v) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v ?? 0);
 
+// ── Crypto balance panel inside BalanceModal ──────────────────────────────────
+function CryptoBalancePanel({ user }) {
+  const [balances, setBalances]       = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [editingAsset, setEditing]    = useState(null); // asset string
+  const [operation, setOperation]     = useState('add');
+  const [amount, setAmount]           = useState('');
+  const [note, setNote]               = useState('');
+  const [submitting, setSubmitting]   = useState(false);
+  const [deletingAsset, setDeleting]  = useState(null);
+  const [showNewForm, setShowNewForm] = useState(false);
+  const [newAsset, setNewAsset]       = useState('');
+  const [newAmount, setNewAmount]     = useState('');
+  const [newNote, setNewNote]         = useState('');
+  const [addingNew, setAddingNew]     = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    try { setBalances(await adminGetUserCryptoBalances(user.id)); }
+    catch (err) { toast.error(err.message || 'Failed to load crypto balances'); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { load(); }, [user.id]);
+
+  const existingAssets = new Set(balances.map(b => b.asset));
+  const availableForNew = CRYPTO_ASSETS.filter(a => !existingAssets.has(a));
+
+  const openEdit = (asset) => {
+    setEditing(asset); setOperation('add'); setAmount(''); setNote('');
+  };
+
+  const currentBal = (asset) => {
+    const row = balances.find(b => b.asset === asset);
+    return row ? parseFloat(row.balance) : 0;
+  };
+
+  const computePreview = (asset) => {
+    const n = parseFloat(amount);
+    if (isNaN(n) || n < 0) return null;
+    const cur = currentBal(asset);
+    if (operation === 'add')    return cur + n;
+    if (operation === 'deduct') return cur - n;
+    if (operation === 'set')    return n;
+    return null;
+  };
+
+  const handleAdjust = async (asset) => {
+    const n = parseFloat(amount);
+    if (isNaN(n) || n < 0) { toast.error('Enter a valid amount'); return; }
+    if (!note.trim()) { toast.error('A reason is required'); return; }
+    const preview = computePreview(asset);
+    if (preview !== null && preview < 0) { toast.error('Balance cannot go negative'); return; }
+
+    setSubmitting(true);
+    try {
+      const result = await adminAdjustCryptoBalance(user.id, asset, operation, n, note.trim());
+      await logAdminAction('crypto_balance_adjusted', 'user_balance', user.id, { asset, operation, amount: n, note: note.trim() });
+      toast.success(`${asset} balance updated → ${result.new_balance}`);
+      setEditing(null); setAmount(''); setNote('');
+      await load();
+    } catch (err) {
+      toast.error(err.message || 'Adjustment failed');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (asset) => {
+    setDeleting(asset);
+    try {
+      await adminAdjustCryptoBalance(user.id, asset, 'delete', 0, 'Admin deleted balance row');
+      await logAdminAction('crypto_balance_deleted', 'user_balance', user.id, { asset });
+      toast.success(`${asset} balance removed`);
+      await load();
+    } catch (err) {
+      toast.error(err.message || 'Delete failed');
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  const handleAddNew = async (e) => {
+    e.preventDefault();
+    if (!newAsset) { toast.error('Select an asset'); return; }
+    const n = parseFloat(newAmount);
+    if (isNaN(n) || n < 0) { toast.error('Enter a valid amount'); return; }
+    if (!newNote.trim()) { toast.error('A reason is required'); return; }
+    setAddingNew(true);
+    try {
+      await adminAdjustCryptoBalance(user.id, newAsset, 'set', n, newNote.trim());
+      await logAdminAction('crypto_balance_created', 'user_balance', user.id, { asset: newAsset, amount: n, note: newNote.trim() });
+      toast.success(`${newAsset} balance set to ${n}`);
+      setShowNewForm(false); setNewAsset(''); setNewAmount(''); setNewNote('');
+      await load();
+    } catch (err) {
+      toast.error(err.message || 'Failed to create balance');
+    } finally {
+      setAddingNew(false);
+    }
+  };
+
+  if (loading) return (
+    <div className="py-10 flex justify-center"><Loader2 size={22} className="animate-spin text-gray-500" /></div>
+  );
+
+  return (
+    <div className="space-y-3">
+      {/* Existing balances */}
+      {balances.length === 0 && !showNewForm && (
+        <p className="text-sm text-gray-500 text-center py-4">No crypto balances yet for this user.</p>
+      )}
+
+      {balances.map((b) => {
+        const meta = ASSET_META[b.asset] || { icon: '?', color: 'text-gray-400' };
+        const isEditing = editingAsset === b.asset;
+        const bal = parseFloat(b.balance);
+        const preview = isEditing ? computePreview(b.asset) : null;
+        const previewNegative = preview !== null && preview < 0;
+
+        return (
+          <div key={b.asset} className="bg-gray-800/60 rounded-xl border border-gray-700/50 overflow-hidden">
+            {/* Row header */}
+            <div className="flex items-center justify-between px-4 py-3">
+              <div className="flex items-center gap-3">
+                <span className={`text-xl font-bold ${meta.color}`}>{meta.icon}</span>
+                <div>
+                  <p className="text-sm font-semibold text-white">{b.asset}</p>
+                  <p className="text-xs text-gray-400 font-mono">{bal.toFixed(8).replace(/\.?0+$/, '') || '0'}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => isEditing ? setEditing(null) : openEdit(b.asset)}
+                  className="px-2.5 py-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 rounded-lg text-xs font-medium transition-colors"
+                >
+                  {isEditing ? 'Cancel' : 'Edit'}
+                </button>
+                <button
+                  onClick={() => handleDelete(b.asset)}
+                  disabled={deletingAsset === b.asset}
+                  className="p-1.5 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-lg transition-colors disabled:opacity-50"
+                  title="Delete balance row"
+                >
+                  {deletingAsset === b.asset ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Edit form */}
+            {isEditing && (
+              <div className="border-t border-gray-700/50 px-4 pb-4 pt-3 space-y-3">
+                {/* Op picker */}
+                <div className="grid grid-cols-3 gap-2">
+                  {CRYPTO_OPS.map(({ key, label, icon: Icon, color }) => (
+                    <button key={key} type="button" onClick={() => setOperation(key)}
+                      className={`flex flex-col items-center gap-1 py-2.5 rounded-lg border text-xs font-medium transition-colors ${
+                        operation === key ? `${color} border-current bg-current/10` : 'text-gray-500 border-gray-700 hover:text-gray-300'
+                      }`}
+                    >
+                      <Icon size={14} /> {label}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="number" min="0" step="any" value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder={`Amount in ${b.asset}`}
+                  className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                />
+                {preview !== null && (
+                  <p className={`text-xs ${previewNegative ? 'text-red-400' : 'text-gray-400'}`}>
+                    Result: <span className="font-mono font-medium">{preview.toFixed(8).replace(/\.?0+$/, '')}</span> {b.asset}
+                    {previewNegative && ' — cannot go negative'}
+                  </p>
+                )}
+                <input
+                  type="text" value={note} onChange={(e) => setNote(e.target.value)}
+                  placeholder="Reason / admin note (required)"
+                  className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                />
+                <button
+                  onClick={() => handleAdjust(b.asset)}
+                  disabled={submitting || !amount || !note.trim() || previewNegative}
+                  className={`w-full py-2 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50 ${
+                    CRYPTO_OPS.find(o => o.key === operation)?.btnColor || 'bg-emerald-600 hover:bg-emerald-500'
+                  }`}
+                >
+                  {submitting ? 'Saving...' : `${CRYPTO_OPS.find(o => o.key === operation)?.label} ${b.asset}`}
+                </button>
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {/* Add new balance */}
+      {availableForNew.length > 0 && !showNewForm && (
+        <button
+          onClick={() => setShowNewForm(true)}
+          className="w-full flex items-center justify-center gap-2 py-2.5 border border-dashed border-gray-700 hover:border-gray-600 rounded-xl text-sm text-gray-400 hover:text-gray-200 transition-colors"
+        >
+          <Plus size={14} /> Add Asset Balance
+        </button>
+      )}
+
+      {showNewForm && (
+        <form onSubmit={handleAddNew} className="bg-gray-800/60 border border-gray-700/50 rounded-xl px-4 py-4 space-y-3">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Add New Asset Balance</p>
+          <select
+            value={newAsset} onChange={(e) => setNewAsset(e.target.value)}
+            className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+          >
+            <option value="">Select asset…</option>
+            {availableForNew.map(a => <option key={a} value={a}>{a}</option>)}
+          </select>
+          <input
+            type="number" min="0" step="any" value={newAmount}
+            onChange={(e) => setNewAmount(e.target.value)}
+            placeholder="Initial balance amount"
+            className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+          />
+          <input
+            type="text" value={newNote} onChange={(e) => setNewNote(e.target.value)}
+            placeholder="Reason / admin note (required)"
+            className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+          />
+          <div className="flex gap-2">
+            <button type="submit" disabled={addingNew || !newAsset || !newAmount || !newNote.trim()}
+              className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors"
+            >
+              {addingNew ? 'Adding…' : 'Add Balance'}
+            </button>
+            <button type="button" onClick={() => { setShowNewForm(false); setNewAsset(''); setNewAmount(''); setNewNote(''); }}
+              className="px-4 py-2 text-gray-400 hover:text-white text-sm transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
+
+// ── Main BalanceModal with Fiat / Crypto tabs ──────────────────────────────────
 function BalanceModal({ user, onClose, onSuccess }) {
-  const [operation, setOperation] = useState('add');
-  const [amount, setAmount] = useState('');
-  const [note, setNote] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [tab, setTab]               = useState('fiat'); // 'fiat' | 'crypto'
+  const [operation, setOperation]   = useState('add');
+  const [amount, setAmount]         = useState('');
+  const [note, setNote]             = useState('');
+  const [loading, setLoading]       = useState(false);
   const [lockLoading, setLockLoading] = useState(false);
   const [lockReason, setLockReason] = useState('');
   const [showLockForm, setShowLockForm] = useState(false);
@@ -66,15 +336,13 @@ function BalanceModal({ user, onClose, onSuccess }) {
     if (isNaN(n) || n < 0) { toast.error('Enter a valid amount'); return; }
     if (!note.trim()) { toast.error('A reason/note is required'); return; }
     if (previewNegative) { toast.error('Balance cannot go negative'); return; }
-
     setLoading(true);
     try {
       const result = await adminAdjustBalance(portfolio.id, operation, n, note.trim());
       const newBal = result?.new_balance ?? preview;
       toast.success(`Balance updated → ${fmt(newBal)}`);
       onSuccess(user.id, { ...portfolio, cash_balance: newBal });
-      setAmount('');
-      setNote('');
+      setAmount(''); setNote('');
     } catch (err) {
       toast.error(err.message || 'Balance update failed');
     } finally {
@@ -90,8 +358,7 @@ function BalanceModal({ user, onClose, onSuccess }) {
       await adminLockBalance(portfolio.id, !isLocked, lockReason.trim() || null);
       toast.success(isLocked ? 'Balance unlocked' : 'Balance locked');
       onSuccess(user.id, { ...portfolio, balance_locked: !isLocked, balance_locked_reason: lockReason.trim() || null });
-      setShowLockForm(false);
-      setLockReason('');
+      setShowLockForm(false); setLockReason('');
     } catch (err) {
       toast.error(err.message || 'Failed to update lock');
     } finally {
@@ -115,158 +382,147 @@ function BalanceModal({ user, onClose, onSuccess }) {
           </button>
         </div>
 
-        <div className="p-6 space-y-6">
-          {/* Balance overview */}
-          <div className="flex items-center justify-between p-4 bg-gray-800/60 rounded-xl">
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Current Cash Balance</p>
-              <p className="text-2xl font-bold text-white">{fmt(currentBalance)}</p>
-              {portfolio?.total_value > 0 && (
-                <p className="text-xs text-gray-500 mt-0.5">+ {fmt(portfolio.total_value)} in holdings</p>
-              )}
-            </div>
-            <div className="flex flex-col items-end gap-2">
-              {isLocked ? (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-500/15 text-red-400 text-xs rounded-full font-medium">
-                  <Lock size={11} /> Locked
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 text-emerald-400 text-xs rounded-full font-medium">
-                  <Unlock size={11} /> Active
-                </span>
-              )}
-              {isLocked && portfolio?.balance_locked_reason && (
-                <p className="text-xs text-gray-500 max-w-[140px] text-right">{portfolio.balance_locked_reason}</p>
-              )}
-            </div>
-          </div>
-
-          {/* Operation tabs */}
-          <div>
-            <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Operation</p>
-            <div className="grid grid-cols-3 gap-2">
-              {OPERATIONS.map(({ key, label, icon: Icon, color }) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setOperation(key)}
-                  className={`flex flex-col items-center gap-1.5 py-3 rounded-xl border text-xs font-medium transition-colors ${
-                    operation === key
-                      ? `${color} border-current bg-current/10`
-                      : 'text-gray-500 border-gray-800 hover:border-gray-700 hover:text-gray-300'
-                  }`}
-                >
-                  <Icon size={16} />
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Balance form */}
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <div>
-              <label className="block text-xs text-gray-500 mb-1.5">
-                Amount (USD) <span className="text-red-400">*</span>
-              </label>
-              <div className="relative">
-                <DollarSign size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" />
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="0.00"
-                  required
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-9 pr-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                />
-              </div>
-              {preview !== null && (
-                <p className={`text-xs mt-1 ${previewNegative ? 'text-red-400' : 'text-gray-400'}`}>
-                  Result: <span className="font-medium">{fmt(preview)}</span>
-                  {previewNegative && ' — insufficient balance'}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-xs text-gray-500 mb-1.5">
-                Reason / Admin note <span className="text-red-400">*</span>
-              </label>
-              <input
-                type="text"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="e.g. Bonus credit, Fee reversal, Manual correction..."
-                required
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading || !amount || !note.trim() || previewNegative}
-              className={`w-full py-2.5 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${op?.btnColor}`}
+        {/* Tabs */}
+        <div className="flex gap-1 px-6 pt-4 pb-0">
+          {[
+            { key: 'fiat',   label: 'Fiat (USD)' },
+            { key: 'crypto', label: 'Crypto Wallets' },
+          ].map(({ key, label }) => (
+            <button key={key} onClick={() => setTab(key)}
+              className={`px-4 py-2 rounded-t-lg text-sm font-semibold transition-colors border-b-2 ${
+                tab === key
+                  ? 'text-emerald-400 border-emerald-500 bg-gray-800/50'
+                  : 'text-gray-400 border-transparent hover:text-gray-200'
+              }`}
             >
-              {loading ? 'Updating...' : `${op?.label}`}
+              {label}
             </button>
-          </form>
+          ))}
+        </div>
 
-          {/* Lock / Unlock section */}
-          <div className="border-t border-gray-800 pt-4">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <p className="text-sm font-medium text-white">{isLocked ? 'Unlock Balance' : 'Lock Balance'}</p>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  {isLocked
-                    ? 'Allow this user to deposit and withdraw again'
-                    : 'Prevent this user from making any transactions'}
-                </p>
-              </div>
-              {!showLockForm && (
-                <button
-                  onClick={() => isLocked ? handleLockToggle() : setShowLockForm(true)}
-                  disabled={lockLoading}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 ${
-                    isLocked
-                      ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'
-                      : 'bg-red-500/10 text-red-400 hover:bg-red-500/20'
-                  }`}
-                >
-                  {lockLoading ? <RefreshCw size={12} className="animate-spin" /> : isLocked ? <Unlock size={12} /> : <Lock size={12} />}
-                  {isLocked ? 'Unlock' : 'Lock'}
-                </button>
-              )}
-            </div>
-
-            {showLockForm && !isLocked && (
-              <div className="space-y-2">
-                <input
-                  type="text"
-                  value={lockReason}
-                  onChange={(e) => setLockReason(e.target.value)}
-                  placeholder="Reason for locking (e.g. Suspicious activity)..."
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-red-500"
-                />
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleLockToggle}
-                    disabled={lockLoading || !lockReason.trim()}
-                    className="flex-1 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-xs font-medium rounded-lg transition-colors"
-                  >
-                    {lockLoading ? 'Locking...' : 'Confirm Lock'}
-                  </button>
-                  <button
-                    onClick={() => { setShowLockForm(false); setLockReason(''); }}
-                    className="px-4 py-2 text-gray-400 hover:text-white text-xs transition-colors"
-                  >
-                    Cancel
-                  </button>
+        <div className="p-6 space-y-6">
+          {tab === 'fiat' && (
+            <>
+              {/* Balance overview */}
+              <div className="flex items-center justify-between p-4 bg-gray-800/60 rounded-xl">
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Current Cash Balance</p>
+                  <p className="text-2xl font-bold text-white">{fmt(currentBalance)}</p>
+                  {portfolio?.total_value > 0 && (
+                    <p className="text-xs text-gray-500 mt-0.5">+ {fmt(portfolio.total_value)} in holdings</p>
+                  )}
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                  {isLocked ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-500/15 text-red-400 text-xs rounded-full font-medium">
+                      <Lock size={11} /> Locked
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 text-emerald-400 text-xs rounded-full font-medium">
+                      <Unlock size={11} /> Active
+                    </span>
+                  )}
+                  {isLocked && portfolio?.balance_locked_reason && (
+                    <p className="text-xs text-gray-500 max-w-[140px] text-right">{portfolio.balance_locked_reason}</p>
+                  )}
                 </div>
               </div>
-            )}
-          </div>
+
+              {/* Operation tabs */}
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Operation</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {OPERATIONS.map(({ key, label, icon: Icon, color }) => (
+                    <button key={key} type="button" onClick={() => setOperation(key)}
+                      className={`flex flex-col items-center gap-1.5 py-3 rounded-xl border text-xs font-medium transition-colors ${
+                        operation === key ? `${color} border-current bg-current/10` : 'text-gray-500 border-gray-800 hover:border-gray-700 hover:text-gray-300'
+                      }`}
+                    >
+                      <Icon size={16} /> {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Fiat form */}
+              <form onSubmit={handleSubmit} className="space-y-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1.5">Amount (USD) <span className="text-red-400">*</span></label>
+                  <div className="relative">
+                    <DollarSign size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" />
+                    <input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)}
+                      placeholder="0.00" required
+                      className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-9 pr-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+                  {preview !== null && (
+                    <p className={`text-xs mt-1 ${previewNegative ? 'text-red-400' : 'text-gray-400'}`}>
+                      Result: <span className="font-medium">{fmt(preview)}</span>
+                      {previewNegative && ' — insufficient balance'}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1.5">Reason / Admin note <span className="text-red-400">*</span></label>
+                  <input type="text" value={note} onChange={(e) => setNote(e.target.value)}
+                    placeholder="e.g. Bonus credit, Fee reversal, Manual correction..." required
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  />
+                </div>
+                <button type="submit" disabled={loading || !amount || !note.trim() || previewNegative}
+                  className={`w-full py-2.5 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${op?.btnColor}`}
+                >
+                  {loading ? 'Updating...' : op?.label}
+                </button>
+              </form>
+
+              {/* Lock / Unlock */}
+              <div className="border-t border-gray-800 pt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="text-sm font-medium text-white">{isLocked ? 'Unlock Balance' : 'Lock Balance'}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {isLocked ? 'Allow this user to deposit and withdraw again' : 'Prevent this user from making any transactions'}
+                    </p>
+                  </div>
+                  {!showLockForm && (
+                    <button
+                      onClick={() => isLocked ? handleLockToggle() : setShowLockForm(true)}
+                      disabled={lockLoading}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 ${
+                        isLocked ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20' : 'bg-red-500/10 text-red-400 hover:bg-red-500/20'
+                      }`}
+                    >
+                      {lockLoading ? <RefreshCw size={12} className="animate-spin" /> : isLocked ? <Unlock size={12} /> : <Lock size={12} />}
+                      {isLocked ? 'Unlock' : 'Lock'}
+                    </button>
+                  )}
+                </div>
+                {showLockForm && !isLocked && (
+                  <div className="space-y-2">
+                    <input type="text" value={lockReason} onChange={(e) => setLockReason(e.target.value)}
+                      placeholder="Reason for locking (e.g. Suspicious activity)..."
+                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-red-500"
+                    />
+                    <div className="flex gap-2">
+                      <button onClick={handleLockToggle} disabled={lockLoading || !lockReason.trim()}
+                        className="flex-1 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-xs font-medium rounded-lg transition-colors"
+                      >
+                        {lockLoading ? 'Locking...' : 'Confirm Lock'}
+                      </button>
+                      <button onClick={() => { setShowLockForm(false); setLockReason(''); }}
+                        className="px-4 py-2 text-gray-400 hover:text-white text-xs transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {tab === 'crypto' && <CryptoBalancePanel user={user} />}
         </div>
       </div>
     </div>
