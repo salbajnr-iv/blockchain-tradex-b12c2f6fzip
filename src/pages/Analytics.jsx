@@ -250,15 +250,14 @@ export default function Analytics() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-6xl mx-auto space-y-8">
+    <div className="max-w-6xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Analytics</h1>
-            <p className="text-muted-foreground mt-1">Portfolio breakdown, P&L, trading activity & withdrawal history</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Analytics</h1>
+            <p className="text-muted-foreground mt-1 text-sm">Portfolio breakdown, P&L, trading activity & withdrawal history</p>
           </div>
-          <Link to="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <Link to="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors shrink-0">
             ← Dashboard
           </Link>
         </div>
