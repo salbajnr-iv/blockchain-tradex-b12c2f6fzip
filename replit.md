@@ -8,9 +8,16 @@
 
 ### Professional Withdrawal Page (`/withdrawal`)
 - **Route**: `/withdrawal` — full-page, protected route inside the Layout
-- **Navigation**: Sidebar "Withdraw" button + Transactions page "Withdraw" button both navigate to this page
+- **Navigation**: Sidebar "Withdraw" button redirects to this page (via WithdrawalSidebar gateway), can also pre-fill `?method=bank_transfer` etc. via query param
 - **KYC Gate**: Fetches `kyc_submissions` table; blocks withdrawal if not `approved`, shows CTA to `/settings/kyc`
-- **Balance Check**: Reads `cashBalance` from PortfolioContext; disables submit if amount exceeds balance
+- **Balance Check**: Reads `cashBalance` from PortfolioContext; validates that USD equivalent of chosen amount ≤ balance
+- **Multi-Currency Support (Latest)**:
+  - **Fiat tab**: USD, EUR, GBP, AUD, CAD, CHF, JPY, SGD, AED, INR — live exchange rates from `frankfurter.app` (refreshed every 5 min)
+  - **Crypto tab**: BTC, ETH, USDT, USDC, BNB, SOL, XRP, ADA, DOGE, AVAX — live prices from `cryptoList` in LivePricesContext (USDT/USDC hardcoded at $1)
+  - User enters amount in the selected currency; USD equivalent is computed in real-time and deducted from balance
+  - Summary shows: currency amount sent, USD equivalent, 2% fee in USD, currency amount received
+  - Selecting a crypto currency auto-locks method to "Crypto Wallet" and pre-fills the coin field
+  - withdrawal_details JSONB includes: `withdrawCurrency`, `withdrawCurrencyType`, `withdrawAmount`, `withdrawUsdEquivalent`
 - **Country-aware Bank Fields**: Reads `user.user_metadata.country`; shows localized bank fields:
   - US: Routing Number + Account Number + Account Type
   - UK: Sort Code + Account Number
@@ -19,8 +26,8 @@
   - EU countries: IBAN + BIC/SWIFT
   - International/default: IBAN + SWIFT/BIC
 - **Method-specific forms**: Bank Transfer, Crypto Wallet (coin + network + address), PayPal (email + confirm + name), Wire Transfer (full international fields)
-- **"Proceed Withdrawal" button**: Only enabled when KYC approved + valid amount ≤ balance + method details filled
-- **Submission**: Creates a `WITHDRAWAL` transaction with `status: 'pending'` and `withdrawal_details` JSONB
+- **Submit**: Only enabled when KYC approved + valid amount + method details filled + rate available
+- **Submission**: Creates a `WITHDRAWAL` transaction with `status: 'pending'`, `total_amount` = USD equivalent, and full `withdrawal_details` JSONB
 - **Status Tracker**: After submit, shows real-time step tracker (Submitted → Pending → Reviewed → Final Decision) via Supabase Realtime subscription on `transactions` table
 - **Admin Message**: Displays message from admin team when `admin_message` field is set on the transaction
 

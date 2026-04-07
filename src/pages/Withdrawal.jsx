@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
 import { usePortfolio } from "@/contexts/PortfolioContext";
+import { useLivePrices } from "@/hooks/useLivePrices";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -11,7 +12,7 @@ import { toast } from "sonner";
 import {
   ArrowLeft, Wallet, ShieldCheck, AlertCircle, CheckCircle2,
   Clock, XCircle, Send, Lock, CreditCard, Globe, Building2,
-  Bitcoin, Info, Loader2, RefreshCw, MessageSquare,
+  Bitcoin, Info, Loader2, RefreshCw, MessageSquare, DollarSign, TrendingUp,
 } from "lucide-react";
 import {
   createWithdrawalRequest,
@@ -20,10 +21,10 @@ import {
 } from "@/lib/api/withdrawal";
 
 const WITHDRAWAL_METHODS = [
-  { value: "bank_transfer",  label: "Bank Transfer",  icon: Building2, desc: "1–3 business days" },
-  { value: "crypto_wallet",  label: "Crypto Wallet",  icon: Bitcoin,   desc: "10–30 minutes" },
+  { value: "bank_transfer",  label: "Bank Transfer",  icon: Building2,  desc: "1–3 business days" },
+  { value: "crypto_wallet",  label: "Crypto Wallet",  icon: Bitcoin,    desc: "10–30 minutes" },
   { value: "paypal",         label: "PayPal",          icon: CreditCard, desc: "Instant – 24 hrs" },
-  { value: "wire_transfer",  label: "Wire Transfer",   icon: Globe,     desc: "2–5 business days" },
+  { value: "wire_transfer",  label: "Wire Transfer",   icon: Globe,      desc: "2–5 business days" },
 ];
 
 const CRYPTO_NETWORKS = [
@@ -42,6 +43,58 @@ const CRYPTO_COINS = [
   { value: "BNB",  label: "BNB" },
   { value: "SOL",  label: "Solana (SOL)" },
 ];
+
+const FIAT_CURRENCIES = [
+  { value: "USD", label: "US Dollar",         symbol: "$",    flag: "🇺🇸" },
+  { value: "EUR", label: "Euro",              symbol: "€",    flag: "🇪🇺" },
+  { value: "GBP", label: "British Pound",     symbol: "£",    flag: "🇬🇧" },
+  { value: "AUD", label: "Australian Dollar", symbol: "A$",   flag: "🇦🇺" },
+  { value: "CAD", label: "Canadian Dollar",   symbol: "C$",   flag: "🇨🇦" },
+  { value: "CHF", label: "Swiss Franc",       symbol: "Fr",   flag: "🇨🇭" },
+  { value: "JPY", label: "Japanese Yen",      symbol: "¥",    flag: "🇯🇵" },
+  { value: "SGD", label: "Singapore Dollar",  symbol: "S$",   flag: "🇸🇬" },
+  { value: "AED", label: "UAE Dirham",        symbol: "د.إ",  flag: "🇦🇪" },
+  { value: "INR", label: "Indian Rupee",      symbol: "₹",    flag: "🇮🇳" },
+];
+
+const CRYPTO_CURRENCIES = [
+  { value: "BTC",  label: "Bitcoin",    symbol: "BTC",  coinId: "bitcoin" },
+  { value: "ETH",  label: "Ethereum",   symbol: "ETH",  coinId: "ethereum" },
+  { value: "USDT", label: "Tether",     symbol: "USDT", coinId: "tether" },
+  { value: "USDC", label: "USD Coin",   symbol: "USDC", coinId: "usd-coin" },
+  { value: "BNB",  label: "BNB",        symbol: "BNB",  coinId: "binancecoin" },
+  { value: "SOL",  label: "Solana",     symbol: "SOL",  coinId: "solana" },
+  { value: "XRP",  label: "XRP",        symbol: "XRP",  coinId: "ripple" },
+  { value: "ADA",  label: "Cardano",    symbol: "ADA",  coinId: "cardano" },
+  { value: "DOGE", label: "Dogecoin",   symbol: "DOGE", coinId: "dogecoin" },
+  { value: "AVAX", label: "Avalanche",  symbol: "AVAX", coinId: "avalanche-2" },
+];
+
+function useFiatRates() {
+  const [rates, setRates] = useState({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchRates() {
+      try {
+        const res = await fetch("https://api.frankfurter.app/latest?base=USD");
+        if (!res.ok) throw new Error("Failed to fetch rates");
+        const data = await res.json();
+        if (!cancelled) setRates(data.rates || {});
+      } catch {
+        if (!cancelled) setRates({});
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    fetchRates();
+    const id = setInterval(fetchRates, 300000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
+
+  return { rates, loading };
+}
 
 const EU_COUNTRIES = new Set([
   "France","Germany","Netherlands","Spain","Italy","Belgium","Austria","Portugal",
@@ -136,19 +189,25 @@ function BankFields({ country, values, onChange }) {
   );
 }
 
-function CryptoFields({ values, onChange }) {
+function CryptoFields({ values, onChange, lockedCoin }) {
   return (
     <div className="space-y-4">
       <div className="space-y-1.5">
         <label className="text-sm font-medium text-foreground">Cryptocurrency <span className="text-destructive">*</span></label>
-        <Select value={values.coin || ""} onValueChange={(v) => onChange("coin", v)}>
-          <SelectTrigger className="bg-secondary/40 border-border">
-            <SelectValue placeholder="Select cryptocurrency" />
-          </SelectTrigger>
-          <SelectContent>
-            {CRYPTO_COINS.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        {lockedCoin ? (
+          <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-primary/10 border border-primary/20 text-sm font-semibold text-primary">
+            {lockedCoin} <span className="text-xs text-muted-foreground font-normal ml-1">(selected via currency)</span>
+          </div>
+        ) : (
+          <Select value={values.coin || ""} onValueChange={(v) => onChange("coin", v)}>
+            <SelectTrigger className="bg-secondary/40 border-border">
+              <SelectValue placeholder="Select cryptocurrency" />
+            </SelectTrigger>
+            <SelectContent>
+              {CRYPTO_COINS.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
       </div>
       <div className="space-y-1.5">
         <label className="text-sm font-medium text-foreground">Network <span className="text-destructive">*</span></label>
@@ -418,13 +477,73 @@ export default function WithdrawalPage() {
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const { cashBalance, portfolioId } = usePortfolio();
+  const { cryptoList } = useLivePrices();
+  const { rates: fiatRates, loading: fiatLoading } = useFiatRates();
+
   const [method, setMethod] = useState(searchParams.get("method") || "");
   const [amount, setAmount] = useState("");
   const [details, setDetails] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [submittedTxn, setSubmittedTxn] = useState(null);
 
+  const [currencyType, setCurrencyType] = useState("fiat");
+  const [currency, setCurrency] = useState("USD");
+
   const userCountry = user?.user_metadata?.country || "";
+
+  const selectedFiat   = FIAT_CURRENCIES.find(c => c.value === currency);
+  const selectedCrypto = CRYPTO_CURRENCIES.find(c => c.value === currency);
+
+  const STABLECOIN_PRICE = { USDT: 1.0, USDC: 1.0 };
+  const cryptoPrice = selectedCrypto
+    ? (cryptoList.find(c => c.symbol === selectedCrypto.value)?.price
+       ?? STABLECOIN_PRICE[selectedCrypto.value]
+       ?? 0)
+    : 0;
+
+  const fiatRate = currency === "USD" ? 1 : (fiatRates[currency] ?? 0);
+
+  const parsedAmount = parseFloat(amount) || 0;
+
+  const usdEquivalent = parsedAmount === 0
+    ? 0
+    : currencyType === "crypto"
+    ? (cryptoPrice > 0 ? parsedAmount * cryptoPrice : 0)
+    : (currency === "USD"
+      ? parsedAmount
+      : (fiatRate > 0 ? parsedAmount / fiatRate : 0));
+
+  const feeUsd    = usdEquivalent * 0.02;
+  const netUsd    = usdEquivalent - feeUsd;
+  const netInCurrency = currencyType === "crypto"
+    ? (cryptoPrice > 0 ? netUsd / cryptoPrice : 0)
+    : (currency === "USD" ? netUsd : netUsd * fiatRate);
+
+  const currencySymbol = currencyType === "crypto"
+    ? (selectedCrypto?.symbol ?? "")
+    : (selectedFiat?.symbol ?? "$");
+
+  const handleCurrencyTypeChange = (type) => {
+    setCurrencyType(type);
+    setCurrency(type === "fiat" ? "USD" : "BTC");
+    setAmount("");
+    if (type === "crypto") {
+      setMethod("crypto_wallet");
+      setDetails({});
+    } else {
+      setMethod("");
+      setDetails({});
+    }
+  };
+
+  const handleCurrencyChange = (cur) => {
+    setCurrency(cur);
+    setAmount("");
+    if (currencyType === "crypto") {
+      setMethod("crypto_wallet");
+      setDetails({ coin: cur });
+    }
+  };
 
   const { data: kycStatus, isLoading: kycLoading } = useQuery({
     queryKey: ["kyc-status", user?.id],
@@ -434,12 +553,8 @@ export default function WithdrawalPage() {
 
   const kycApproved = kycStatus?.status === "approved";
   const kycPending = kycStatus?.status === "pending" || kycStatus?.status === "under_review";
-  const noKyc = !kycStatus;
 
-  const parsedAmount = parseFloat(amount) || 0;
-  const fee = parsedAmount > 0 ? (parsedAmount * 0.02).toFixed(2) : "0.00";
-  const netAmount = parsedAmount > 0 ? (parsedAmount - parseFloat(fee)).toFixed(2) : "0.00";
-  const hasSufficientBalance = parsedAmount > 0 && parsedAmount <= cashBalance;
+  const hasSufficientBalance = usdEquivalent > 0 && usdEquivalent <= cashBalance;
   const methodSelected = !!method;
 
   const handleDetailChange = useCallback((key, value) => {
@@ -447,15 +562,16 @@ export default function WithdrawalPage() {
   }, []);
 
   const handleMethodChange = (val) => {
+    if (currencyType === "crypto") return;
     setMethod(val);
     setDetails({ _country: userCountry });
   };
 
   useEffect(() => {
-    if (userCountry) {
+    if (userCountry && currencyType === "fiat") {
       setDetails(prev => ({ ...prev, _country: userCountry }));
     }
-  }, [userCountry]);
+  }, [userCountry, currencyType]);
 
   const handleSubmit = async () => {
     if (!kycApproved) {
@@ -468,6 +584,10 @@ export default function WithdrawalPage() {
     }
     if (!parsedAmount || parsedAmount <= 0) {
       toast.error("Please enter a valid amount");
+      return;
+    }
+    if (usdEquivalent <= 0) {
+      toast.error("Unable to compute USD equivalent — please try again shortly");
       return;
     }
     if (!hasSufficientBalance) {
@@ -483,11 +603,23 @@ export default function WithdrawalPage() {
     setSubmitting(true);
     try {
       const methodLabel = WITHDRAWAL_METHODS.find(m => m.value === method)?.label || method;
+      const currencyLabel = currencyType === "crypto"
+        ? `${parsedAmount} ${currency}`
+        : currency === "USD"
+        ? `$${parsedAmount} USD`
+        : `${currencySymbol}${parsedAmount} ${currency} (~$${usdEquivalent.toFixed(2)} USD)`;
+
       const txn = await createWithdrawalRequest(portfolioId, {
-        amount: parsedAmount,
+        amount: usdEquivalent,
         method,
-        withdrawalDetails: details,
-        notes: `Withdrawal via ${methodLabel} — submitted by user`,
+        withdrawalDetails: {
+          ...details,
+          withdrawCurrency: currency,
+          withdrawCurrencyType: currencyType,
+          withdrawAmount: parsedAmount,
+          withdrawUsdEquivalent: usdEquivalent,
+        },
+        notes: `Withdrawal of ${currencyLabel} via ${methodLabel}`,
       });
       setSubmittedTxn(txn);
       toast.success("Withdrawal request submitted successfully!");
@@ -498,7 +630,7 @@ export default function WithdrawalPage() {
     }
   };
 
-  const canProceed = kycApproved && methodSelected && parsedAmount > 0 && hasSufficientBalance && !submitting;
+  const canProceed = kycApproved && methodSelected && parsedAmount > 0 && usdEquivalent > 0 && hasSufficientBalance && !submitting;
 
   if (submittedTxn) {
     return (
@@ -594,44 +726,118 @@ export default function WithdrawalPage() {
           </motion.div>
         )}
 
+        {/* ── Currency Selection ── */}
         <div className="bg-card rounded-2xl border border-border overflow-hidden">
           <div className="px-6 py-5 border-b border-border">
-            <h2 className="font-semibold text-foreground">Withdrawal Method</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">Select how you want to receive your funds</p>
+            <h2 className="font-semibold text-foreground">Withdrawal Currency</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">Select the currency you want to receive</p>
           </div>
-          <div className="p-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {WITHDRAWAL_METHODS.map((m) => {
-              const Icon = m.icon;
-              const selected = method === m.value;
-              return (
+          <div className="p-6 space-y-4">
+            {/* Fiat / Crypto tab */}
+            <div className="flex gap-2 p-1 bg-secondary/50 rounded-xl w-fit">
+              {[
+                { type: "fiat",   icon: DollarSign, label: "Fiat Currencies" },
+                { type: "crypto", icon: TrendingUp,  label: "Cryptocurrencies" },
+              ].map(({ type, icon: Icon, label }) => (
                 <button
-                  key={m.value}
-                  onClick={() => handleMethodChange(m.value)}
-                  className={`rounded-xl border p-3 text-left transition-all cursor-pointer ${selected ? "border-primary bg-primary/10" : "border-border bg-secondary/30 hover:border-primary/50 hover:bg-secondary/50"}`}
+                  key={type}
+                  onClick={() => handleCurrencyTypeChange(type)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    currencyType === type
+                      ? "bg-card border border-border text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
                 >
-                  <Icon className={`w-5 h-5 mb-2 ${selected ? "text-primary" : "text-muted-foreground"}`} />
-                  <p className={`text-xs font-semibold leading-tight ${selected ? "text-primary" : "text-foreground"}`}>{m.label}</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">{m.desc}</p>
+                  <Icon className="w-4 h-4" />
+                  {label}
                 </button>
-              );
-            })}
+              ))}
+            </div>
+
+            {/* Currency grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+              {(currencyType === "fiat" ? FIAT_CURRENCIES : CRYPTO_CURRENCIES).map((cur) => {
+                const selected = currency === cur.value;
+                const liveEntry = currencyType === "crypto"
+                  ? cryptoList.find(c => c.symbol === cur.value)
+                  : null;
+                const stablePrice = { USDT: 1.0, USDC: 1.0 }[cur.value];
+                const priceHint = currencyType === "crypto"
+                  ? (liveEntry
+                    ? `$${liveEntry.price.toLocaleString("en-US", { maximumFractionDigits: 2 })}`
+                    : stablePrice != null ? `$${stablePrice.toFixed(2)}` : "…")
+                  : (cur.value !== "USD" && fiatRates[cur.value]
+                    ? `${fiatRates[cur.value].toFixed(2)} / $1`
+                    : null);
+                return (
+                  <button
+                    key={cur.value}
+                    onClick={() => handleCurrencyChange(cur.value)}
+                    className={`rounded-xl border p-3 text-left transition-all ${
+                      selected
+                        ? "border-primary bg-primary/10"
+                        : "border-border bg-secondary/30 hover:border-primary/40 hover:bg-secondary/50"
+                    }`}
+                  >
+                    <p className="text-base mb-0.5">{cur.flag ?? cur.symbol}</p>
+                    <p className={`text-xs font-bold ${selected ? "text-primary" : "text-foreground"}`}>{cur.value}</p>
+                    <p className="text-[10px] text-muted-foreground truncate">{cur.label}</p>
+                    {priceHint && (
+                      <p className="text-[10px] text-muted-foreground/70 mt-0.5 truncate">{priceHint}</p>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 
+        {/* ── Withdrawal Method (fiat only) ── */}
+        {currencyType === "fiat" && (
+          <div className="bg-card rounded-2xl border border-border overflow-hidden">
+            <div className="px-6 py-5 border-b border-border">
+              <h2 className="font-semibold text-foreground">Withdrawal Method</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Select how you want to receive your funds</p>
+            </div>
+            <div className="p-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {WITHDRAWAL_METHODS.map((m) => {
+                const Icon = m.icon;
+                const selected = method === m.value;
+                return (
+                  <button
+                    key={m.value}
+                    onClick={() => handleMethodChange(m.value)}
+                    className={`rounded-xl border p-3 text-left transition-all cursor-pointer ${selected ? "border-primary bg-primary/10" : "border-border bg-secondary/30 hover:border-primary/50 hover:bg-secondary/50"}`}
+                  >
+                    <Icon className={`w-5 h-5 mb-2 ${selected ? "text-primary" : "text-muted-foreground"}`} />
+                    <p className={`text-xs font-semibold leading-tight ${selected ? "text-primary" : "text-foreground"}`}>{m.label}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{m.desc}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── Method Details ── */}
         <AnimatePresence mode="wait">
           {method && (
-            <motion.div key={method} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="bg-card rounded-2xl border border-border overflow-hidden">
+            <motion.div key={`${method}-${currency}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="bg-card rounded-2xl border border-border overflow-hidden">
               <div className="px-6 py-5 border-b border-border">
                 <h2 className="font-semibold text-foreground">
-                  {WITHDRAWAL_METHODS.find(m => m.value === method)?.label} Details
+                  {currencyType === "crypto"
+                    ? `${currency} Wallet Details`
+                    : `${WITHDRAWAL_METHODS.find(m => m.value === method)?.label} Details`}
                 </h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {userCountry ? `Fields tailored for ${userCountry}` : "Please set your country in profile settings for localized fields"}
+                  {method === "bank_transfer" && userCountry
+                    ? `Fields tailored for ${userCountry}`
+                    : "Please provide your receiving account details"}
                 </p>
               </div>
               <div className="p-6">
                 {method === "bank_transfer" && <BankFields country={userCountry} values={details} onChange={handleDetailChange} />}
-                {method === "crypto_wallet" && <CryptoFields values={details} onChange={handleDetailChange} />}
+                {method === "crypto_wallet" && <CryptoFields values={details} onChange={handleDetailChange} lockedCoin={currencyType === "crypto" ? currency : null} />}
                 {method === "paypal" && <PayPalFields values={details} onChange={handleDetailChange} />}
                 {method === "wire_transfer" && <WireFields values={details} onChange={handleDetailChange} />}
               </div>
@@ -639,60 +845,107 @@ export default function WithdrawalPage() {
           )}
         </AnimatePresence>
 
+        {/* ── Amount ── */}
         {method && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-card rounded-2xl border border-border overflow-hidden">
             <div className="px-6 py-5 border-b border-border">
               <h2 className="font-semibold text-foreground">Withdrawal Amount</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">Available balance: <span className="text-foreground font-medium">${cashBalance.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span></p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Your USD balance: <span className="text-foreground font-medium">${cashBalance.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+              </p>
             </div>
             <div className="p-6 space-y-4">
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-foreground">Amount (USD) <span className="text-destructive">*</span></label>
+                <label className="text-sm font-medium text-foreground">
+                  Amount ({currencyType === "crypto" ? currency : currency})
+                  <span className="text-destructive ml-1">*</span>
+                </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium text-sm">$</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium text-sm">
+                    {currencyType === "fiat" ? (selectedFiat?.symbol ?? "$") : ""}
+                  </span>
                   <Input
                     type="number"
                     placeholder="0.00"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
-                    className="bg-secondary/40 border-border pl-7 text-base font-medium"
+                    className={`bg-secondary/40 border-border text-base font-medium ${currencyType === "fiat" ? "pl-7" : "pl-3"}`}
                     min="0"
-                    step="0.01"
+                    step={currencyType === "crypto" ? "0.00000001" : "0.01"}
                   />
+                  {currencyType === "crypto" && (
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">{currency}</span>
+                  )}
                 </div>
-                <div className="flex gap-2 mt-1">
-                  {[25, 50, 75, 100].map((pct) => (
-                    <button
-                      key={pct}
-                      onClick={() => setAmount((cashBalance * pct / 100).toFixed(2))}
-                      className="text-xs px-2.5 py-1 rounded-md bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-colors border border-border"
-                    >
-                      {pct}%
-                    </button>
-                  ))}
-                </div>
-                {parsedAmount > 0 && !hasSufficientBalance && (
+                {/* % shortcuts based on USD balance → target currency conversion */}
+                {currencyType === "fiat" && (
+                  <div className="flex gap-2 mt-1">
+                    {[25, 50, 75, 100].map((pct) => {
+                      const pctUsd = cashBalance * pct / 100;
+                      const pctVal = currency === "USD" ? pctUsd : (fiatRate > 0 ? pctUsd * fiatRate : 0);
+                      return (
+                        <button
+                          key={pct}
+                          onClick={() => setAmount(pctVal > 0 ? pctVal.toFixed(2) : "")}
+                          disabled={pctVal <= 0}
+                          className="text-xs px-2.5 py-1 rounded-md bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-colors border border-border disabled:opacity-40"
+                        >
+                          {pct}%
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {parsedAmount > 0 && !hasSufficientBalance && usdEquivalent > 0 && (
                   <p className="text-xs text-destructive flex items-center gap-1 mt-1">
-                    <AlertCircle className="w-3 h-3" /> Amount exceeds available balance
+                    <AlertCircle className="w-3 h-3" /> Amount exceeds available USD balance
+                  </p>
+                )}
+                {parsedAmount > 0 && currencyType === "crypto" && cryptoPrice <= 0 && (
+                  <p className="text-xs text-yellow-500 flex items-center gap-1 mt-1">
+                    <AlertCircle className="w-3 h-3" /> Live price unavailable — cannot compute USD equivalent
+                  </p>
+                )}
+                {parsedAmount > 0 && currencyType === "fiat" && currency !== "USD" && fiatRate <= 0 && (
+                  <p className="text-xs text-yellow-500 flex items-center gap-1 mt-1">
+                    <AlertCircle className="w-3 h-3" /> Exchange rate unavailable — please try again
                   </p>
                 )}
               </div>
 
-              {parsedAmount > 0 && (
+              {parsedAmount > 0 && usdEquivalent > 0 && (
                 <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="bg-secondary/30 rounded-xl border border-border p-4 space-y-3">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Transaction Summary</p>
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Withdrawal Amount</span>
-                      <span className="font-semibold">${parsedAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                      <span className="text-muted-foreground">You Send ({currency})</span>
+                      <span className="font-semibold">
+                        {currencyType === "fiat"
+                          ? `${selectedFiat?.symbol ?? ""}${parsedAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}`
+                          : `${parsedAmount.toLocaleString("en-US", { maximumSignificantDigits: 8 })} ${currency}`}
+                      </span>
                     </div>
+                    {currency !== "USD" && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">USD Equivalent</span>
+                        <span className="font-medium text-muted-foreground">≈ ${usdEquivalent.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Processing Fee (2%)</span>
-                      <span className="font-semibold text-destructive">−${fee}</span>
+                      <span className="font-semibold text-destructive">−${feeUsd.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
                     </div>
                     <div className="border-t border-border pt-2 flex justify-between">
                       <span className="font-semibold text-sm">You Receive</span>
-                      <span className="font-bold text-lg text-primary">${parseFloat(netAmount).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                      <span className="font-bold text-lg text-primary">
+                        {currencyType === "fiat"
+                          ? `${selectedFiat?.symbol ?? ""}${netInCurrency.toLocaleString("en-US", { minimumFractionDigits: 2 })}`
+                          : `${netInCurrency.toLocaleString("en-US", { maximumSignificantDigits: 8 })} ${currency}`}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-xs text-muted-foreground/60">
+                      <span>Deducted from USD balance</span>
+                      <span>${usdEquivalent.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
                     </div>
                   </div>
                 </motion.div>
