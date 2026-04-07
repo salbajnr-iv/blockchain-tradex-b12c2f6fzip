@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
+import { supabaseMisconfigured } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2, Eye, EyeOff, TrendingUp, ShieldCheck, Zap, BarChart2 } from 'lucide-react';
+import { Loader2, Eye, EyeOff, TrendingUp, ShieldCheck, Zap, BarChart2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import ThemeToggle from '@/components/ThemeToggle';
 
@@ -120,6 +121,15 @@ export default function Login() {
 
         <div className="flex-1 flex items-center justify-center px-6 pb-10">
           <div className="w-full max-w-sm">
+            {supabaseMisconfigured && (
+              <div className="mb-5 flex items-start gap-3 bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 rounded-xl p-4">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <p className="text-sm leading-relaxed">
+                  <strong>Configuration missing.</strong> Supabase environment variables are not set. Sign-in and sign-up will not work until <code className="font-mono text-xs bg-amber-500/20 px-1 py-0.5 rounded">VITE_SUPABASE_URL</code> and <code className="font-mono text-xs bg-amber-500/20 px-1 py-0.5 rounded">VITE_SUPABASE_ANON_KEY</code> are configured.
+                </p>
+              </div>
+            )}
+
             <div className="mb-8">
               <h1 className="text-2xl font-bold text-foreground">Welcome back</h1>
               <p className="text-muted-foreground text-sm mt-1">Sign in to your BlockTrade account</p>
