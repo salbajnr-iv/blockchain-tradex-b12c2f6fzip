@@ -10,15 +10,16 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  X, ArrowRight, ArrowLeft, Search, CheckCircle2, AlertCircle,
+  ArrowRight, ArrowLeft, Search, CheckCircle2, AlertCircle,
   Loader2, Copy, Users, Wallet, Send, RefreshCw, ChevronRight,
-  ShieldCheck, UserCheck,
+  ShieldCheck, UserCheck, Mail, Hash,
 } from "lucide-react";
-import { getMyTransferId, lookupUserForTransfer, executeTransfer } from "@/lib/api/transfer";
+import { getMyTransferId, lookupUserForTransfer, lookupUserByEmail, executeTransfer } from "@/lib/api/transfer";
 
 const STEPS = ["recipient", "amount", "confirm", "success"];
 
 function MyTransferIdCard() {
+  const [copied, setCopied] = useState(false);
   const { data, isLoading, error } = useQuery({
     queryKey: ["my-transfer-id"],
     queryFn: getMyTransferId,
@@ -30,7 +31,9 @@ function MyTransferIdCard() {
   const handleCopy = () => {
     if (!transferId) return;
     navigator.clipboard.writeText(transferId).then(() => {
+      setCopied(true);
       toast.success("Transfer ID copied!");
+      setTimeout(() => setCopied(false), 2000);
     });
   };
 
@@ -60,7 +63,7 @@ function MyTransferIdCard() {
           className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors px-3 py-1.5 rounded-lg border border-primary/20 hover:bg-primary/5 shrink-0"
         >
           <Copy className="w-3 h-3" />
-          Copy
+          {copied ? "Copied!" : "Copy"}
         </button>
       </div>
     </div>
@@ -73,7 +76,8 @@ export default function TransferDialog({ open, onClose }) {
   const queryClient = useQueryClient();
 
   const [step, setStep] = useState(0);
-  const [recipientUid, setRecipientUid] = useState("");
+  const [lookupMode, setLookupMode] = useState("id");   // "id" | "email"
+  const [recipientInput, setRecipientInput] = useState("");
   const [recipient, setRecipient] = useState(null);
   const [lookingUp, setLookingUp] = useState(false);
   const [lookupError, setLookupError] = useState("");
@@ -87,7 +91,8 @@ export default function TransferDialog({ open, onClose }) {
 
   const reset = useCallback(() => {
     setStep(0);
-    setRecipientUid("");
+    setLookupMode("id");
+    setRecipientInput("");
     setRecipient(null);
     setLookingUp(false);
     setLookupError("");
@@ -102,15 +107,30 @@ export default function TransferDialog({ open, onClose }) {
     setTimeout(reset, 300);
   };
 
+  const handleModeSwitch = (mode) => {
+    setLookupMode(mode);
+    setRecipientInput("");
+    setRecipient(null);
+    setLookupError("");
+  };
+
   const handleLookup = async () => {
-    if (!recipientUid.trim()) return;
+    const val = recipientInput.trim();
+    if (!val) return;
     setLookingUp(true);
     setLookupError("");
     setRecipient(null);
     try {
-      const res = await lookupUserForTransfer(recipientUid.trim());
+      const res = lookupMode === "email"
+        ? await lookupUserByEmail(val)
+        : await lookupUserForTransfer(val);
+
       if (!res?.found) {
-        setLookupError("No active user found with that Transfer ID. Double-check the number and try again.");
+        setLookupError(
+          lookupMode === "email"
+            ? "No active account found with that email address. Please check the address and try again."
+            : "No active user found with that Transfer ID. Double-check and try again."
+        );
       } else {
         setRecipient(res);
       }
@@ -162,7 +182,7 @@ export default function TransferDialog({ open, onClose }) {
                   {step === 3 ? "Transfer Complete" : "Send Funds"}
                 </DialogTitle>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {step === 0 && "Find recipient by Transfer ID"}
+                  {step === 0 && "Find recipient by Transfer ID or Email"}
                   {step === 1 && "Enter the amount to send"}
                   {step === 2 && "Review and confirm"}
                   {step === 3 && "Funds sent successfully"}
@@ -186,36 +206,91 @@ export default function TransferDialog({ open, onClose }) {
         <div className="px-6 py-5 space-y-5 overflow-y-auto max-h-[60vh]">
           <AnimatePresence mode="wait">
 
+            {/* ── Step 0: Recipient ── */}
             {step === 0 && (
               <motion.div key="step-0" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
                 <MyTransferIdCard />
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">Recipient's Transfer ID</label>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="e.g. xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                      value={recipientUid}
-                      onChange={(e) => {
-                        setRecipientUid(e.target.value.trim());
-                        setRecipient(null);
-                        setLookupError("");
-                      }}
-                      onKeyDown={(e) => e.key === "Enter" && handleLookup()}
-                      className="bg-secondary/40 border-border font-mono text-xs"
-                    />
-                    <Button
-                      onClick={handleLookup}
-                      disabled={!recipientUid.trim() || lookingUp}
-                      variant="outline"
-                      className="shrink-0 px-4 border-primary/30 text-primary hover:bg-primary/5"
-                    >
-                      {lookingUp ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">Paste the Transfer ID (UUID) of the person you want to send funds to.</p>
+                {/* Lookup Mode Toggle */}
+                <div className="flex gap-1 p-1 bg-secondary/50 rounded-xl">
+                  <button
+                    onClick={() => handleModeSwitch("id")}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all ${
+                      lookupMode === "id"
+                        ? "bg-card border border-border text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Hash className="w-3.5 h-3.5" />
+                    Transfer ID
+                  </button>
+                  <button
+                    onClick={() => handleModeSwitch("email")}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all ${
+                      lookupMode === "email"
+                        ? "bg-card border border-border text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Mail className="w-3.5 h-3.5" />
+                    Email Address
+                  </button>
                 </div>
 
+                {/* Input + Search */}
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={lookupMode}
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    className="space-y-2"
+                  >
+                    <label className="text-sm font-medium text-foreground">
+                      {lookupMode === "email" ? "Recipient's Email Address" : "Recipient's Transfer ID"}
+                    </label>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        {lookupMode === "email" ? (
+                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        ) : (
+                          <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        )}
+                        <Input
+                          type={lookupMode === "email" ? "email" : "text"}
+                          placeholder={
+                            lookupMode === "email"
+                              ? "recipient@example.com"
+                              : "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                          }
+                          value={recipientInput}
+                          onChange={(e) => {
+                            setRecipientInput(e.target.value);
+                            setRecipient(null);
+                            setLookupError("");
+                          }}
+                          onKeyDown={(e) => e.key === "Enter" && handleLookup()}
+                          className={`bg-secondary/40 border-border pl-9 ${lookupMode === "id" ? "font-mono text-xs" : "text-sm"}`}
+                        />
+                      </div>
+                      <Button
+                        onClick={handleLookup}
+                        disabled={!recipientInput.trim() || lookingUp}
+                        variant="outline"
+                        className="shrink-0 px-4 border-primary/30 text-primary hover:bg-primary/5"
+                      >
+                        {lookingUp ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {lookupMode === "email"
+                        ? "Enter the email address registered to the recipient's BlockTrade account."
+                        : "Paste the Transfer ID (UUID) shared by the person you want to send funds to."}
+                    </p>
+                  </motion.div>
+                </AnimatePresence>
+
+                {/* Lookup error */}
                 <AnimatePresence>
                   {lookupError && (
                     <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex items-start gap-2 bg-destructive/10 border border-destructive/20 rounded-xl p-3">
@@ -224,6 +299,7 @@ export default function TransferDialog({ open, onClose }) {
                     </motion.div>
                   )}
 
+                  {/* Recipient found card */}
                   {recipient && (
                     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="bg-green-500/5 border border-green-500/20 rounded-xl p-4">
                       <div className="flex items-center gap-3">
@@ -232,13 +308,23 @@ export default function TransferDialog({ open, onClose }) {
                             {(recipient.display_name || recipient.username)?.[0]?.toUpperCase()}
                           </span>
                         </div>
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5">
                             <p className="font-semibold text-foreground">{recipient.display_name || recipient.username}</p>
-                            <CheckCircle2 className="w-4 h-4 text-green-500" />
+                            <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
                           </div>
                           <p className="text-xs text-muted-foreground">@{recipient.username}</p>
-                          <p className="text-xs font-mono text-muted-foreground mt-0.5 truncate max-w-[180px]">ID: {recipient.transfer_id}</p>
+                          {recipient.email_hint && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                              <Mail className="w-3 h-3" />
+                              {recipient.email_hint}
+                            </p>
+                          )}
+                          {!recipient.email_hint && (
+                            <p className="text-xs font-mono text-muted-foreground mt-0.5 truncate">
+                              ID: {recipient.transfer_id?.slice(0, 18)}…
+                            </p>
+                          )}
                         </div>
                       </div>
                     </motion.div>
@@ -248,12 +334,13 @@ export default function TransferDialog({ open, onClose }) {
                 <div className="bg-secondary/30 border border-border rounded-xl p-3 flex items-start gap-2">
                   <ShieldCheck className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    Internal transfers are instant, free, and irreversible. Always verify the recipient's Transfer ID before sending.
+                    Internal transfers are <strong>instant, free, and irreversible</strong>. Always verify the recipient before sending.
                   </p>
                 </div>
               </motion.div>
             )}
 
+            {/* ── Step 1: Amount ── */}
             {step === 1 && (
               <motion.div key="step-1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
                 <div className="bg-secondary/40 rounded-xl border border-border p-4 flex items-center gap-3">
@@ -262,13 +349,19 @@ export default function TransferDialog({ open, onClose }) {
                       {(recipient?.display_name || recipient?.username)?.[0]?.toUpperCase()}
                     </span>
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-sm font-semibold text-foreground">{recipient?.display_name || recipient?.username}</p>
-                    <p className="text-xs font-mono text-muted-foreground truncate max-w-[160px]">ID: {recipient?.transfer_id?.slice(0, 18)}…</p>
+                    {recipient?.email_hint ? (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Mail className="w-3 h-3" /> {recipient.email_hint}
+                      </p>
+                    ) : (
+                      <p className="text-xs font-mono text-muted-foreground truncate">ID: {recipient?.transfer_id?.slice(0, 18)}…</p>
+                    )}
                   </div>
-                  <div className="ml-auto text-xs text-muted-foreground flex items-center gap-1">
+                  <div className="ml-auto text-xs text-muted-foreground flex items-center gap-1 shrink-0">
                     <Wallet className="w-3.5 h-3.5" />
-                    Balance: <span className="font-semibold text-foreground ml-1">${cashBalance.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                    <span className="font-semibold text-foreground">${cashBalance.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
                   </div>
                 </div>
 
@@ -336,6 +429,7 @@ export default function TransferDialog({ open, onClose }) {
               </motion.div>
             )}
 
+            {/* ── Step 2: Confirm ── */}
             {step === 2 && (
               <motion.div key="step-2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
                 <p className="text-sm text-muted-foreground">Please review all details carefully. Transfers are instant and cannot be reversed.</p>
@@ -349,7 +443,13 @@ export default function TransferDialog({ open, onClose }) {
                       <span className="text-sm text-muted-foreground">To</span>
                       <div className="text-right">
                         <p className="text-sm font-semibold text-foreground">{recipient?.display_name || recipient?.username}</p>
-                        <p className="text-xs font-mono text-muted-foreground truncate">{recipient?.transfer_id?.slice(0, 18)}…</p>
+                        {recipient?.email_hint ? (
+                          <p className="text-xs text-muted-foreground flex items-center gap-1 justify-end">
+                            <Mail className="w-3 h-3" /> {recipient.email_hint}
+                          </p>
+                        ) : (
+                          <p className="text-xs font-mono text-muted-foreground">{recipient?.transfer_id?.slice(0, 18)}…</p>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center justify-between px-4 py-3">
@@ -378,12 +478,13 @@ export default function TransferDialog({ open, onClose }) {
                 <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
                   <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
-                    Once confirmed, this transfer is <strong>instant and irreversible</strong>. Make sure the Transfer ID and amount are correct before proceeding.
+                    Once confirmed, this transfer is <strong>instant and irreversible</strong>. Make sure the recipient and amount are correct.
                   </p>
                 </div>
               </motion.div>
             )}
 
+            {/* ── Step 3: Success ── */}
             {step === 3 && (
               <motion.div key="step-3" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="space-y-5 py-2">
                 <div className="text-center space-y-3">
@@ -398,7 +499,8 @@ export default function TransferDialog({ open, onClose }) {
                   <div>
                     <p className="text-xl font-bold text-foreground">Transfer Successful!</p>
                     <p className="text-muted-foreground text-sm mt-1">
-                      <span className="font-semibold text-primary">${parsedAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span> sent to <span className="font-semibold">{result?.recipient_username}</span>
+                      <span className="font-semibold text-primary">${parsedAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>{" "}
+                      sent to <span className="font-semibold">{result?.recipient_username}</span>
                     </p>
                   </div>
                 </div>
@@ -427,22 +529,15 @@ export default function TransferDialog({ open, onClose }) {
           </AnimatePresence>
         </div>
 
+        {/* ── Footer Buttons ── */}
         <div className="px-6 py-4 border-t border-border bg-card">
           {step === 0 && (
-            <Button
-              className="w-full"
-              onClick={() => setStep(1)}
-              disabled={!canProceedToAmount}
-            >
+            <Button className="w-full" onClick={() => setStep(1)} disabled={!canProceedToAmount}>
               Continue <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           )}
           {step === 1 && (
-            <Button
-              className="w-full"
-              onClick={() => setStep(2)}
-              disabled={!canConfirm}
-            >
+            <Button className="w-full" onClick={() => setStep(2)} disabled={!canConfirm}>
               Review Transfer <ChevronRight className="w-4 h-4 ml-2" />
             </Button>
           )}
@@ -462,7 +557,7 @@ export default function TransferDialog({ open, onClose }) {
           )}
           {step === 3 && (
             <div className="flex gap-3">
-              <Button variant="outline" onClick={() => { reset(); }} className="flex-1">
+              <Button variant="outline" onClick={reset} className="flex-1">
                 <RefreshCw className="w-4 h-4 mr-2" /> New Transfer
               </Button>
               <Button onClick={handleClose} className="flex-1">
