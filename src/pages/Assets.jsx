@@ -1,607 +1,295 @@
-import React, { useState, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import React, { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
 import { usePortfolio } from "@/contexts/PortfolioContext";
 import { useLivePrices } from "@/hooks/useLivePrices";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { toast } from "sonner";
+import { getUserCryptoBalances } from "@/lib/api/cryptoDeposits";
 import {
-  Copy, CheckCircle2, Clock, XCircle, Upload, X,
-  Info, Loader2, ExternalLink, Wallet, RefreshCw,
-  AlertCircle, FileImage, DollarSign, TrendingUp,
-  ChevronDown, ChevronRight,
+  Wallet, Search, ChevronRight, TrendingUp, TrendingDown,
+  DollarSign, Bitcoin,
 } from "lucide-react";
-import {
-  getMasterWallets,
-  getUserDeposits,
-  submitCryptoDeposit,
-  getUserCryptoBalances,
-  getDepositProofUrl,
-} from "@/lib/api/cryptoDeposits";
 
-const ASSET_META = {
-  BTC:  { color: "text-orange-500",  bg: "bg-orange-500/10",  border: "border-orange-500/20",  icon: "₿",  label: "Bitcoin",   coinId: "bitcoin" },
-  ETH:  { color: "text-blue-500",    bg: "bg-blue-500/10",    border: "border-blue-500/20",    icon: "Ξ",  label: "Ethereum",  coinId: "ethereum" },
-  SOL:  { color: "text-purple-500",  bg: "bg-purple-500/10",  border: "border-purple-500/20",  icon: "◎",  label: "Solana",    coinId: "solana" },
-  BNB:  { color: "text-yellow-500",  bg: "bg-yellow-500/10",  border: "border-yellow-500/20",  icon: "B",  label: "BNB",       coinId: "binancecoin" },
-  USDT: { color: "text-emerald-500", bg: "bg-emerald-500/10", border: "border-emerald-500/20", icon: "₮",  label: "Tether",    coinId: "tether" },
-  USDC: { color: "text-sky-500",     bg: "bg-sky-500/10",     border: "border-sky-500/20",     icon: "$",  label: "USD Coin",  coinId: "usd-coin" },
-};
+// ── All supported crypto assets ───────────────────────────────────────────────
+export const CRYPTO_ASSETS = [
+  { symbol: "BTC",  name: "Bitcoin",         icon: "₿",  color: "#F7931A", bg: "bg-orange-500/10",   text: "text-orange-500",   coinId: "bitcoin" },
+  { symbol: "ETH",  name: "Ethereum",        icon: "Ξ",  color: "#627EEA", bg: "bg-blue-500/10",     text: "text-blue-500",     coinId: "ethereum" },
+  { symbol: "SOL",  name: "Solana",          icon: "◎",  color: "#9945FF", bg: "bg-purple-500/10",   text: "text-purple-500",   coinId: "solana" },
+  { symbol: "BNB",  name: "BNB",             icon: "B",  color: "#F3BA2F", bg: "bg-yellow-500/10",   text: "text-yellow-500",   coinId: "binancecoin" },
+  { symbol: "XRP",  name: "XRP",             icon: "✕",  color: "#00AAE4", bg: "bg-sky-500/10",      text: "text-sky-500",      coinId: "ripple" },
+  { symbol: "ADA",  name: "Cardano",         icon: "₳",  color: "#0033AD", bg: "bg-blue-600/10",     text: "text-blue-600",     coinId: "cardano" },
+  { symbol: "AVAX", name: "Avalanche",       icon: "A",  color: "#E84142", bg: "bg-red-500/10",      text: "text-red-500",      coinId: "avalanche-2" },
+  { symbol: "DOGE", name: "Dogecoin",        icon: "Ð",  color: "#C2A633", bg: "bg-yellow-600/10",   text: "text-yellow-600",   coinId: "dogecoin" },
+  { symbol: "DOT",  name: "Polkadot",        icon: "●",  color: "#E6007A", bg: "bg-pink-500/10",     text: "text-pink-500",     coinId: "polkadot" },
+  { symbol: "MATIC",name: "Polygon",         icon: "M",  color: "#8247E5", bg: "bg-violet-500/10",   text: "text-violet-500",   coinId: "matic-network" },
+  { symbol: "LINK", name: "Chainlink",       icon: "⬡",  color: "#375BD2", bg: "bg-indigo-500/10",   text: "text-indigo-500",   coinId: "chainlink" },
+  { symbol: "LTC",  name: "Litecoin",        icon: "Ł",  color: "#BFBBBB", bg: "bg-slate-500/10",    text: "text-slate-400",    coinId: "litecoin" },
+  { symbol: "ATOM", name: "Cosmos",          icon: "⚛",  color: "#2E3148", bg: "bg-gray-600/10",     text: "text-gray-400",     coinId: "cosmos" },
+  { symbol: "UNI",  name: "Uniswap",         icon: "🦄", color: "#FF007A", bg: "bg-pink-600/10",     text: "text-pink-400",     coinId: "uniswap" },
+  { symbol: "USDT", name: "Tether",          icon: "₮",  color: "#26A17B", bg: "bg-emerald-500/10",  text: "text-emerald-500",  coinId: "tether" },
+  { symbol: "USDC", name: "USD Coin",        icon: "$",  color: "#2775CA", bg: "bg-sky-600/10",      text: "text-sky-500",      coinId: "usd-coin" },
+  { symbol: "TRX",  name: "TRON",            icon: "T",  color: "#FF0013", bg: "bg-red-600/10",      text: "text-red-400",      coinId: "tron" },
+  { symbol: "TON",  name: "Toncoin",         icon: "💎", color: "#0098EA", bg: "bg-blue-400/10",     text: "text-blue-400",     coinId: "the-open-network" },
+  { symbol: "NEAR", name: "NEAR Protocol",   icon: "N",  color: "#00C08B", bg: "bg-emerald-600/10",  text: "text-emerald-400",  coinId: "near" },
+  { symbol: "BCH",  name: "Bitcoin Cash",    icon: "Ƀ",  color: "#8DC351", bg: "bg-lime-500/10",     text: "text-lime-500",     coinId: "bitcoin-cash" },
+  { symbol: "SHIB", name: "Shiba Inu",       icon: "🐕", color: "#FFA409", bg: "bg-amber-500/10",    text: "text-amber-500",    coinId: "shiba-inu" },
+  { symbol: "APT",  name: "Aptos",           icon: "A",  color: "#22D3EE", bg: "bg-cyan-500/10",     text: "text-cyan-500",     coinId: "aptos" },
+  { symbol: "ARB",  name: "Arbitrum",        icon: "◈",  color: "#12AAFF", bg: "bg-blue-400/10",     text: "text-blue-300",     coinId: "arbitrum" },
+  { symbol: "OP",   name: "Optimism",        icon: "O",  color: "#FF0420", bg: "bg-red-500/10",      text: "text-red-400",      coinId: "optimism" },
+];
 
-const STATUS_CONFIG = {
-  pending:      { label: "Pending",      color: "text-yellow-500",  bg: "bg-yellow-500/10 border-yellow-500/20",   icon: Clock },
-  under_review: { label: "Under Review", color: "text-blue-500",    bg: "bg-blue-500/10 border-blue-500/20",       icon: RefreshCw },
-  completed:    { label: "Completed",    color: "text-emerald-500", bg: "bg-emerald-500/10 border-emerald-500/20", icon: CheckCircle2 },
-  rejected:     { label: "Rejected",     color: "text-destructive", bg: "bg-destructive/10 border-destructive/20", icon: XCircle },
-};
+// ── All supported fiat currencies ─────────────────────────────────────────────
+export const FIAT_CURRENCIES = [
+  { symbol: "USD", name: "US Dollar",          flag: "🇺🇸", color: "#10B981", bg: "bg-emerald-500/10", text: "text-emerald-500" },
+  { symbol: "EUR", name: "Euro",               flag: "🇪🇺", color: "#3B82F6", bg: "bg-blue-500/10",    text: "text-blue-500" },
+  { symbol: "GBP", name: "British Pound",      flag: "🇬🇧", color: "#8B5CF6", bg: "bg-violet-500/10",  text: "text-violet-500" },
+  { symbol: "AUD", name: "Australian Dollar",  flag: "🇦🇺", color: "#F59E0B", bg: "bg-amber-500/10",   text: "text-amber-500" },
+  { symbol: "CAD", name: "Canadian Dollar",    flag: "🇨🇦", color: "#EF4444", bg: "bg-red-500/10",     text: "text-red-500" },
+  { symbol: "CHF", name: "Swiss Franc",        flag: "🇨🇭", color: "#F43F5E", bg: "bg-rose-500/10",    text: "text-rose-500" },
+  { symbol: "JPY", name: "Japanese Yen",       flag: "🇯🇵", color: "#EC4899", bg: "bg-pink-500/10",    text: "text-pink-500" },
+  { symbol: "SGD", name: "Singapore Dollar",   flag: "🇸🇬", color: "#14B8A6", bg: "bg-teal-500/10",    text: "text-teal-500" },
+  { symbol: "AED", name: "UAE Dirham",         flag: "🇦🇪", color: "#22C55E", bg: "bg-green-500/10",   text: "text-green-500" },
+  { symbol: "INR", name: "Indian Rupee",       flag: "🇮🇳", color: "#F97316", bg: "bg-orange-500/10",  text: "text-orange-500" },
+  { symbol: "BRL", name: "Brazilian Real",     flag: "🇧🇷", color: "#84CC16", bg: "bg-lime-500/10",    text: "text-lime-500" },
+  { symbol: "MXN", name: "Mexican Peso",       flag: "🇲🇽", color: "#06B6D4", bg: "bg-cyan-500/10",    text: "text-cyan-500" },
+  { symbol: "KRW", name: "South Korean Won",   flag: "🇰🇷", color: "#A855F7", bg: "bg-purple-500/10",  text: "text-purple-500" },
+  { symbol: "HKD", name: "Hong Kong Dollar",   flag: "🇭🇰", color: "#EF4444", bg: "bg-red-500/10",     text: "text-red-400" },
+  { symbol: "NOK", name: "Norwegian Krone",    flag: "🇳🇴", color: "#EF4444", bg: "bg-red-600/10",     text: "text-red-500" },
+  { symbol: "SEK", name: "Swedish Krona",      flag: "🇸🇪", color: "#3B82F6", bg: "bg-blue-600/10",    text: "text-blue-400" },
+  { symbol: "DKK", name: "Danish Krone",       flag: "🇩🇰", color: "#EF4444", bg: "bg-red-500/10",     text: "text-red-400" },
+  { symbol: "NZD", name: "New Zealand Dollar", flag: "🇳🇿", color: "#1D4ED8", bg: "bg-blue-700/10",    text: "text-blue-400" },
+  { symbol: "ZAR", name: "South African Rand", flag: "🇿🇦", color: "#22C55E", bg: "bg-green-600/10",   text: "text-green-400" },
+  { symbol: "NGN", name: "Nigerian Naira",     flag: "🇳🇬", color: "#22C55E", bg: "bg-green-500/10",   text: "text-green-500" },
+  { symbol: "TRY", name: "Turkish Lira",       flag: "🇹🇷", color: "#EF4444", bg: "bg-red-500/10",     text: "text-red-400" },
+  { symbol: "CNY", name: "Chinese Yuan",       flag: "🇨🇳", color: "#EF4444", bg: "bg-red-600/10",     text: "text-red-500" },
+  { symbol: "THB", name: "Thai Baht",          flag: "🇹🇭", color: "#3B82F6", bg: "bg-blue-500/10",    text: "text-blue-400" },
+  { symbol: "MYR", name: "Malaysian Ringgit",  flag: "🇲🇾", color: "#F59E0B", bg: "bg-amber-500/10",   text: "text-amber-400" },
+];
 
 const STABLECOIN_PRICE = { USDT: 1.0, USDC: 1.0 };
 
-function CopyButton({ value }) {
-  const [copied, setCopied] = useState(false);
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(value);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-  return (
-    <button onClick={handleCopy}
-      className="shrink-0 p-1.5 rounded-lg hover:bg-secondary/60 transition-colors text-muted-foreground hover:text-foreground"
-      title="Copy to clipboard"
-    >
-      {copied ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
-    </button>
-  );
-}
-
-// ── Fiat Balance Section ──────────────────────────────────────────────────────
-function FiatSection({ cashBalance }) {
-  const fmt = (v) =>
-    new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(v ?? 0);
-
-  return (
-    <div className="bg-card border border-border rounded-2xl overflow-hidden">
-      <div className="flex items-center gap-2 px-5 py-3.5 border-b border-border/50">
-        <DollarSign className="w-4 h-4 text-primary" />
-        <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">Fiat Balance</h2>
-      </div>
-      <div className="px-5 py-5 flex items-center justify-between">
-        <div>
-          <p className="text-xs text-muted-foreground mb-1">Available USD Balance</p>
-          <p className="text-3xl font-bold text-foreground tabular-nums">{fmt(cashBalance)}</p>
-          <p className="text-xs text-muted-foreground mt-1.5">
-            Your spendable USD for trading and withdrawals
-          </p>
-        </div>
-        <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
-          <span className="text-2xl font-bold text-primary">$</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Crypto Balances Section ───────────────────────────────────────────────────
-function CryptoSection({ balances, cryptoList, isLoading }) {
-  const [collapsed, setCollapsed] = useState(false);
-
-  const getPrice = (asset) =>
-    STABLECOIN_PRICE[asset] ??
-    cryptoList.find((c) => c.symbol === asset)?.price ??
-    0;
-
-  const totalUsd = balances.reduce((sum, b) => {
-    const price = getPrice(b.asset);
-    return sum + parseFloat(b.balance) * price;
-  }, 0);
-
-  const fmt = (v) =>
-    new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(v ?? 0);
-
-  return (
-    <div className="bg-card border border-border rounded-2xl overflow-hidden">
-      <button
-        onClick={() => setCollapsed((c) => !c)}
-        className="w-full flex items-center justify-between px-5 py-3.5 border-b border-border/50 hover:bg-secondary/20 transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          <Wallet className="w-4 h-4 text-primary" />
-          <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">Crypto Balances</h2>
-          {balances.length > 0 && (
-            <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-semibold">
-              {balances.length} asset{balances.length > 1 ? "s" : ""}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-3">
-          {!collapsed && totalUsd > 0 && (
-            <span className="text-sm font-semibold text-foreground">{fmt(totalUsd)}</span>
-          )}
-          {collapsed ? <ChevronRight className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
-        </div>
-      </button>
-
-      {!collapsed && (
-        <div>
-          {isLoading ? (
-            <div className="py-8 flex justify-center">
-              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-            </div>
-          ) : balances.length === 0 ? (
-            <div className="py-8 text-center space-y-1.5">
-              <Wallet className="w-8 h-8 text-muted-foreground/25 mx-auto" />
-              <p className="text-sm text-muted-foreground">No crypto balances yet</p>
-              <p className="text-xs text-muted-foreground/60">Make a deposit and it will appear here after admin approval</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-border/40">
-              {balances.map((b) => {
-                const meta = ASSET_META[b.asset] || { color: "text-foreground", bg: "bg-secondary/40", icon: "?", label: b.asset };
-                const bal = parseFloat(b.balance);
-                const price = getPrice(b.asset);
-                const usdVal = bal * price;
-                return (
-                  <div key={b.asset} className="flex items-center gap-4 px-5 py-4 hover:bg-secondary/20 transition-colors">
-                    <div className={`w-10 h-10 rounded-xl ${meta.bg} flex items-center justify-center shrink-0`}>
-                      <span className={`text-base font-bold ${meta.color}`}>{meta.icon}</span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-foreground">{b.asset}</p>
-                      <p className="text-xs text-muted-foreground">{meta.label}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-bold text-foreground tabular-nums">
-                        {bal.toFixed(8).replace(/\.?0+$/, "") || "0"}
-                        <span className="text-xs font-normal text-muted-foreground ml-1">{b.asset}</span>
-                      </p>
-                      {price > 0 && (
-                        <p className="text-xs text-muted-foreground tabular-nums">{fmt(usdVal)}</p>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-
-              {/* Total row */}
-              {balances.length > 1 && totalUsd > 0 && (
-                <div className="flex items-center justify-between px-5 py-3 bg-secondary/20">
-                  <div className="flex items-center gap-2">
-                    <TrendingUp className="w-3.5 h-3.5 text-primary" />
-                    <span className="text-xs font-semibold text-muted-foreground">Total Crypto Value</span>
-                  </div>
-                  <span className="text-sm font-bold text-foreground">{fmt(totalUsd)}</span>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Asset card in deposit list ────────────────────────────────────────────────
-function AssetCard({ wallet, balance, onDeposit, isSelected, onSelect }) {
-  const meta = ASSET_META[wallet.asset] || { color: "text-foreground", bg: "bg-secondary/40", border: "border-border", icon: "?", label: wallet.asset };
-  const bal = parseFloat(balance?.balance ?? 0);
-
-  return (
-    <motion.button layout onClick={onSelect}
-      className={`w-full text-left rounded-2xl border p-4 transition-all ${
-        isSelected
-          ? `${meta.bg} ${meta.border} ring-1 ring-offset-1 ring-offset-background ${meta.border.replace("border-", "ring-")}`
-          : "bg-card border-border hover:border-primary/30 hover:bg-secondary/30"
-      }`}
-    >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-xl ${meta.bg} ${meta.border} border flex items-center justify-center shrink-0`}>
-            <span className={`text-lg font-bold ${meta.color}`}>{meta.icon}</span>
-          </div>
-          <div>
-            <p className="text-sm font-bold text-foreground">{wallet.asset}</p>
-            <p className="text-xs text-muted-foreground">{meta.label} · {wallet.network}</p>
-          </div>
-        </div>
-        <div className="text-right">
-          <p className="text-sm font-semibold text-foreground tabular-nums">
-            {bal > 0 ? bal.toFixed(8).replace(/\.?0+$/, "") : "0"}
-          </p>
-          <p className="text-xs text-muted-foreground">{wallet.asset} held</p>
-        </div>
-      </div>
-
-      {isSelected && (
-        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
-          className="mt-4 pt-4 border-t border-border/40 space-y-3"
-        >
-          <div>
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Deposit Address</p>
-            <div className="flex items-center gap-2 bg-secondary/50 rounded-xl px-3 py-2.5 border border-border/50">
-              <p className="flex-1 font-mono text-xs text-foreground break-all">{wallet.address}</p>
-              <CopyButton value={wallet.address} />
-            </div>
-          </div>
-          <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 flex gap-2">
-            <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-            <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
-              Only send <strong>{wallet.asset}</strong> on the <strong>{wallet.network}</strong> network to this address.
-            </p>
-          </div>
-          <Button onClick={(e) => { e.stopPropagation(); onDeposit(wallet); }}
-            className="w-full rounded-xl text-sm font-semibold bg-primary hover:bg-primary/90"
-          >
-            Submit Deposit Proof
-          </Button>
-        </motion.div>
-      )}
-    </motion.button>
-  );
-}
-
-// ── Deposit submission form ───────────────────────────────────────────────────
-function DepositForm({ wallet, userId, onSuccess, onCancel }) {
-  const meta = ASSET_META[wallet.asset] || {};
-  const [amount, setAmount] = useState("");
-  const [txHash, setTxHash] = useState("");
-  const [file, setFile]     = useState(null);
-  const [submitting, setSubmitting] = useState(false);
-  const fileInputRef = useRef(null);
-
-  const handleFile = (e) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    if (f.size > 10 * 1024 * 1024) { toast.error("File must be under 10 MB"); return; }
-    const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
-    if (!allowed.includes(f.type)) { toast.error("Only images or PDF allowed"); return; }
-    setFile(f);
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const parsed = parseFloat(amount);
-    if (!parsed || parsed <= 0) { toast.error("Enter a valid amount"); return; }
-    if (!file && !txHash.trim()) {
-      toast.error("Please provide a transaction hash or upload a proof screenshot");
-      return;
-    }
-    setSubmitting(true);
-    try {
-      await submitCryptoDeposit({ userId, asset: wallet.asset, network: wallet.network, amount: parsed, txHash: txHash || null, proofFile: file || null });
-      toast.success("Deposit submitted! Our team will review it shortly.");
-      onSuccess();
-    } catch (err) {
-      toast.error(err.message || "Failed to submit deposit");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 16 }}
-      className="bg-card border border-border rounded-2xl p-6 space-y-5"
-    >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className={`w-9 h-9 rounded-xl ${meta.bg} flex items-center justify-center`}>
-            <span className={`font-bold ${meta.color}`}>{meta.icon}</span>
-          </div>
-          <div>
-            <p className="text-base font-bold text-foreground">Submit {wallet.asset} Deposit</p>
-            <p className="text-xs text-muted-foreground">{meta.label} · {wallet.network}</p>
-          </div>
-        </div>
-        <button onClick={onCancel} className="text-muted-foreground hover:text-foreground p-1.5 rounded-lg hover:bg-secondary/60 transition-colors">
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-
-      <div className="bg-secondary/40 rounded-xl p-3 text-xs text-muted-foreground space-y-1">
-        <p className="font-semibold text-foreground text-xs">Deposit Address</p>
-        <div className="flex items-center gap-2">
-          <p className="font-mono break-all flex-1">{wallet.address}</p>
-          <CopyButton value={wallet.address} />
-        </div>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium text-foreground">Amount <span className="text-destructive">*</span></label>
-          <div className="relative">
-            <Input type="number" step="any" min="0" placeholder="e.g. 0.005" value={amount}
-              onChange={(e) => setAmount(e.target.value)} className="bg-secondary/40 border-border pr-16" />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-muted-foreground">{wallet.asset}</span>
-          </div>
-        </div>
-
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium text-foreground">
-            Transaction Hash <span className="text-muted-foreground text-xs font-normal ml-1">(optional)</span>
-          </label>
-          <Input placeholder="e.g. 0xabc123... or txid..." value={txHash}
-            onChange={(e) => setTxHash(e.target.value)} className="bg-secondary/40 border-border font-mono text-xs" />
-        </div>
-
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium text-foreground">
-            Proof of Payment <span className="text-muted-foreground text-xs font-normal ml-1">(screenshot or PDF)</span>
-          </label>
-          <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" onChange={handleFile} className="hidden" />
-          {file ? (
-            <div className="flex items-center gap-3 bg-secondary/40 rounded-xl border border-border px-3 py-2.5">
-              <FileImage className="w-4 h-4 text-primary shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">{file.name}</p>
-                <p className="text-xs text-muted-foreground">{(file.size / 1024).toFixed(1)} KB</p>
-              </div>
-              <button type="button" onClick={() => { setFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
-                className="text-muted-foreground hover:text-destructive transition-colors"><X className="w-4 h-4" /></button>
-            </div>
-          ) : (
-            <button type="button" onClick={() => fileInputRef.current?.click()}
-              className="w-full flex flex-col items-center justify-center gap-2 border-2 border-dashed border-border hover:border-primary/40 rounded-xl py-6 transition-colors text-muted-foreground hover:text-foreground bg-secondary/20 hover:bg-secondary/40"
-            >
-              <Upload className="w-5 h-5" />
-              <span className="text-sm">Click to upload proof</span>
-              <span className="text-xs">JPG, PNG, WebP, GIF, PDF · Max 10 MB</span>
-            </button>
-          )}
-        </div>
-
-        <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 flex gap-2">
-          <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
-          <p className="text-xs text-blue-700 dark:text-blue-400 leading-relaxed">
-            Your deposit will be reviewed and credited by our team. This typically takes 1–24 hours.
-          </p>
-        </div>
-
-        <div className="flex gap-3">
-          <Button type="button" variant="outline" onClick={onCancel} className="flex-1 rounded-xl" disabled={submitting}>Cancel</Button>
-          <Button type="submit" className="flex-1 rounded-xl" disabled={submitting}>
-            {submitting ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Submitting...</> : "Submit Deposit"}
-          </Button>
-        </div>
-      </form>
-    </motion.div>
-  );
-}
-
-// ── Deposit history row ───────────────────────────────────────────────────────
-function DepositHistoryRow({ deposit }) {
-  const cfg = STATUS_CONFIG[deposit.status] || STATUS_CONFIG.pending;
-  const StatusIcon = cfg.icon;
-  const meta = ASSET_META[deposit.asset] || {};
-  const [proofUrl, setProofUrl] = useState(null);
-  const [loadingProof, setLoadingProof] = useState(false);
-
-  const handleViewProof = async () => {
-    if (proofUrl) { window.open(proofUrl, "_blank"); return; }
-    if (!deposit.proof_url) return;
-    setLoadingProof(true);
-    try {
-      const url = await getDepositProofUrl(deposit.proof_url);
-      setProofUrl(url);
-      window.open(url, "_blank");
-    } catch { toast.error("Could not load proof file"); }
-    finally { setLoadingProof(false); }
-  };
-
-  return (
-    <div className="flex items-start gap-3 p-4 border-b border-border/40 last:border-0 hover:bg-secondary/20 transition-colors">
-      <div className={`w-9 h-9 rounded-xl ${meta.bg || "bg-secondary/40"} flex items-center justify-center shrink-0`}>
-        <span className={`font-bold text-sm ${meta.color || "text-foreground"}`}>{meta.icon || deposit.asset[0]}</span>
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <p className="text-sm font-semibold text-foreground">
-            {parseFloat(deposit.amount).toFixed(8).replace(/\.?0+$/, "")} {deposit.asset}
-          </p>
-          <span className="text-xs text-muted-foreground">{deposit.network}</span>
-        </div>
-        <div className="flex items-center gap-3 mt-1 flex-wrap">
-          <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border ${cfg.bg} ${cfg.color}`}>
-            <StatusIcon className="w-3 h-3" />{cfg.label}
-          </span>
-          <span className="text-xs text-muted-foreground">
-            {new Date(deposit.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
-          </span>
-          {deposit.tx_hash && (
-            <span className="text-xs text-muted-foreground font-mono truncate max-w-[120px]" title={deposit.tx_hash}>
-              {deposit.tx_hash.slice(0, 10)}…
-            </span>
-          )}
-        </div>
-        {deposit.admin_note && (
-          <p className="text-xs text-muted-foreground mt-1.5 italic">"{deposit.admin_note}"</p>
-        )}
-      </div>
-      {deposit.proof_url && (
-        <button onClick={handleViewProof} disabled={loadingProof}
-          className="shrink-0 p-1.5 rounded-lg hover:bg-secondary/60 transition-colors text-muted-foreground hover:text-foreground" title="View proof"
-        >
-          {loadingProof ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
-        </button>
-      )}
-    </div>
-  );
-}
-
-// ── Main Assets Page ──────────────────────────────────────────────────────────
 export default function AssetsPage() {
-  const { user }                     = useAuth();
-  const { cashBalance }              = usePortfolio();
-  const { cryptoList }               = useLivePrices();
-  const queryClient                  = useQueryClient();
-  const [selectedWallet, setSelected] = useState(null);
-  const [depositFormWallet, setDepositForm] = useState(null);
-  const [activeTab, setActiveTab]    = useState("deposit");
-  const [statusFilter, setStatus]    = useState("all");
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { cashBalance } = usePortfolio();
+  const { cryptoList } = useLivePrices();
+  const [tab, setTab] = useState("crypto");
+  const [search, setSearch] = useState("");
 
-  const { data: wallets = [], isLoading: walletsLoading } = useQuery({
-    queryKey: ["master_wallets"],
-    queryFn:  getMasterWallets,
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const { data: balances = [], isLoading: balancesLoading } = useQuery({
+  const { data: cryptoBalances = [] } = useQuery({
     queryKey: ["user_crypto_balances", user?.id],
-    queryFn:  () => getUserCryptoBalances(user?.id),
-    enabled:  !!user?.id,
+    queryFn: () => getUserCryptoBalances(user?.id),
+    enabled: !!user?.id,
   });
 
-  const { data: deposits = [], isLoading: depositsLoading } = useQuery({
-    queryKey: ["user_deposits", user?.id],
-    queryFn:  () => getUserDeposits(user?.id),
-    enabled:  !!user?.id,
-  });
+  const balanceMap = useMemo(
+    () => Object.fromEntries(cryptoBalances.map((b) => [b.asset, parseFloat(b.balance)])),
+    [cryptoBalances]
+  );
 
-  const balanceMap = Object.fromEntries(balances.map((b) => [b.asset, b]));
+  const getPriceData = (symbol) =>
+    STABLECOIN_PRICE[symbol] != null
+      ? { price: STABLECOIN_PRICE[symbol], change24h: 0 }
+      : cryptoList.find((c) => c.symbol === symbol) || null;
 
-  const filteredDeposits = statusFilter === "all"
-    ? deposits
-    : deposits.filter((d) => d.status === statusFilter);
+  const filteredCrypto = useMemo(
+    () =>
+      CRYPTO_ASSETS.filter(
+        (a) =>
+          a.symbol.toLowerCase().includes(search.toLowerCase()) ||
+          a.name.toLowerCase().includes(search.toLowerCase())
+      ),
+    [search]
+  );
 
-  const handleDeposit = (wallet) => {
-    setDepositForm(wallet);
-    setSelected(null);
-  };
+  const filteredFiat = useMemo(
+    () =>
+      FIAT_CURRENCIES.filter(
+        (f) =>
+          f.symbol.toLowerCase().includes(search.toLowerCase()) ||
+          f.name.toLowerCase().includes(search.toLowerCase())
+      ),
+    [search]
+  );
 
-  const handleDepositSuccess = () => {
-    setDepositForm(null);
-    setSelected(null);
-    setActiveTab("history");
-    queryClient.invalidateQueries(["user_deposits", user?.id]);
-    queryClient.invalidateQueries(["user_crypto_balances", user?.id]);
-  };
+  const totalCryptoUsd = useMemo(() => {
+    return cryptoBalances.reduce((sum, b) => {
+      const price = getPriceData(b.asset)?.price ?? 0;
+      return sum + parseFloat(b.balance) * price;
+    }, 0);
+  }, [cryptoBalances, cryptoList]);
 
-  const pendingCount = deposits.filter((d) => d.status === "pending").length;
+  const fmtUsd = (v) =>
+    new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(v ?? 0);
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
       {/* Header */}
-      <div>
-        <div className="flex items-center gap-3 mb-1">
-          <div className="w-9 h-9 rounded-xl bg-primary/15 flex items-center justify-center">
-            <Wallet className="w-[18px] h-[18px] text-primary" />
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center">
+          <Wallet className="w-5 h-5 text-primary" />
+        </div>
+        <div>
+          <h1 className="text-xl font-bold text-foreground">Assets</h1>
+          <p className="text-sm text-muted-foreground">Manage your crypto and fiat balances</p>
+        </div>
+      </div>
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-card border border-border rounded-2xl p-4">
+          <p className="text-xs text-muted-foreground mb-1">Fiat Balance</p>
+          <p className="text-xl font-bold text-foreground tabular-nums">{fmtUsd(cashBalance)}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Available USD</p>
+        </div>
+        <div className="bg-card border border-border rounded-2xl p-4">
+          <p className="text-xs text-muted-foreground mb-1">Crypto Balance</p>
+          <p className="text-xl font-bold text-foreground tabular-nums">{fmtUsd(totalCryptoUsd)}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{cryptoBalances.length} asset{cryptoBalances.length !== 1 ? "s" : ""}</p>
+        </div>
+      </div>
+
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search assets or currencies..."
+          className="w-full pl-10 pr-4 py-2.5 bg-secondary/40 border border-border rounded-xl text-sm focus:outline-none focus:border-primary/50 transition-colors"
+        />
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 bg-secondary/40 rounded-xl p-1">
+        {[
+          { id: "crypto", label: "Crypto Assets", icon: Bitcoin },
+          { id: "fiat",   label: "Fiat Currencies", icon: DollarSign },
+        ].map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            onClick={() => setTab(id)}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition-all ${
+              tab === id
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Icon className="w-4 h-4" />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Crypto list */}
+      {tab === "crypto" && (
+        <div className="bg-card border border-border rounded-2xl overflow-hidden">
+          <div className="px-5 py-3 border-b border-border/50">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              {filteredCrypto.length} Cryptocurrencies
+            </p>
           </div>
-          <h1 className="text-2xl font-bold text-foreground">Assets</h1>
+          <div className="divide-y divide-border/30">
+            {filteredCrypto.map((asset, idx) => {
+              const priceData = getPriceData(asset.symbol);
+              const balance = balanceMap[asset.symbol] ?? 0;
+              const usdValue = balance * (priceData?.price ?? 0);
+              const change = priceData?.change24h ?? 0;
+              const isPos = change >= 0;
+
+              return (
+                <motion.button
+                  key={asset.symbol}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.02 }}
+                  onClick={() => navigate(`/assets/crypto/${asset.symbol}`)}
+                  className="w-full flex items-center gap-4 px-5 py-4 hover:bg-secondary/20 transition-colors text-left"
+                >
+                  <div className={`w-10 h-10 rounded-xl ${asset.bg} flex items-center justify-center shrink-0`}>
+                    <span className={`text-base font-bold ${asset.text}`}>{asset.icon}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-foreground">{asset.name}</p>
+                    <p className="text-xs text-muted-foreground">{asset.symbol}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    {priceData ? (
+                      <>
+                        <p className="text-sm font-semibold text-foreground tabular-nums">
+                          {priceData.price >= 1000
+                            ? `$${priceData.price.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+                            : priceData.price >= 1
+                            ? `$${priceData.price.toFixed(4)}`
+                            : `$${priceData.price.toFixed(6)}`}
+                        </p>
+                        <p className={`text-xs font-medium flex items-center justify-end gap-0.5 ${isPos ? "text-emerald-500" : "text-red-500"}`}>
+                          {isPos ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                          {isPos ? "+" : ""}{change.toFixed(2)}%
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">—</p>
+                    )}
+                    {balance > 0 && (
+                      <p className="text-xs text-primary font-medium mt-0.5">{fmtUsd(usdValue)}</p>
+                    )}
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                </motion.button>
+              );
+            })}
+          </div>
         </div>
-        <p className="text-muted-foreground text-sm ml-12">
-          Your balances and crypto deposit system
-        </p>
-      </div>
+      )}
 
-      {/* ── FIAT SECTION ── */}
-      <FiatSection cashBalance={cashBalance} />
-
-      {/* ── CRYPTO BALANCES SECTION ── */}
-      <CryptoSection balances={balances} cryptoList={cryptoList} isLoading={balancesLoading} />
-
-      {/* ── DEPOSIT / HISTORY TABS ── */}
-      <div>
-        <div className="flex gap-1 bg-secondary/50 p-1 rounded-xl w-fit mb-5">
-          {[
-            { key: "deposit", label: "Deposit" },
-            { key: "history", label: "History", badge: pendingCount },
-          ].map(({ key, label, badge }) => (
-            <button key={key}
-              onClick={() => { setActiveTab(key); setDepositForm(null); setSelected(null); }}
-              className={`relative px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                activeTab === key ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {label}
-              {badge > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-yellow-500 text-[9px] font-bold text-white flex items-center justify-center">
-                  {badge}
-                </span>
-              )}
-            </button>
-          ))}
+      {/* Fiat list */}
+      {tab === "fiat" && (
+        <div className="bg-card border border-border rounded-2xl overflow-hidden">
+          <div className="px-5 py-3 border-b border-border/50">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              {filteredFiat.length} Fiat Currencies
+            </p>
+          </div>
+          <div className="divide-y divide-border/30">
+            {filteredFiat.map((currency, idx) => {
+              const isUsd = currency.symbol === "USD";
+              return (
+                <motion.button
+                  key={currency.symbol}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.02 }}
+                  onClick={() => navigate(`/assets/fiat/${currency.symbol}`)}
+                  className="w-full flex items-center gap-4 px-5 py-4 hover:bg-secondary/20 transition-colors text-left"
+                >
+                  <div className={`w-10 h-10 rounded-xl ${currency.bg} flex items-center justify-center shrink-0 text-xl`}>
+                    {currency.flag}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-foreground">{currency.name}</p>
+                    <p className="text-xs text-muted-foreground">{currency.symbol}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    {isUsd && cashBalance > 0 ? (
+                      <p className="text-sm font-semibold text-primary tabular-nums">{fmtUsd(cashBalance)}</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">—</p>
+                    )}
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                </motion.button>
+              );
+            })}
+          </div>
         </div>
-
-        <AnimatePresence mode="wait">
-          {activeTab === "deposit" && (
-            <motion.div key="deposit" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-4">
-              <AnimatePresence>
-                {depositFormWallet && (
-                  <DepositForm
-                    wallet={depositFormWallet}
-                    userId={user?.id}
-                    onSuccess={handleDepositSuccess}
-                    onCancel={() => setDepositForm(null)}
-                  />
-                )}
-              </AnimatePresence>
-
-              {!depositFormWallet && (
-                <>
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-muted-foreground">Select an asset to see its deposit address</p>
-                    {walletsLoading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
-                  </div>
-                  <div className="space-y-2">
-                    {walletsLoading
-                      ? Array.from({ length: 6 }).map((_, i) => (
-                          <div key={i} className="h-[72px] bg-secondary/40 rounded-2xl animate-pulse" />
-                        ))
-                      : wallets.map((wallet) => (
-                          <AssetCard
-                            key={wallet.id}
-                            wallet={wallet}
-                            balance={balanceMap[wallet.asset]}
-                            isSelected={selectedWallet?.id === wallet.id}
-                            onSelect={() => setSelected((prev) => prev?.id === wallet.id ? null : wallet)}
-                            onDeposit={handleDeposit}
-                          />
-                        ))
-                    }
-                  </div>
-                </>
-              )}
-            </motion.div>
-          )}
-
-          {activeTab === "history" && (
-            <motion.div key="history" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-4">
-              <div className="flex gap-2 flex-wrap">
-                {["all", "pending", "under_review", "completed", "rejected"].map((s) => (
-                  <button key={s} onClick={() => setStatus(s)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all capitalize ${
-                      statusFilter === s ? "bg-primary/15 text-primary" : "bg-secondary/50 text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {s === "under_review" ? "Under Review" : s.charAt(0).toUpperCase() + s.slice(1)}
-                  </button>
-                ))}
-              </div>
-
-              <div className="bg-card border border-border rounded-2xl overflow-hidden">
-                {depositsLoading ? (
-                  <div className="py-12 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
-                ) : filteredDeposits.length === 0 ? (
-                  <div className="py-12 text-center space-y-2">
-                    <Wallet className="w-10 h-10 text-muted-foreground/30 mx-auto" />
-                    <p className="text-sm font-medium text-muted-foreground">No deposits found</p>
-                    <p className="text-xs text-muted-foreground/60">
-                      {statusFilter === "all" ? "Submit your first crypto deposit to get started" : `No ${statusFilter} deposits`}
-                    </p>
-                    <Button size="sm" variant="outline" onClick={() => setActiveTab("deposit")} className="mt-2 rounded-xl">
-                      Make a Deposit
-                    </Button>
-                  </div>
-                ) : (
-                  filteredDeposits.map((deposit) => (
-                    <DepositHistoryRow key={deposit.id} deposit={deposit} />
-                  ))
-                )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+      )}
     </div>
   );
 }

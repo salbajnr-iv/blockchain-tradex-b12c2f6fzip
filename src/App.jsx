@@ -44,6 +44,7 @@ import AdminSettings from './pages/admin/AdminSettings';
 import AdminAuditLog from './pages/admin/AdminAuditLog';
 import Recurring from './pages/Recurring';
 import Assets from './pages/Assets';
+import AssetDetail from './pages/AssetDetail';
 import AdminDeposits from './pages/admin/AdminDeposits';
 
 function App() {
@@ -97,6 +98,7 @@ function App() {
                     <Route path="/withdrawal" element={<Withdrawal />} />
                     <Route path="/recurring" element={<Recurring />} />
                     <Route path="/assets" element={<Assets />} />
+                    <Route path="/assets/:type/:id" element={<AssetDetail />} />
 
                     <Route path="/settings" element={<SettingsLayout />}>
                       <Route index element={<ProfileSettings />} />

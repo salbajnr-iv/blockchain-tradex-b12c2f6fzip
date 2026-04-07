@@ -4,9 +4,62 @@
 
 **Blockchain Tradex** is a full-featured cryptocurrency trading dashboard and portfolio management application built with React 18, Vite, and Tailwind CSS. Uses Supabase for authentication and PostgreSQL database, CoinGecko API for live market data.
 
-## Crypto Deposit System (Latest)
+## Assets System (Latest)
 
-### Assets Page (`/assets`)
+### Assets List Page (`/assets`)
+- **Route**: `/assets` — redesigned list page with two tabs: Crypto Assets (24 coins) + Fiat Currencies (24 currencies)
+- Shows live price + 24h change for crypto, user balances highlighted in primary color
+- Search bar filters both lists simultaneously
+- Clicking any asset navigates to `/assets/:type/:id` (e.g. `/assets/crypto/BTC` or `/assets/fiat/USD`)
+- Summary cards show total fiat balance (USD) and total crypto value in USD
+
+### Asset Detail Page (`/assets/:type/:id`)
+- **Route**: `/assets/crypto/:symbol` or `/assets/fiat/:currency`
+- Shows asset header (name, icon, live price + 24h change for crypto, balance)
+- **4 action buttons**: Deposit, Withdraw, Transfer, Convert — each opens its own slide-up modal with multi-step flow
+
+#### Deposit Flow (Crypto)
+- **Step 1**: Shows master wallet address with copy button, network warning, and instructions
+- **Step 2**: Upload proof (amount, TX hash, screenshot/PDF) → calls `submitCryptoDeposit`
+- If no wallet address configured yet → shows "Coming soon" message
+
+#### Deposit Flow (Fiat)
+- **Step 1**: Enter amount + choose method (Bank Transfer, Wire Transfer, Debit Card)
+- **Step 2**: Shows bank details with reference code (copy buttons on each field)
+- **Step 3**: Optional payment proof upload → calls `createTransaction` with type=DEPOSIT
+
+#### Withdraw Flow
+- **Step 1**: Enter amount + select method (bank/wire/paypal for fiat; crypto wallet for crypto)
+- **Step 2**: Fill destination details (account number, address, etc.)
+- **Step 3**: Review summary + confirm → calls `createTransaction` with type=WITHDRAWAL
+
+#### Transfer Flow
+- **Step 1**: Enter amount + recipient email/ID + optional note
+- **Step 2**: Review + confirm → calls `createTransaction`
+
+#### Convert Flow
+- **Step 1**: Select from/to asset pair, enter amount, see live exchange rate preview
+- **Step 2**: Review (rate, fee 0.5%) + confirm → calls `createTransaction`
+
+### Crypto Deposit History
+- Shown inline on the Asset Detail page (not the action sheet) as a second tab
+- Filtered to show only deposits for the specific asset
+
+### Supported Crypto Assets (24)
+BTC, ETH, SOL, BNB, XRP, ADA, AVAX, DOGE, DOT, MATIC, LINK, LTC, ATOM, UNI, USDT, USDC, TRX, TON, NEAR, BCH, SHIB, APT, ARB, OP
+
+### Supported Fiat Currencies (24)
+USD, EUR, GBP, AUD, CAD, CHF, JPY, SGD, AED, INR, BRL, MXN, KRW, HKD, NOK, SEK, DKK, NZD, ZAR, NGN, TRY, CNY, THB, MYR
+
+### New Files
+- `src/pages/Assets.jsx` — rewritten as list page; exports `CRYPTO_ASSETS` and `FIAT_CURRENCIES` arrays used by AssetDetail
+- `src/pages/AssetDetail.jsx` — new detail page with all 4 action flows inline
+
+---
+
+## Crypto Deposit System (Legacy Docs)
+
+### Assets Page (Old) (`/assets`)
 - **Route**: `/assets` — full-page, protected route inside the Layout
 - **Navigation**: Sidebar "Assets" item under the Portfolio section
 - **Features**:
