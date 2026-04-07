@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import ThemeToggle from '@/components/ThemeToggle';
+import SocialAuthButtons from '@/components/auth/SocialAuthButtons';
 
 const COUNTRIES = [
   "Algeria","Angola","Australia","Benin","Botswana","Brazil","Burkina Faso","Burundi","Cabo Verde","Cameroon",
@@ -188,6 +189,17 @@ export default function Register() {
             </div>
 
             <div className="bg-card border border-border/60 rounded-2xl p-6 shadow-lg">
+
+              {/* Social sign-up */}
+              <SocialAuthButtons mode="signup" />
+
+              <div className="relative my-5">
+                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border/40" /></div>
+                <div className="relative flex justify-center">
+                  <span className="bg-card px-3 text-xs text-muted-foreground">or sign up with email</span>
+                </div>
+              </div>
+
               <form onSubmit={handleSubmit} className="space-y-5">
 
                 {/* Personal Information */}

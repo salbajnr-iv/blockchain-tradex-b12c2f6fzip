@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Loader2, Eye, EyeOff, TrendingUp, ShieldCheck, Zap, BarChart2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import ThemeToggle from '@/components/ThemeToggle';
+import SocialAuthButtons from '@/components/auth/SocialAuthButtons';
 
 const FEATURES = [
   { icon: TrendingUp,   title: "Real-time Markets",    desc: "Live prices for 100+ cryptocurrencies updated every 30 seconds." },
@@ -184,11 +185,13 @@ export default function Login() {
               <div className="relative my-5">
                 <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border/40" /></div>
                 <div className="relative flex justify-center">
-                  <span className="bg-card px-3 text-xs text-muted-foreground">or</span>
+                  <span className="bg-card px-3 text-xs text-muted-foreground">or continue with</span>
                 </div>
               </div>
 
-              <p className="text-center text-sm text-muted-foreground">
+              <SocialAuthButtons mode="signin" />
+
+              <p className="text-center text-sm text-muted-foreground mt-5">
                 Don't have an account?{' '}
                 <Link to="/register" className="text-primary hover:text-primary/80 font-semibold transition-colors">
                   Create account
