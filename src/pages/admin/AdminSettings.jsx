@@ -234,21 +234,17 @@ export default function AdminSettings() {
         </button>
       </div>
 
-      {/* SQL reminder notice */}
-      <div className="flex gap-3 p-4 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl">
-        <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
-        <div>
-          <p className="text-sm font-medium text-amber-700 dark:text-amber-400">Database migration required</p>
-          <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">
-            Run <code className="font-mono bg-amber-100 dark:bg-amber-900/40 px-1 py-0.5 rounded">sql/admin-features-migration.sql</code> in your Supabase SQL Editor before using this page.
-            Settings are persisted in the <code className="font-mono bg-amber-100 dark:bg-amber-900/40 px-1 py-0.5 rounded">platform_settings</code> table.
-          </p>
-        </div>
-      </div>
-
       {error && (
-        <div className="p-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-xl text-red-600 dark:text-red-400 text-sm">
-          {error}
+        <div className="flex gap-3 p-4 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl">
+          <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-amber-700 dark:text-amber-400">Database migration required</p>
+            <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">
+              Run <code className="font-mono bg-amber-100 dark:bg-amber-900/40 px-1 py-0.5 rounded">sql/admin-features-migration.sql</code> in your Supabase SQL Editor before using this page.
+              Settings are persisted in the <code className="font-mono bg-amber-100 dark:bg-amber-900/40 px-1 py-0.5 rounded">platform_settings</code> table.
+            </p>
+            <p className="text-xs text-red-500 dark:text-red-400 mt-1 font-mono">{error}</p>
+          </div>
         </div>
       )}
 
