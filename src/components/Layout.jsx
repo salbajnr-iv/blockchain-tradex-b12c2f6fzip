@@ -30,9 +30,9 @@ const NAV_SECTIONS = [
   {
     title: "Portfolio",
     items: [
-      { label: "My Portfolio", icon: Wallet,     path: "/transactions" },
-      { label: "Analytics",   icon: LineChart,   path: "/analytics" },
-      { label: "Card",        icon: CreditCard,  path: "/card" },
+      { label: "Transactions", icon: History,   path: "/transactions" },
+      { label: "Analytics",    icon: LineChart,  path: "/analytics" },
+      { label: "Card",         icon: CreditCard, path: "/card" },
     ],
   },
   {
@@ -44,10 +44,6 @@ const NAV_SECTIONS = [
       { label: "Recurring/DCA", icon: RefreshCw,      path: "/recurring" },
       { label: "Notifications", icon: Bell,           path: "/alerts" },
     ],
-  },
-  {
-    title: "History",
-    items: [{ label: "Transactions", icon: History, path: "/transactions" }],
   },
   {
     title: "Account",

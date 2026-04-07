@@ -613,17 +613,69 @@ export default function Transactions() {
 
   const hasActiveFilters = typeFilter !== "all" || dateRange !== "all" || searchSymbol.trim();
 
+  const exportCSV = () => {
+    if (filtered.length === 0) { toast.error("No transactions to export"); return; }
+    const escape = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const headers = ["Date", "Type", "Symbol", "Quantity", "Price Per Unit", "Total Amount", "Fee", "Status", "Notes"];
+    const rows = filtered.map((item) => {
+      if (item._source === "trade") {
+        return [
+          format(item._date, "yyyy-MM-dd HH:mm:ss"),
+          item.type,
+          item.symbol || "",
+          item.quantity ?? "",
+          item.unit_price ?? "",
+          ((item.quantity || 0) * (item.unit_price || 0)).toFixed(2),
+          item.fees ?? 0,
+          item.status || "completed",
+          item.notes || "",
+        ];
+      }
+      return [
+        format(item._date, "yyyy-MM-dd HH:mm:ss"),
+        item.type,
+        item.symbol || "",
+        item.quantity ?? "",
+        item.price_per_unit ?? "",
+        item.total_amount ?? "",
+        "",
+        item.status || "",
+        item.notes || "",
+      ];
+    });
+    const csv = [headers.map(escape).join(","), ...rows.map((r) => r.map(escape).join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = `blocktrade-transactions-${format(new Date(), "yyyy-MM-dd")}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${filtered.length} transactions`);
+  };
+
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-5xl mx-auto">
 
         {/* Header */}
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-3xl font-bold text-foreground mb-1">Transactions</h1>
             <p className="text-muted-foreground text-sm">All trades, deposits, and withdrawals · Click any row to view details</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              onClick={exportCSV}
+              variant="outline"
+              className="border-border/60 hover:border-primary/40 hover:text-primary gap-2"
+              disabled={!portfolioId || filtered.length === 0}
+            >
+              <Download className="w-4 h-4" />
+              Export CSV
+            </Button>
             <Button
               onClick={() => setDepositDialog(true)}
               variant="outline"
