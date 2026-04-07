@@ -20,6 +20,7 @@ import { useSystemNotifications } from "@/hooks/useSystemNotifications";
 import { useAlertEngine } from "@/hooks/useAlertEngine";
 import { usePendingOrderEngine } from "@/hooks/usePendingOrderEngine";
 import { useRecurringOrderEngine } from "@/hooks/useRecurringOrderEngine";
+import { useRealtimeNotifications } from "@/hooks/useRealtimeNotifications";
 import { motion, AnimatePresence } from "framer-motion";
 
 const NAV_SECTIONS = [
@@ -153,15 +154,24 @@ function NotificationBell({ cryptoList, portfolioTotal }) {
 
   const getIcon = (n) => {
     switch (n.type) {
-      case "welcome":          return <Bell className="w-4 h-4 text-primary" />;
-      case "market_mover":     return n.message?.includes("up") || n.message?.includes("surging")
+      case "welcome":               return <Bell className="w-4 h-4 text-primary" />;
+      case "market_mover":          return n.message?.includes("up") || n.message?.includes("surging")
         ? <TrendingUp className="w-4 h-4 text-emerald-500" />
         : <TrendingDown className="w-4 h-4 text-red-500" />;
-      case "portfolio_change": return <BarChart2 className="w-4 h-4 text-primary" />;
-      case "price_above":      return <TrendingUp className="w-4 h-4 text-primary" />;
-      case "price_below":      return <TrendingDown className="w-4 h-4 text-destructive" />;
-      case "volatility":       return <Zap className="w-4 h-4 text-yellow-400" />;
-      default:                 return <Info className="w-4 h-4 text-muted-foreground" />;
+      case "portfolio_change":      return <BarChart2 className="w-4 h-4 text-primary" />;
+      case "price_above":           return <TrendingUp className="w-4 h-4 text-primary" />;
+      case "price_below":           return <TrendingDown className="w-4 h-4 text-destructive" />;
+      case "price_volatility":      return <Zap className="w-4 h-4 text-yellow-400" />;
+      case "volatility":            return <Zap className="w-4 h-4 text-yellow-400" />;
+      case "transaction_deposit":   return <ArrowUpRight className="w-4 h-4 text-emerald-500" />;
+      case "transaction_withdrawal":return <ArrowUpRight className="w-4 h-4 text-orange-500" style={{ transform: "rotate(90deg)" }} />;
+      case "transaction":           return <History className="w-4 h-4 text-muted-foreground" />;
+      case "trade":                 return n.side === "buy"
+        ? <TrendingUp className="w-4 h-4 text-emerald-500" />
+        : <TrendingDown className="w-4 h-4 text-red-500" />;
+      case "order":                 return <ClipboardList className="w-4 h-4 text-primary" />;
+      case "order_filled":          return <CheckCheck className="w-4 h-4 text-emerald-500" />;
+      default:                      return <Info className="w-4 h-4 text-muted-foreground" />;
     }
   };
 
@@ -344,6 +354,7 @@ export default function Layout() {
   useAlertEngine(cryptoPrices);
   usePendingOrderEngine(cryptoPrices);
   useRecurringOrderEngine(cryptoPrices);
+  useRealtimeNotifications({ portfolioId });
 
   const handleLogout = async () => {
     try { await signOut(); } catch (err) { console.error("Logout error:", err); }

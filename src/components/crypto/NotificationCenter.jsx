@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { updateAlert } from "@/lib/api/alerts";
-import { AlertCircle, TrendingUp, TrendingDown, Zap, X, Bell, Info, BarChart2 } from "lucide-react";
+import { AlertCircle, TrendingUp, TrendingDown, Zap, X, Bell, Info, BarChart2, ArrowUpRight, History, ClipboardList, CheckCheck } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSystemNotifications, emitSystemNotif } from "@/hooks/useSystemNotifications";
 
@@ -111,12 +111,23 @@ export default function NotificationCenter({ alerts, cryptoPrices, cryptoChanges
   const getIcon = (item) => {
     if (item.source === "system") {
       switch (item.type) {
-        case "welcome":        return <Bell className="w-4 h-4 text-primary" />;
-        case "market_mover":  return item.message?.includes("up") || item.message?.includes("surging")
+        case "welcome":               return <Bell className="w-4 h-4 text-primary" />;
+        case "market_mover":          return item.message?.includes("up") || item.message?.includes("surging")
           ? <TrendingUp className="w-4 h-4 text-emerald-500" />
           : <TrendingDown className="w-4 h-4 text-red-500" />;
-        case "portfolio_change": return <BarChart2 className="w-4 h-4 text-primary" />;
-        default: return <Info className="w-4 h-4 text-primary" />;
+        case "portfolio_change":      return <BarChart2 className="w-4 h-4 text-primary" />;
+        case "transaction_deposit":   return <ArrowUpRight className="w-4 h-4 text-emerald-500" />;
+        case "transaction_withdrawal":return <ArrowUpRight className="w-4 h-4 text-orange-500" style={{ transform: "rotate(90deg)" }} />;
+        case "transaction":           return <History className="w-4 h-4 text-muted-foreground" />;
+        case "trade":                 return item.side === "buy"
+          ? <TrendingUp className="w-4 h-4 text-emerald-500" />
+          : <TrendingDown className="w-4 h-4 text-red-500" />;
+        case "order":                 return <ClipboardList className="w-4 h-4 text-primary" />;
+        case "order_filled":          return <CheckCheck className="w-4 h-4 text-emerald-500" />;
+        case "price_above":           return <TrendingUp className="w-4 h-4 text-primary" />;
+        case "price_below":           return <TrendingDown className="w-4 h-4 text-destructive" />;
+        case "price_volatility":      return <Zap className="w-4 h-4 text-yellow-400" />;
+        default:                      return <Info className="w-4 h-4 text-primary" />;
       }
     }
     switch (item.type) {
@@ -130,10 +141,20 @@ export default function NotificationCenter({ alerts, cryptoPrices, cryptoChanges
   const getBorderColor = (item) => {
     if (item.source === "system") {
       switch (item.type) {
-        case "market_mover": return item.message?.includes("up") || item.message?.includes("surging")
+        case "market_mover":          return item.message?.includes("up") || item.message?.includes("surging")
           ? "border-l-4 border-l-emerald-500 border-border/30"
           : "border-l-4 border-l-red-500 border-border/30";
-        default: return "border-l-4 border-l-primary border-border/30";
+        case "transaction_deposit":   return "border-l-4 border-l-emerald-500 border-border/30";
+        case "transaction_withdrawal":return "border-l-4 border-l-orange-500 border-border/30";
+        case "trade":                 return item.side === "buy"
+          ? "border-l-4 border-l-emerald-500 border-border/30"
+          : "border-l-4 border-l-red-500 border-border/30";
+        case "order":                 return "border-l-4 border-l-primary border-border/30";
+        case "order_filled":          return "border-l-4 border-l-emerald-500 border-border/30";
+        case "price_above":           return "border-l-4 border-l-primary border-border/30";
+        case "price_below":           return "border-l-4 border-l-destructive border-border/30";
+        case "price_volatility":      return "border-l-4 border-l-yellow-400 border-border/30";
+        default:                      return "border-l-4 border-l-primary border-border/30";
       }
     }
     switch (item.type) {
@@ -145,7 +166,20 @@ export default function NotificationCenter({ alerts, cryptoPrices, cryptoChanges
   };
 
   const getLabel = (item) => {
-    if (item.source === "system") return item.title || "System";
+    if (item.source === "system") {
+      switch (item.type) {
+        case "transaction_deposit":    return "Deposit";
+        case "transaction_withdrawal": return "Withdrawal";
+        case "transaction":            return "Transaction";
+        case "trade":                  return item.side === "buy" ? "Trade: Bought" : "Trade: Sold";
+        case "order":                  return "Order Placed";
+        case "order_filled":           return "Order Filled";
+        case "price_above":
+        case "price_below":
+        case "price_volatility":       return "Alert Triggered";
+        default:                       return item.title || "System";
+      }
+    }
     return "Alert Triggered";
   };
 
