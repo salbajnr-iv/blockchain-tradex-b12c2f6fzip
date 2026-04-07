@@ -1,0 +1,282 @@
+Agent
+
+
+
+Show previous messages
+
+40 messages & 63 actions
+
+Checkpoint made
+1 hour ago
+
+Worked for 9 minutes
+In the kyc verification list of countries, some countries do not show like lithuania, e.t.c and other european countries. I will like you to add them as well. Then update the in app notification to notify users with a push notification upon any new triggered alert such as transactions, trades, orders, system notification etc. Let the functionality be realtime not hardcoded.
+
+1 hour ago
+
+21 messages & 57 actions
+
+Checkpoint made
+57 minutes ago
+
+Worked for 6 minutes
+
+Pasted--MASTER-WALLET-MANUAL-DEPOSIT-VERIFICATION-SYSTEM-OBJEC_1775595321611.txt
+Now i want you to create an asset page to jntegrate this functionality: and write an sql script i will use in my database to implement this update. 1. Master Wallet Table (Global Addresses)
+These are the same for everyone (other assets will be added in the future : {
+"master_wallets": [
+{
+"id": "uuid-btc",
+"asset": "BTC",
+"network": "Bitcoin",
+"address": "bc1qk9hp7gel2mvcncckqc39hk6ypns3jqlv8n5t0c",
+"created_at": "timestamp"
+},
+{
+"id": "uuid-eth",
+"asset": "ETH",
+"network": "ERC20",
+"address": "0x277aE008E2d37D560B6034D10aBEc5f29c384Ca7",
+"created_at": "timestamp"
+},
+{
+"id": "uuid-sol",
+"asset": "SOL",
+"network": "Solana",
+"address": "3avJ3X6kmq7sgjMG3KPcoQPfqyww6Cc7vHEmFK7ku2oK",
+"created_at": "timestamp"
+},
+{
+"id": "uuid-bnb",
+"asset": "BNB",
+"network": "BEP20",
+"address": "0x277aE008E2d37D560B6034D10aBEc5f29c384Ca7",
+"created_at": "timestamp"
+},
+{
+"id": "uuid-usdt",
+"asset": "USDT",
+"network": "ERC20",
+"address": "0x277aE008E2d37D560B6034D10aBEc5f29c384Ca7",
+"created_at": "timestamp"
+},
+{
+"id": "uuid-usdc",
+"asset": "USDC",
+"network": "ERC20",
+"address": "0x277aE008E2d37D560B6034D10aBEc5f29c384Ca7",
+"created_at": "timestamp"
+}
+]
+} ERC20 for ETH, USDT, USDC (since same address)
+BEP20 for BNB (same address but different network context)
+The id values are placeholders → your DB should generate real UUIDs
+created_at should default to NOW() in SQL
+
+# 🏦 MASTER WALLET + MANUAL DEPOSIT VERIFICATION SYSTEM
+
+## 🎯 OBJECTIVE
+Design and implement a centralized crypto deposit system where:
+
+- All users share the same **master wallet addresses**
+- Each user is uniquely identified by a **UUID**
+- Deposits are **manually verified by an admin**
+- User balances are updated **only after admin approval**
+
+---
+
+## 🧱 CORE ARCHITECTURE
+
+### 1. Master Wallet System
+- Create a table called `master_wallets`
+- This table stores **global wallet addresses per asset/network**
+- These addresses are **shared across all users**
+
+Each record must include:
+- `id (uuid)`
+- `asset (e.g., BTC, ETH, USDT)`
+- `network (e.g., Bitcoin, ERC20, Solana)`
+- `address (string)`
+- `created_at (timestamp)`
+
+---
+
+### 2. Users Table
+- Each user has a unique `id (uuid)`
+- No wallet is assigned per user
+- Users will reference master wallets when depositing
+
+---
+
+### 3. User Balances System
+- Create a table `user_balances`
+- Each user has balances per asset
+
+Fields:
+- `id (uuid)`
+- `user_id (foreign key)`
+- `asset`
+- `balance (numeric, default 0)`
+- `updated_at (timestamp)`
+
+Constraints:
+- One balance row per user per asset
+- Enforce uniqueness: `(user_id, asset)`
+
+---
+
+### 4. Deposit System (CRITICAL)
+
+Create a table `deposits` to handle manual deposit submissions.
+
+Fields:
+- `id (uuid)`
+- `user_id (foreign key)`
+- `asset`
+- `network`
+- `amount (numeric)`
+- `proof_url (string)` → uploaded image/file
+- `tx_hash (optional string)`
+- `status (enum: pending, under_review, completed, rejected)`
+- `admin_note (text, nullable)`
+- `created_at (timestamp)`
+- `reviewed_at (timestamp, nullable)`
+
+---
+
+## 🔄 USER FLOW LOGIC
+
+### Step 1: Deposit Initiation
+- User selects asset (e.g., BTC)
+- System fetches corresponding address from `master_wallets`
+- User sends funds externally
+
+---
+
+### Step 2: Deposit Submission
+User submits:
+- asset
+- network
+- amount
+- optional tx_hash
+- proof of payment (image/file)
+
+System actions:
+- Upload proof file to storage
+- Store record in `deposits`
+- Set `status = 'pending'`
+
+---
+
+### Step 3: User Interface
+- Users can view deposit history
+- Status should be visible:
+  - pending
+  - under_review
+  - completed
+  - rejected
+
+---
+
+## 🛠️ ADMIN FLOW LOGIC
+
+### 1. View Deposits
+- Admin can fetch all deposits where:
+  - `status = 'pending' OR 'under_review'`
+
+---
+
+### 2. Review Deposit
+Admin actions:
+- Inspect proof
+- Verify transaction externally
+
+---
+
+### 3. Approve Deposit
+
+When admin approves:
+
+#### MUST EXECUTE IN A TRANSACTION:
+
+1. Update deposit:
+   - `status = 'completed'`
+   - `reviewed_at = current_timestamp`
+
+2. Update user balance:
+   - Find `user_balances` row for `(user_id, asset)`
+   - If exists → increment balance
+   - If not → create new row with amount
+
+---
+
+### 4. Reject Deposit
+
+- Set:
+  - `status = 'rejected'`
+  - `admin_note = reason`
+  - `reviewed_at = current_timestamp`
+
+- Do NOT modify balance
+
+---
+
+## 🔐 SECURITY & RULES
+
+### Access Control:
+- Users:
+  - Can INSERT into `deposits`
+  - Can SELECT their own deposits
+  - Cannot update status
+
+- Admin:
+  - Can UPDATE deposit status
+  - Can update balances
+
+---
+
+### Data Integrity:
+- Deposits must NEVER be deleted
+- All balance updates must be traceable to a deposit
+- Prevent double-crediting:
+  - Do not allow approving already completed deposits
+
+---
+
+### Storage:
+- Proof files must be stored securely (e.g., Supabase Storage or S3)
+- Only authenticated users can upload
+- Admin can view all proofs
+
+---
+
+## 💡 OPTIONAL ENHANCEMENTS
+
+- Add `transaction_log` table for audit trail
+- Add notifications:
+  - deposit submitted
+  - deposit approved
+  - deposit rejected
+- Add `under_review` status before approval
+
+---
+
+## 🚀 EXPECTED OUTPUT FROM AGENT
+
+The system should generate:
+- SQL schema (tables, constraints, indexes)
+- RLS policies for Supabase
+- Triggers or functions for safe balance updates
+- Secure file upload handling
+- Clean relational structure ready for API usage
+
+---
+
+## ⚠️ IMPORTANT DESIGN PRINCIPLE
+
+This is a **centralized custody system**:
+- Blockchain is NOT used to identify users
+- The database is the **source of truth for balances**
+- Admin approval is the **only authority for crediting funds**
+
+---
