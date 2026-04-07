@@ -575,7 +575,6 @@ export default function Analytics() {
             )}
           </motion.div>
         </div>
-      </div>
     </div>
   );
 }
