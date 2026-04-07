@@ -297,6 +297,7 @@ export default function KycSettings() {
   // Form state
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [selectedTier, setSelectedTier] = useState("intermediate");
 
   const [personal, setPersonal] = useState({
     firstName: "", lastName: "", dateOfBirth: "", nationality: "",
@@ -393,7 +394,7 @@ export default function KycSettings() {
       if (files.address)  uploaded.address  = await uploadKycFile("kyc-documents", uid, files.address,  "address");
 
       const result = await submitKycApplication({
-        tier: "intermediate",
+        tier: selectedTier,
         personalInfo: personal,
         documentInfo: docInfo,
         filePaths: uploaded,
@@ -433,18 +434,42 @@ export default function KycSettings() {
               Verify your identity to unlock higher withdrawal limits, advanced features, and full platform access.
               Your documents are encrypted and stored securely.
             </p>
-            <div className="flex flex-wrap gap-4 mt-3">
-              {[
-                { label: "Basic", desc: "Up to $500/day" },
-                { label: "Intermediate", desc: "Up to $10,000/day", active: true },
-                { label: "Pro", desc: "Unlimited" },
-              ].map(({ label, desc, active }) => (
-                <div key={label} className={`text-xs px-3 py-1.5 rounded-lg border ${active ? "bg-primary/10 border-primary/20 text-primary" : "bg-secondary border-border/50 text-muted-foreground"}`}>
-                  <span className="font-semibold">{label}</span>
-                  <span className="ml-1.5">{desc}</span>
-                </div>
-              ))}
-            </div>
+            {showForm && (
+              <div className="flex flex-wrap gap-2 mt-3">
+                <p className="w-full text-xs text-muted-foreground mb-1">Select verification tier:</p>
+                {[
+                  { value: "basic",        label: "Basic",        desc: "Up to $500/day" },
+                  { value: "intermediate", label: "Intermediate", desc: "Up to $10,000/day" },
+                  { value: "pro",          label: "Pro",          desc: "Unlimited" },
+                ].map(({ value, label, desc }) => {
+                  const active = selectedTier === value;
+                  return (
+                    <button
+                      key={value}
+                      onClick={() => setSelectedTier(value)}
+                      className={`text-xs px-3 py-1.5 rounded-lg border transition-all focus:outline-none ${active ? "bg-primary/10 border-primary/30 text-primary ring-1 ring-primary/30" : "bg-secondary border-border/50 text-muted-foreground hover:border-primary/20 hover:text-foreground"}`}
+                    >
+                      <span className="font-semibold">{label}</span>
+                      <span className="ml-1.5 opacity-70">{desc}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {!showForm && (
+              <div className="flex flex-wrap gap-2 mt-3">
+                {[
+                  { label: "Basic", desc: "Up to $500/day" },
+                  { label: "Intermediate", desc: "Up to $10,000/day" },
+                  { label: "Pro", desc: "Unlimited" },
+                ].map(({ label, desc }) => (
+                  <div key={label} className="text-xs px-3 py-1.5 rounded-lg border bg-secondary border-border/50 text-muted-foreground">
+                    <span className="font-semibold">{label}</span>
+                    <span className="ml-1.5">{desc}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

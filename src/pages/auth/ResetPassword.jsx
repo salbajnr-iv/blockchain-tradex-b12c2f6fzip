@@ -15,11 +15,23 @@ export default function ResetPassword() {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState('');
+  const [hasRecoverySession, setHasRecoverySession] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') setError('');
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setHasRecoverySession(true);
+        setError('');
+      }
+      setCheckingSession(false);
     });
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) setHasRecoverySession(true);
+      setCheckingSession(false);
+    });
+
     return () => subscription.unsubscribe();
   }, []);
 
@@ -54,6 +66,51 @@ export default function ResetPassword() {
       setLoading(false);
     }
   };
+
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!hasRecoverySession) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <div className="flex items-center justify-between px-6 py-4">
+          <Link to="/" className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-primary/20 flex items-center justify-center">
+              <span className="text-primary font-bold text-sm">BT</span>
+            </div>
+            <span className="font-bold text-foreground">Block<span className="text-primary">Trade</span></span>
+          </Link>
+          <ThemeToggle />
+        </div>
+        <div className="flex-1 flex items-center justify-center px-6 py-10">
+          <div className="w-full max-w-sm text-center space-y-5">
+            <div className="w-14 h-14 rounded-full bg-destructive/10 border border-destructive/20 flex items-center justify-center mx-auto">
+              <AlertCircle className="w-7 h-7 text-destructive" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-foreground">Invalid or expired link</h1>
+              <p className="text-muted-foreground text-sm mt-2">
+                This password reset link is invalid or has already expired. Please request a new one.
+              </p>
+            </div>
+            <Link to="/forgot-password">
+              <Button className="w-full bg-primary hover:bg-primary/90 h-11 text-primary-foreground">
+                Request new reset link
+              </Button>
+            </Link>
+            <Link to="/login" className="block text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Back to Sign In
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-background">

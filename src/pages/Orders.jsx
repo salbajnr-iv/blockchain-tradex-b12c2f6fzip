@@ -10,7 +10,7 @@ import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import {
   Clock, CheckCircle2, XCircle, X, RefreshCw, ArrowUpRight, ArrowDownLeft,
-  TrendingUp, TrendingDown, BarChart2, Loader2, AlertCircle, Zap, Search,
+  TrendingUp, TrendingDown, BarChart2, Loader2, AlertCircle, Zap, Search, Trash2,
 } from "lucide-react";
 
 const fmt = (n, d = 2) =>
@@ -70,6 +70,8 @@ export default function Orders() {
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [cancellingId, setCancellingId] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [bulkCancelling, setBulkCancelling] = useState(false);
 
   // Live price map from market coins
   const priceMap = useMemo(() => {
@@ -134,12 +136,39 @@ export default function Orders() {
       await cancelPendingOrder(orderId);
       toast.success("Order cancelled");
       setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, status: "cancelled", cancelled_at: new Date().toISOString() } : o));
+      setSelectedIds((prev) => { const next = new Set(prev); next.delete(orderId); return next; });
     } catch (err) {
       toast.error(err.message || "Failed to cancel order");
     } finally {
       setCancellingId(null);
     }
   };
+
+  const handleBulkCancel = async () => {
+    if (selectedIds.size === 0) return;
+    setBulkCancelling(true);
+    let succeeded = 0;
+    let failed = 0;
+    for (const id of selectedIds) {
+      try {
+        await cancelPendingOrder(id);
+        setOrders((prev) => prev.map((o) => o.id === id ? { ...o, status: "cancelled", cancelled_at: new Date().toISOString() } : o));
+        succeeded++;
+      } catch {
+        failed++;
+      }
+    }
+    setSelectedIds(new Set());
+    setBulkCancelling(false);
+    if (succeeded > 0) toast.success(`${succeeded} order${succeeded !== 1 ? "s" : ""} cancelled`);
+    if (failed > 0) toast.error(`${failed} order${failed !== 1 ? "s" : ""} failed to cancel`);
+  };
+
+  const toggleSelect = (id) => setSelectedIds((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
 
   const filtered = useMemo(() => {
     let list = filter === "all" ? orders : orders.filter((o) => o.status === filter);
@@ -149,6 +178,18 @@ export default function Orders() {
     }
     return list;
   }, [orders, filter, search]);
+
+  const pendingFiltered = useMemo(() => filtered.filter((o) => o.status === "pending"), [filtered]);
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === pendingFiltered.length && pendingFiltered.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(pendingFiltered.map((o) => o.id)));
+    }
+  };
+
+  const allPendingSelected = pendingFiltered.length > 0 && selectedIds.size === pendingFiltered.length;
 
   // Stats
   const pendingCount   = orders.filter((o) => o.status === "pending").length;
@@ -260,11 +301,45 @@ export default function Orders() {
           </div>
         ) : (
           <>
+            {/* Bulk cancel bar */}
+            <AnimatePresence>
+              {selectedIds.size > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="flex items-center justify-between px-4 py-2 bg-primary/5 border-b border-primary/20"
+                >
+                  <p className="text-sm text-foreground font-medium">
+                    {selectedIds.size} order{selectedIds.size !== 1 ? "s" : ""} selected
+                  </p>
+                  <button
+                    onClick={handleBulkCancel}
+                    disabled={bulkCancelling}
+                    className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 transition-all disabled:opacity-50"
+                  >
+                    {bulkCancelling ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                    Cancel selected
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* Desktop table */}
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border/40 bg-secondary/20">
+                    <th className="py-3 pl-4 pr-2 w-8">
+                      {pendingFiltered.length > 0 && (
+                        <input
+                          type="checkbox"
+                          checked={allPendingSelected}
+                          onChange={toggleSelectAll}
+                          className="rounded border-border cursor-pointer accent-primary"
+                        />
+                      )}
+                    </th>
                     {["Asset", "Side", "Quantity", "Limit Price", "Current Price", "Gap", "Total Value", "Status", "Placed", ""].map((h) => (
                       <th key={h} className={`py-3 px-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground ${h === "" || h === "Side" || h === "Status" ? "text-center" : h === "Placed" ? "text-right" : "text-right first:text-left"}`}>
                         {h}
@@ -282,6 +357,8 @@ export default function Orders() {
                       const StatusIcon = cfg.icon;
                       const total = order.quantity * order.limit_price;
                       const coin = coins.find((c) => c.symbol === order.symbol);
+                      const isPending = order.status === "pending";
+                      const isSelected = selectedIds.has(order.id);
 
                       return (
                         <motion.tr
@@ -289,8 +366,20 @@ export default function Orders() {
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           exit={{ opacity: 0 }}
-                          className="border-b border-border/20 hover:bg-secondary/20 transition-colors"
+                          className={`border-b border-border/20 hover:bg-secondary/20 transition-colors ${isSelected ? "bg-primary/5" : ""}`}
                         >
+                          {/* Checkbox */}
+                          <td className="pl-4 pr-2 py-3 w-8">
+                            {isPending && (
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleSelect(order.id)}
+                                className="rounded border-border cursor-pointer accent-primary"
+                              />
+                            )}
+                          </td>
+
                           {/* Asset */}
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">

@@ -115,6 +115,7 @@ export default function Register() {
     }
     if (password !== confirmPassword) { toast.error('Passwords do not match'); return; }
     if (password.length < 6) { toast.error('Password must be at least 6 characters'); return; }
+    if (passwordStrength < 2) { toast.error('Password is too weak — add uppercase letters, numbers, or symbols'); return; }
     if (!agreeTerms) { toast.error('Please agree to the Terms of Service'); return; }
     setLoading(true);
     try {

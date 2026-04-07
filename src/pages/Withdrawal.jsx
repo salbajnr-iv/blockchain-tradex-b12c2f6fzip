@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import {
   ArrowLeft, Wallet, ShieldCheck, AlertCircle, CheckCircle2,
   Clock, XCircle, Send, Lock, CreditCard, Globe, Building2,
-  Bitcoin, Info, Loader2, RefreshCw, MessageSquare, DollarSign, TrendingUp,
+  Bitcoin, Info, Loader2, RefreshCw, MessageSquare, DollarSign, TrendingUp, X,
 } from "lucide-react";
 import {
   createWithdrawalRequest,
@@ -486,6 +486,13 @@ export default function WithdrawalPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submittedTxn, setSubmittedTxn] = useState(null);
 
+  const SAVED_DEST_KEY = `blocktrade_saved_destinations_${user?.id || ""}`;
+  const [savedDestinations, setSavedDestinations] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(SAVED_DEST_KEY) || "[]"); } catch { return []; }
+  });
+  const [showSaveForm, setShowSaveForm] = useState(false);
+  const [destLabel, setDestLabel] = useState("");
+
   const [currencyType, setCurrencyType] = useState("fiat");
   const [currency, setCurrency] = useState("USD");
 
@@ -565,6 +572,40 @@ export default function WithdrawalPage() {
     if (currencyType === "crypto") return;
     setMethod(val);
     setDetails({ _country: userCountry });
+  };
+
+  const saveDestination = () => {
+    if (!destLabel.trim() || !method) return;
+    const dest = {
+      id: Date.now().toString(),
+      label: destLabel.trim(),
+      method,
+      details: { ...details },
+      currencyType,
+      currency,
+    };
+    const updated = [dest, ...savedDestinations.slice(0, 9)];
+    setSavedDestinations(updated);
+    localStorage.setItem(SAVED_DEST_KEY, JSON.stringify(updated));
+    setDestLabel("");
+    setShowSaveForm(false);
+    toast.success("Destination saved!");
+  };
+
+  const loadDestination = (dest) => {
+    setCurrencyType(dest.currencyType);
+    setCurrency(dest.currency);
+    setMethod(dest.method);
+    setDetails(dest.details);
+    if (dest.currencyType === "crypto") setMethod("crypto_wallet");
+    toast.success(`Loaded: ${dest.label}`);
+  };
+
+  const deleteDestination = (id) => {
+    const updated = savedDestinations.filter((d) => d.id !== id);
+    setSavedDestinations(updated);
+    localStorage.setItem(SAVED_DEST_KEY, JSON.stringify(updated));
+    toast.success("Destination removed");
   };
 
   useEffect(() => {
@@ -819,22 +860,99 @@ export default function WithdrawalPage() {
           </div>
         )}
 
+        {/* ── Saved Destinations ── */}
+        {savedDestinations.length > 0 && (
+          <div className="bg-card rounded-2xl border border-border overflow-hidden">
+            <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+              <div>
+                <h2 className="font-semibold text-foreground">Saved Destinations</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">Load a previously saved withdrawal destination</p>
+              </div>
+            </div>
+            <div className="p-4 flex flex-col gap-2">
+              {savedDestinations.map((dest) => {
+                const methodMeta = WITHDRAWAL_METHODS.find(m => m.value === dest.method);
+                const DestIcon = methodMeta?.icon;
+                return (
+                  <div key={dest.id} className="flex items-center justify-between gap-3 p-3 rounded-xl border border-border bg-secondary/20 hover:bg-secondary/40 transition-colors">
+                    <div className="flex items-center gap-3 min-w-0">
+                      {DestIcon && <DestIcon className="w-4 h-4 text-muted-foreground shrink-0" />}
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-foreground truncate">{dest.label}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {dest.currencyType === "crypto" ? `${dest.currency} Wallet` : `${methodMeta?.label ?? dest.method} • ${dest.currency}`}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        onClick={() => loadDestination(dest)}
+                        className="text-xs px-3 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 font-medium transition-all"
+                      >
+                        Load
+                      </button>
+                      <button
+                        onClick={() => deleteDestination(dest.id)}
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* ── Method Details ── */}
         <AnimatePresence mode="wait">
           {method && (
             <motion.div key={`${method}-${currency}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="bg-card rounded-2xl border border-border overflow-hidden">
-              <div className="px-6 py-5 border-b border-border">
-                <h2 className="font-semibold text-foreground">
-                  {currencyType === "crypto"
-                    ? `${currency} Wallet Details`
-                    : `${WITHDRAWAL_METHODS.find(m => m.value === method)?.label} Details`}
-                </h2>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {method === "bank_transfer" && userCountry
-                    ? `Fields tailored for ${userCountry}`
-                    : "Please provide your receiving account details"}
-                </p>
+              <div className="px-6 py-5 border-b border-border flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="font-semibold text-foreground">
+                    {currencyType === "crypto"
+                      ? `${currency} Wallet Details`
+                      : `${WITHDRAWAL_METHODS.find(m => m.value === method)?.label} Details`}
+                  </h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {method === "bank_transfer" && userCountry
+                      ? `Fields tailored for ${userCountry}`
+                      : "Please provide your receiving account details"}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowSaveForm((p) => !p)}
+                  className="text-xs px-3 py-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:border-primary/40 transition-all shrink-0 mt-0.5"
+                >
+                  {showSaveForm ? "Cancel" : "Save destination"}
+                </button>
               </div>
+              <AnimatePresence>
+                {showSaveForm && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="px-6 py-4 border-b border-border bg-secondary/20 flex items-center gap-3"
+                  >
+                    <Input
+                      placeholder='Label, e.g. "My Chase Account"'
+                      value={destLabel}
+                      onChange={(e) => setDestLabel(e.target.value)}
+                      className="bg-background border-border text-sm h-9 flex-1"
+                    />
+                    <button
+                      onClick={saveDestination}
+                      disabled={!destLabel.trim()}
+                      className="text-xs px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 font-medium transition-all disabled:opacity-50 h-9"
+                    >
+                      Save
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
               <div className="p-6">
                 {method === "bank_transfer" && <BankFields country={userCountry} values={details} onChange={handleDetailChange} />}
                 {method === "crypto_wallet" && <CryptoFields values={details} onChange={handleDetailChange} lockedCoin={currencyType === "crypto" ? currency : null} />}
