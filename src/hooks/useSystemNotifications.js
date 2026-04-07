@@ -3,6 +3,21 @@ import { useState, useEffect, useRef, useCallback } from "react";
 let globalListeners = [];
 let globalNotifications = [];
 
+const READ_STORAGE_KEY = "bt_notif_read_ids";
+
+function getStoredReadIds() {
+  try { return new Set(JSON.parse(localStorage.getItem(READ_STORAGE_KEY) || "[]")); }
+  catch { return new Set(); }
+}
+
+function persistReadIds(ids) {
+  try {
+    const existing = getStoredReadIds();
+    ids.forEach((id) => existing.add(id));
+    localStorage.setItem(READ_STORAGE_KEY, JSON.stringify([...existing]));
+  } catch { /* ignore */ }
+}
+
 export function emitSystemNotif(notif) {
   const entry = { ...notif, id: `sys-${Date.now()}-${Math.random()}`, timestamp: new Date(), source: "system" };
   globalNotifications = [entry, ...globalNotifications].slice(0, 30);
@@ -11,6 +26,7 @@ export function emitSystemNotif(notif) {
 
 export function useSystemNotifications({ cryptoList = [], portfolioTotal = 0 } = {}) {
   const [notifications, setNotifications] = useState([...globalNotifications]);
+  const [readIds, setReadIds] = useState(getStoredReadIds);
   const moverFiredRef = useRef(new Set());
   const welcomeFiredRef = useRef(false);
   const prevTotalRef = useRef(null);
@@ -78,15 +94,28 @@ export function useSystemNotifications({ cryptoList = [], portfolioTotal = 0 } =
     prevTotalRef.current = portfolioTotal;
   }, [portfolioTotal]);
 
+  const refreshReadIds = useCallback(() => setReadIds(getStoredReadIds()), []);
+
   const dismiss = useCallback((id) => {
+    persistReadIds([id]);
     globalNotifications = globalNotifications.filter((n) => n.id !== id);
     globalListeners.forEach((fn) => fn([...globalNotifications]));
+    setReadIds(getStoredReadIds());
   }, []);
 
   const clearAll = useCallback(() => {
+    persistReadIds(globalNotifications.map((n) => n.id));
     globalNotifications = [];
     globalListeners.forEach((fn) => fn([]));
+    setReadIds(getStoredReadIds());
   }, []);
 
-  return { notifications, dismiss, clearAll };
+  const markAllRead = useCallback(() => {
+    persistReadIds(globalNotifications.map((n) => n.id));
+    setReadIds(getStoredReadIds());
+  }, []);
+
+  const unreadCount = notifications.filter((n) => !readIds.has(n.id)).length;
+
+  return { notifications, dismiss, clearAll, markAllRead, readIds, unreadCount, refreshReadIds };
 }

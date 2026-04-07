@@ -11,18 +11,7 @@ import {
 import { toast } from 'sonner';
 import ThemeToggle from '@/components/ThemeToggle';
 import SocialAuthButtons from '@/components/auth/SocialAuthButtons';
-
-const COUNTRIES = [
-  "Algeria","Angola","Australia","Benin","Botswana","Brazil","Burkina Faso","Burundi","Cabo Verde","Cameroon",
-  "Canada","Central African Republic","Chad","Comoros","Congo (Republic)","Congo (Democratic Republic)","Denmark",
-  "Djibouti","Egypt","Equatorial Guinea","Eritrea","Eswatini","Ethiopia","France","Gabon","Gambia","Germany",
-  "Ghana","Guinea","Guinea-Bissau","Hong Kong","India","Israel","Ivory Coast","Japan","Kenya","Lesotho",
-  "Liberia","Libya","Madagascar","Malawi","Mali","Mauritania","Mauritius","Morocco","Mozambique","Namibia",
-  "Netherlands","New Zealand","Niger","Nigeria","Norway","Rwanda","São Tomé and Príncipe","Senegal","Seychelles",
-  "Sierra Leone","Singapore","Somalia","South Africa","South Korea","South Sudan","Spain","Sudan","Sweden",
-  "Switzerland","Tanzania","Togo","Tunisia","Uganda","United Arab Emirates","United Kingdom","United States",
-  "Zambia","Zimbabwe",
-];
+import { COUNTRIES } from '@/lib/countries';
 
 const BRAND_BULLETS = [
   { icon: TrendingUp,  text: "Live prices for 100+ crypto assets" },

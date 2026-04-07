@@ -46,6 +46,9 @@ import Recurring from './pages/Recurring';
 import Assets from './pages/Assets';
 import AssetDetail from './pages/AssetDetail';
 import AdminDeposits from './pages/admin/AdminDeposits';
+import AdminNotifications from './pages/admin/AdminNotifications';
+import Notifications from './pages/Notifications';
+import Support from './pages/Support';
 
 function App() {
   return (
@@ -99,6 +102,8 @@ function App() {
                     <Route path="/recurring" element={<Recurring />} />
                     <Route path="/assets" element={<Assets />} />
                     <Route path="/assets/:type/:id" element={<AssetDetail />} />
+                    <Route path="/notifications" element={<Notifications />} />
+                    <Route path="/support" element={<Support />} />
 
                     <Route path="/settings" element={<SettingsLayout />}>
                       <Route index element={<ProfileSettings />} />
@@ -124,6 +129,7 @@ function App() {
                     <Route path="settings" element={<AdminSettings />} />
                     <Route path="deposits" element={<AdminDeposits />} />
                     <Route path="audit-log" element={<AdminAuditLog />} />
+                    <Route path="notifications" element={<AdminNotifications />} />
                   </Route>
                 </Route>
 

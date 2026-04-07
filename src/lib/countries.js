@@ -1,0 +1,60 @@
+// Comprehensive countries list — shared across Register, KYC, and other forms
+export const COUNTRIES = [
+  // Europe — comprehensive
+  "Albania","Andorra","Armenia","Austria","Azerbaijan",
+  "Belarus","Belgium","Bosnia and Herzegovina","Bulgaria",
+  "Croatia","Cyprus","Czech Republic",
+  "Denmark",
+  "Estonia",
+  "Faroe Islands","Finland","France",
+  "Georgia","Germany","Gibraltar","Greece",
+  "Hungary",
+  "Iceland","Ireland","Isle of Man","Italy",
+  "Jersey",
+  "Kosovo","Kyrgyzstan",
+  "Latvia","Liechtenstein","Lithuania","Luxembourg",
+  "Malta","Moldova","Monaco","Montenegro",
+  "Netherlands","North Macedonia","Norway",
+  "Poland","Portugal",
+  "Romania","Russia",
+  "San Marino","Serbia","Slovakia","Slovenia","Spain","Sweden","Switzerland",
+  "Ukraine","United Kingdom",
+  "Vatican City",
+  // North America
+  "Canada","Mexico","United States",
+  // Caribbean & Central America
+  "Antigua and Barbuda","Bahamas","Barbados","Belize","Costa Rica",
+  "Cuba","Dominica","Dominican Republic","El Salvador","Grenada",
+  "Guatemala","Haiti","Honduras","Jamaica","Nicaragua","Panama",
+  "Saint Kitts and Nevis","Saint Lucia","Saint Vincent and the Grenadines",
+  "Trinidad and Tobago",
+  // South America
+  "Argentina","Bolivia","Brazil","Chile","Colombia","Ecuador",
+  "Guyana","Paraguay","Peru","Suriname","Uruguay","Venezuela",
+  // Middle East
+  "Bahrain","Iraq","Israel","Jordan","Kuwait","Lebanon",
+  "Oman","Palestine","Qatar","Saudi Arabia",
+  "Syria","United Arab Emirates","Yemen",
+  // Africa
+  "Algeria","Angola","Benin","Botswana","Burkina Faso","Burundi",
+  "Cabo Verde","Cameroon","Central African Republic","Chad",
+  "Comoros","Congo (Republic)","Congo (Democratic Republic)",
+  "Djibouti","Egypt","Equatorial Guinea","Eritrea","Eswatini","Ethiopia",
+  "Gabon","Gambia","Ghana","Guinea","Guinea-Bissau",
+  "Ivory Coast","Kenya","Lesotho","Liberia","Libya",
+  "Madagascar","Malawi","Mali","Mauritania","Mauritius","Morocco","Mozambique",
+  "Namibia","Niger","Nigeria","Rwanda",
+  "São Tomé and Príncipe","Senegal","Seychelles","Sierra Leone",
+  "Somalia","South Africa","South Sudan","Sudan",
+  "Tanzania","Togo","Tunisia","Uganda","Zambia","Zimbabwe",
+  // Asia & Pacific
+  "Afghanistan","Australia","Bangladesh","Bhutan","Brunei",
+  "Cambodia","China","Fiji","Hong Kong","India","Indonesia",
+  "Japan","Kazakhstan","Laos","Malaysia","Maldives","Mongolia",
+  "Myanmar","Nepal","New Zealand","North Korea","Pakistan",
+  "Papua New Guinea","Philippines","Singapore","South Korea",
+  "Sri Lanka","Taiwan","Tajikistan","Thailand","Timor-Leste",
+  "Turkmenistan","Uzbekistan","Vanuatu","Vietnam",
+  // Other
+  "Samoa","Solomon Islands",
+].sort();

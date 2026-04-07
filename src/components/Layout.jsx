@@ -4,7 +4,7 @@ import {
   LayoutDashboard, BarChart3, ArrowUpDown, Bell, CreditCard, History,
   ArrowUpRight, Menu, X, RefreshCw, LogOut, PlusCircle, LineChart, Search,
   ChevronDown, Wallet, TrendingUp, ShieldCheck, Settings, ChevronRight,
-  Info, BarChart2, Zap, TrendingDown, CheckCheck, ClipboardList,
+  Info, BarChart2, Zap, TrendingDown, CheckCheck, ClipboardList, LifeBuoy, Megaphone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import DepositDialog from "@/components/crypto/DepositDialog";
@@ -44,12 +44,16 @@ const NAV_SECTIONS = [
       { label: "Trade",         icon: ArrowUpDown,    path: "/trade" },
       { label: "Open Orders",   icon: ClipboardList,  path: "/orders" },
       { label: "Recurring/DCA", icon: RefreshCw,      path: "/recurring" },
-      { label: "Notifications", icon: Bell,           path: "/alerts" },
+      { label: "Price Alerts",  icon: Bell,           path: "/alerts" },
     ],
   },
   {
     title: "Account",
-    items: [{ label: "Settings", icon: Settings, path: "/settings" }],
+    items: [
+      { label: "Settings",      icon: Settings,  path: "/settings" },
+      { label: "Notifications", icon: Bell,       path: "/notifications" },
+      { label: "Support",       icon: LifeBuoy,  path: "/support" },
+    ],
   },
 ];
 
@@ -143,9 +147,10 @@ function CoinSearch({ cryptoList }) {
 function NotificationBell({ cryptoList, portfolioTotal }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
-  const { notifications, dismiss, clearAll } = useSystemNotifications({ cryptoList, portfolioTotal });
+  const navigate = useNavigate();
+  const { notifications, dismiss, clearAll, markAllRead, unreadCount } = useSystemNotifications({ cryptoList, portfolioTotal });
 
-  const unread = notifications.length;
+  const unread = unreadCount;
 
   useEffect(() => {
     const handleClick = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
@@ -209,9 +214,9 @@ function NotificationBell({ cryptoList, portfolioTotal }) {
                 )}
               </div>
               {unread > 0 && (
-                <button onClick={clearAll} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
+                <button onClick={markAllRead} className="text-xs text-primary hover:text-primary/80 flex items-center gap-1 transition-colors font-medium">
                   <CheckCheck className="w-3 h-3" />
-                  Clear all
+                  Mark all read
                 </button>
               )}
             </div>
@@ -249,14 +254,19 @@ function NotificationBell({ cryptoList, portfolioTotal }) {
               )}
             </div>
 
-            <div className="px-4 py-2.5 border-t border-border/30 bg-secondary/20">
+            <div className="px-4 py-2.5 border-t border-border/30 bg-secondary/20 flex items-center justify-between">
               <Link
-                to="/alerts"
+                to="/notifications"
                 onClick={() => setOpen(false)}
                 className="text-xs text-primary hover:text-primary/80 font-medium transition-colors"
               >
-                View all price alerts →
+                View all notifications →
               </Link>
+              {notifications.length > 0 && (
+                <button onClick={clearAll} className="text-[10px] text-muted-foreground hover:text-foreground transition-colors">
+                  Clear all
+                </button>
+              )}
             </div>
           </motion.div>
         )}
