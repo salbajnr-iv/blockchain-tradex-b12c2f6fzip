@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getAdminDashboardStats, getAdminAnalytics } from '@/lib/api/admin';
 import {
-  ArrowDownToLine, ShieldCheck, Users, DollarSign, RefreshCw,
+  ArrowDownToLine, ArrowUpToLine, ShieldCheck, Users, DollarSign, RefreshCw,
   TrendingUp, BarChart3, Activity, Wallet,
 } from 'lucide-react';
 import {
@@ -115,9 +115,9 @@ export default function AdminDashboard() {
       )}
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
         {loading && !stats ? (
-          Array.from({ length: 4 }).map((_, i) => (
+          Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5 animate-pulse">
               <div className="w-9 h-9 bg-gray-200 dark:bg-gray-800 rounded-lg mb-3" />
               <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-24 mb-2" />
@@ -126,6 +126,13 @@ export default function AdminDashboard() {
           ))
         ) : stats ? (
           <>
+            <StatCard
+              icon={ArrowUpToLine}
+              label="Pending Deposits"
+              value={stats.pendingDeposits}
+              color="bg-emerald-500/15 text-emerald-500"
+              sub="awaiting review"
+            />
             <StatCard
               icon={ArrowDownToLine}
               label="Pending Withdrawals"

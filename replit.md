@@ -83,16 +83,22 @@ USD, EUR, GBP, AUD, CAD, CHF, JPY, SGD, AED, INR, BRL, MXN, KRW, HKD, NOK, SEK, 
   - Rejection calls `fn_reject_deposit` RPC
   - All actions logged to `admin_audit_log` via `logAdminAction`
 
-### SQL Migration (`sql/master_wallet_deposit_system.sql`)
-Run this script in Supabase SQL Editor to create the full deposit system:
-- `master_wallets` table — global wallet addresses per asset/network
+### SQL Migration (`sql/wallet-deposit-migration.sql`) ← USE THIS ONE
+Run this comprehensive all-in-one script in the Supabase SQL Editor:
+- `master_wallets` table — global wallet addresses per asset/network (seeded with 6 coins)
 - `user_balances` table — per-user, per-asset crypto balances
 - `deposits` table — manual deposit submissions with status enum
-- RLS policies for all three tables
-- Storage RLS for `deposit-proofs` bucket
+- `admin_notifications` table — broadcast/targeted admin notifications
+- `support_tickets` table — user support ticket system
+- RLS policies for all five tables
+- Storage bucket instructions for `deposit-proofs` (manual step in Supabase Dashboard)
 - `fn_approve_deposit(deposit_id, admin_note)` — atomic approval + balance credit
 - `fn_reject_deposit(deposit_id, admin_note)` — rejection without balance change
 - `fn_set_deposit_under_review(deposit_id)` — marks pending → under_review
+- `fn_admin_adjust_crypto_balance(user_id, asset, operation, amount)` — add/deduct/set/delete
+- `fn_admin_adjust_balance(portfolio_id, operation, amount)` — cash balance management
+- `fn_admin_lock_balance(portfolio_id, locked, reason)` — lock/unlock user balance
+- `fn_admin_update_withdrawal(transaction_id, status, message)` — withdrawal approval
 
 ### API Layer (`src/lib/api/cryptoDeposits.js`)
 - `getMasterWallets()` — fetch active wallet addresses

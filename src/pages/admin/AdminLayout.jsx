@@ -13,18 +13,20 @@ import {
   Settings,
   ScrollText,
   ArrowUpToLine,
+  Megaphone,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import ThemeToggle from '@/components/ThemeToggle';
 
 const navItems = [
-  { to: '/admin',            label: 'Dashboard',  icon: LayoutDashboard, end: true },
-  { to: '/admin/deposits',   label: 'Deposits',   icon: ArrowUpToLine },
-  { to: '/admin/withdrawals',label: 'Withdrawals', icon: ArrowDownToLine },
-  { to: '/admin/kyc',        label: 'KYC Review',  icon: ShieldCheck },
-  { to: '/admin/users',      label: 'Users',       icon: Users },
-  { to: '/admin/settings',   label: 'Settings',    icon: Settings },
-  { to: '/admin/audit-log',  label: 'Audit Log',   icon: ScrollText },
+  { to: '/admin',                label: 'Dashboard',     icon: LayoutDashboard, end: true },
+  { to: '/admin/deposits',       label: 'Deposits',      icon: ArrowUpToLine },
+  { to: '/admin/withdrawals',    label: 'Withdrawals',   icon: ArrowDownToLine },
+  { to: '/admin/kyc',            label: 'KYC Review',    icon: ShieldCheck },
+  { to: '/admin/users',          label: 'Users',         icon: Users },
+  { to: '/admin/notifications',  label: 'Notifications', icon: Megaphone },
+  { to: '/admin/settings',       label: 'Settings',      icon: Settings },
+  { to: '/admin/audit-log',      label: 'Audit Log',     icon: ScrollText },
 ];
 
 function Sidebar({ onClose }) {

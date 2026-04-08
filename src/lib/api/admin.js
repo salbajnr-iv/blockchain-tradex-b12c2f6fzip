@@ -395,7 +395,7 @@ export const getAdminDashboardStats = async () => {
     }
   }
 
-  const [pendingWithdrawals, pendingKyc, totalUsers, portfolioSum] = await Promise.all([
+  const [pendingWithdrawals, pendingKyc, pendingDeposits, totalUsers, portfolioSum] = await Promise.all([
     safeCount(
       supabase
         .from('transactions')
@@ -408,6 +408,12 @@ export const getAdminDashboardStats = async () => {
         .from('kyc_submissions')
         .select('id', { count: 'exact', head: true })
         .eq('status', 'pending')
+    ),
+    safeCount(
+      supabase
+        .from('deposits')
+        .select('id', { count: 'exact', head: true })
+        .in('status', ['pending', 'under_review'])
     ),
     safeCount(
       supabase
@@ -429,6 +435,7 @@ export const getAdminDashboardStats = async () => {
   return {
     pendingWithdrawals,
     pendingKyc,
+    pendingDeposits,
     totalUsers,
     totalPlatformValue,
   }
