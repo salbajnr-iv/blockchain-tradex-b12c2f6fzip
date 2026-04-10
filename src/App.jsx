@@ -20,7 +20,6 @@ import Trade from './pages/Trade';
 import Markets from './pages/Markets';
 import Asset from './pages/Asset';
 import Orders from './pages/Orders';
-import Alerts from './pages/Alerts';
 import Card from './pages/Card';
 import Transactions from './pages/Transactions';
 import Analytics from './pages/Analytics';
@@ -99,7 +98,7 @@ function App() {
                     <Route path="/markets" element={<Markets />} />
                     <Route path="/asset/:coinId" element={<Asset />} />
                     <Route path="/orders" element={<Orders />} />
-                    <Route path="/alerts" element={<Alerts />} />
+                    <Route path="/alerts" element={<Navigate to="/notifications" replace />} />
                     <Route path="/card" element={<Card />} />
                     <Route path="/transactions" element={<Transactions />} />
                     <Route path="/analytics" element={<Analytics />} />
