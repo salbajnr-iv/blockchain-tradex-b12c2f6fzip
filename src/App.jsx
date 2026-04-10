@@ -137,11 +137,8 @@ function App() {
                     <Route path="deposits" element={<AdminDeposits />} />
                     <Route path="audit-log" element={<AdminAuditLog />} />
                     <Route path="notifications" element={<AdminNotifications />} />
-<<<<<<< HEAD
                     <Route path="support" element={<AdminSupport />} />
-=======
                     <Route path="leaderboard" element={<AdminLeaderboard />} />
->>>>>>> bfd2199 (Add a community leaderboard and admin control panel)
                   </Route>
                 </Route>
 
