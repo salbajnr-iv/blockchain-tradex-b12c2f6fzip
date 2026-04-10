@@ -53,3 +53,19 @@ export const fillPendingOrder = async (orderId) => {
   if (error) throw error;
   return data;
 };
+
+export const updatePendingOrder = async (orderId, { limitPrice, quantity }) => {
+  const updates = {};
+  if (limitPrice !== undefined) updates.limit_price = parseFloat(limitPrice);
+  if (quantity !== undefined) updates.quantity = parseFloat(quantity);
+
+  const { data, error } = await supabase
+    .from('pending_orders')
+    .update(updates)
+    .eq('id', orderId)
+    .eq('status', 'pending')
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+};

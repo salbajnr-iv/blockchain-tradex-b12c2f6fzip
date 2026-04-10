@@ -19,6 +19,7 @@ import {
   getUserKycStatus,
   subscribeToWithdrawalStatus,
 } from "@/lib/api/withdrawal";
+import { supabase } from "@/lib/supabaseClient";
 
 const WITHDRAWAL_METHODS = [
   { value: "bank_transfer",  label: "Bank Transfer",  icon: Building2,  desc: "1–3 business days" },
@@ -493,6 +494,21 @@ export default function WithdrawalPage() {
   const [showSaveForm, setShowSaveForm] = useState(false);
   const [destLabel, setDestLabel] = useState("");
 
+  // On mount: load from Supabase user_metadata (source of truth) and merge with localStorage
+  useEffect(() => {
+    if (!user?.id) return;
+    const meta = user?.user_metadata?.saved_destinations;
+    if (Array.isArray(meta) && meta.length > 0) {
+      setSavedDestinations(meta);
+      try { localStorage.setItem(SAVED_DEST_KEY, JSON.stringify(meta)); } catch { /* ignore */ }
+    }
+  }, [user?.id]);
+
+  const persistDestinations = (destinations) => {
+    try { localStorage.setItem(SAVED_DEST_KEY, JSON.stringify(destinations)); } catch { /* ignore */ }
+    supabase.auth.updateUser({ data: { saved_destinations: destinations } }).catch(() => {});
+  };
+
   const [currencyType, setCurrencyType] = useState("fiat");
   const [currency, setCurrency] = useState("USD");
 
@@ -586,7 +602,7 @@ export default function WithdrawalPage() {
     };
     const updated = [dest, ...savedDestinations.slice(0, 9)];
     setSavedDestinations(updated);
-    localStorage.setItem(SAVED_DEST_KEY, JSON.stringify(updated));
+    persistDestinations(updated);
     setDestLabel("");
     setShowSaveForm(false);
     toast.success("Destination saved!");
@@ -604,7 +620,7 @@ export default function WithdrawalPage() {
   const deleteDestination = (id) => {
     const updated = savedDestinations.filter((d) => d.id !== id);
     setSavedDestinations(updated);
-    localStorage.setItem(SAVED_DEST_KEY, JSON.stringify(updated));
+    persistDestinations(updated);
     toast.success("Destination removed");
   };
 

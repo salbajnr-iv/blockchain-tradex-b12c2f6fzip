@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   CreditCard, Building2, Wallet2, CheckCircle2, Loader2,
-  ChevronLeft, ShieldCheck, Lock,
+  ChevronLeft, ShieldCheck, Lock, Info,
 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { addPaymentMethod, detectCardBrand, formatCardNumber, formatExpiry } from "@/lib/api/paymentMethods";
@@ -85,7 +85,9 @@ export default function AddPaymentMethodDialog({ open, onClose, onAdded }) {
   const [accountHolder, setAccountHolder] = useState("");
 
   // PayPal
-  const [paypalEmail, setPaypalEmail] = useState("");
+  const [paypalEmail,        setPaypalEmail]        = useState("");
+  const [paypalEmailConfirm, setPaypalEmailConfirm] = useState("");
+  const [paypalName,         setPaypalName]         = useState("");
 
   const brand = detectCardBrand(cardNumber);
 
@@ -93,7 +95,7 @@ export default function AddPaymentMethodDialog({ open, onClose, onAdded }) {
     setStep(1); setType("");
     setCardNumber(""); setCardName(""); setExpiry(""); setCvv("");
     setBankName(""); setAccountNum(""); setRoutingNum(""); setAccountHolder("");
-    setPaypalEmail("");
+    setPaypalEmail(""); setPaypalEmailConfirm(""); setPaypalName("");
   };
 
   const handleClose = () => { resetForm(); onClose(); };
@@ -111,7 +113,10 @@ export default function AddPaymentMethodDialog({ open, onClose, onAdded }) {
       return bankName.trim() && accountNum.replace(/\D/g,"").length >= 4 &&
              routingNum.replace(/\D/g,"").length === 9 && accountHolder.trim();
     }
-    if (type === "paypal") return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(paypalEmail);
+    if (type === "paypal") {
+      const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(paypalEmail);
+      return emailValid && paypalEmail === paypalEmailConfirm && paypalName.trim().length >= 2;
+    }
     return false;
   };
 
@@ -143,7 +148,12 @@ export default function AddPaymentMethodDialog({ open, onClose, onAdded }) {
           label: `${bankName.trim()} ••••${accountNum.replace(/\D/g,"").slice(-4)}`,
         };
       } else if (type === "paypal") {
-        payload = { ...payload, paypal_email: paypalEmail.trim(), label: `PayPal (${paypalEmail.trim()})` };
+        payload = {
+          ...payload,
+          paypal_email:   paypalEmail.trim(),
+          account_holder: paypalName.trim(),
+          label: `PayPal (${paypalEmail.trim()})`,
+        };
       }
 
       const added = await addPaymentMethod(user.id, payload);
@@ -290,10 +300,46 @@ export default function AddPaymentMethodDialog({ open, onClose, onAdded }) {
               )}
 
               {type === "paypal" && (
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-1 block">PayPal Email Address</label>
-                  <Input value={paypalEmail} onChange={e => setPaypalEmail(e.target.value)} type="email" placeholder="you@example.com" className="bg-secondary/50 border-border/50" autoComplete="email" />
-                  <p className="text-xs text-muted-foreground mt-2">Make sure this matches your PayPal account email.</p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1 block">Account Holder Name</label>
+                    <Input
+                      value={paypalName}
+                      onChange={e => setPaypalName(e.target.value)}
+                      placeholder="Full name on your PayPal account"
+                      className="bg-secondary/50 border-border/50"
+                      autoComplete="name"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1 block">PayPal Email Address</label>
+                    <Input
+                      value={paypalEmail}
+                      onChange={e => setPaypalEmail(e.target.value)}
+                      type="email"
+                      placeholder="you@example.com"
+                      className="bg-secondary/50 border-border/50"
+                      autoComplete="email"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1 block">Confirm Email Address</label>
+                    <Input
+                      value={paypalEmailConfirm}
+                      onChange={e => setPaypalEmailConfirm(e.target.value)}
+                      type="email"
+                      placeholder="Re-enter your PayPal email"
+                      className={`bg-secondary/50 border-border/50 ${paypalEmailConfirm && paypalEmail !== paypalEmailConfirm ? "border-destructive" : ""}`}
+                      autoComplete="email"
+                    />
+                    {paypalEmailConfirm && paypalEmail !== paypalEmailConfirm && (
+                      <p className="text-xs text-destructive mt-1">Emails do not match</p>
+                    )}
+                  </div>
+                  <div className="flex items-start gap-2 text-xs text-muted-foreground bg-amber-500/5 border border-amber-500/20 rounded-lg p-3">
+                    <Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-500" />
+                    <span>PayPal is not verified via OAuth. Please ensure the email and name match your active PayPal account exactly.</span>
+                  </div>
                 </div>
               )}
 
@@ -327,9 +373,13 @@ export default function AddPaymentMethodDialog({ open, onClose, onAdded }) {
                   </div>
                 )}
                 {type === "paypal" && (
-                  <div className="text-sm flex justify-between">
-                    <span className="text-muted-foreground">PayPal</span>
-                    <span className="font-medium">{paypalEmail}</span>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between"><span className="text-muted-foreground">Account Name</span><span className="font-medium">{paypalName}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">PayPal Email</span><span className="font-medium">{paypalEmail}</span></div>
+                    <div className="flex items-start gap-1.5 text-xs text-amber-500/80 pt-1">
+                      <Info className="w-3 h-3 shrink-0 mt-0.5" />
+                      <span>Not OAuth-verified — ensure this matches your active PayPal account</span>
+                    </div>
                   </div>
                 )}
               </div>

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePortfolio } from "@/contexts/PortfolioContext";
 import { useMarketCoins } from "@/hooks/useMarketCoins";
-import { listPendingOrders, cancelPendingOrder } from "@/lib/api/pendingOrders";
+import { listPendingOrders, cancelPendingOrder, updatePendingOrder } from "@/lib/api/pendingOrders";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
@@ -11,7 +11,11 @@ import { useNavigate } from "react-router-dom";
 import {
   Clock, CheckCircle2, XCircle, X, RefreshCw, ArrowUpRight, ArrowDownLeft,
   TrendingUp, TrendingDown, BarChart2, Loader2, AlertCircle, Zap, Search, Trash2,
+  Pencil, Info,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const fmt = (n, d = 2) =>
   n == null ? "—" : Number(n).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -72,6 +76,10 @@ export default function Orders() {
   const [cancellingId, setCancellingId] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [bulkCancelling, setBulkCancelling] = useState(false);
+  const [editingOrder, setEditingOrder] = useState(null);
+  const [editPrice, setEditPrice] = useState("");
+  const [editQty, setEditQty] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
 
   // Live price map from market coins
   const priceMap = useMemo(() => {
@@ -164,6 +172,31 @@ export default function Orders() {
     if (failed > 0) toast.error(`${failed} order${failed !== 1 ? "s" : ""} failed to cancel`);
   };
 
+  const openEdit = (order) => {
+    setEditingOrder(order);
+    setEditPrice(String(order.limit_price));
+    setEditQty(String(order.quantity));
+  };
+
+  const handleEditSave = async () => {
+    if (!editingOrder) return;
+    const newPrice = parseFloat(editPrice);
+    const newQty   = parseFloat(editQty);
+    if (!newPrice || newPrice <= 0) { toast.error("Enter a valid limit price"); return; }
+    if (!newQty   || newQty   <= 0) { toast.error("Enter a valid quantity"); return; }
+    setEditSaving(true);
+    try {
+      const updated = await updatePendingOrder(editingOrder.id, { limitPrice: newPrice, quantity: newQty });
+      setOrders((prev) => prev.map((o) => o.id === updated.id ? updated : o));
+      toast.success("Order updated");
+      setEditingOrder(null);
+    } catch (err) {
+      toast.error(err.message || "Failed to update order");
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
   const toggleSelect = (id) => setSelectedIds((prev) => {
     const next = new Set(prev);
     if (next.has(id)) next.delete(id); else next.add(id);
@@ -229,6 +262,14 @@ export default function Orders() {
             Place Order
           </button>
         </div>
+      </div>
+
+      {/* Client-side notice */}
+      <div className="flex items-start gap-2.5 px-4 py-3 bg-yellow-500/5 border border-yellow-500/20 rounded-xl text-xs text-muted-foreground">
+        <Info className="w-4 h-4 text-yellow-500 shrink-0 mt-0.5" />
+        <span>
+          Limit orders are monitored in real-time while this page is open. If you close the browser, orders will resume checking on your next visit.
+        </span>
       </div>
 
       {/* Stats strip */}
@@ -444,19 +485,28 @@ export default function Orders() {
                             {format(new Date(order.created_at), "MMM d, HH:mm")}
                           </td>
 
-                          {/* Cancel */}
+                          {/* Actions */}
                           <td className="px-4 py-3 text-center">
                             {order.status === "pending" && (
-                              <button
-                                onClick={() => handleCancel(order.id)}
-                                disabled={cancellingId === order.id}
-                                className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all disabled:opacity-50"
-                                title="Cancel order"
-                              >
-                                {cancellingId === order.id
-                                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                  : <X className="w-3.5 h-3.5" />}
-                              </button>
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  onClick={() => openEdit(order)}
+                                  className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all"
+                                  title="Edit order"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleCancel(order.id)}
+                                  disabled={cancellingId === order.id}
+                                  className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all disabled:opacity-50"
+                                  title="Cancel order"
+                                >
+                                  {cancellingId === order.id
+                                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    : <X className="w-3.5 h-3.5" />}
+                                </button>
+                              </div>
                             )}
                           </td>
                         </motion.tr>
@@ -502,13 +552,22 @@ export default function Orders() {
                             {cfg.label}
                           </span>
                           {order.status === "pending" && (
-                            <button
-                              onClick={() => handleCancel(order.id)}
-                              disabled={cancellingId === order.id}
-                              className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all disabled:opacity-50"
-                            >
-                              {cancellingId === order.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
-                            </button>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => openEdit(order)}
+                                className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all"
+                                title="Edit order"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleCancel(order.id)}
+                                disabled={cancellingId === order.id}
+                                className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all disabled:opacity-50"
+                              >
+                                {cancellingId === order.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
+                              </button>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -557,6 +616,65 @@ export default function Orders() {
           </div>
         )}
       </motion.div>
+
+      {/* Edit Order Modal */}
+      <Dialog open={!!editingOrder} onOpenChange={(open) => !open && setEditingOrder(null)}>
+        <DialogContent className="border-border/50 bg-card max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Pencil className="w-4 h-4 text-primary" />
+              Edit Limit Order
+            </DialogTitle>
+          </DialogHeader>
+          {editingOrder && (
+            <div className="space-y-4 pt-1">
+              <div className="flex items-center gap-2 p-3 bg-secondary/40 rounded-lg">
+                <span className={`text-xs font-bold px-2 py-0.5 rounded ${editingOrder.side === "BUY" ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-500"}`}>
+                  {editingOrder.side}
+                </span>
+                <span className="text-sm font-semibold">{editingOrder.symbol}</span>
+                <span className="text-xs text-muted-foreground">{editingOrder.name}</span>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Limit Price (USD)</label>
+                <Input
+                  type="number"
+                  value={editPrice}
+                  onChange={(e) => setEditPrice(e.target.value)}
+                  placeholder="0.00"
+                  min="0"
+                  step="any"
+                  className="bg-secondary/40 border-border font-mono"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Quantity</label>
+                <Input
+                  type="number"
+                  value={editQty}
+                  onChange={(e) => setEditQty(e.target.value)}
+                  placeholder="0.000000"
+                  min="0"
+                  step="any"
+                  className="bg-secondary/40 border-border font-mono"
+                />
+              </div>
+              {editPrice && editQty && parseFloat(editPrice) > 0 && parseFloat(editQty) > 0 && (
+                <p className="text-xs text-muted-foreground text-right">
+                  Total value: <span className="font-semibold text-foreground">${(parseFloat(editPrice) * parseFloat(editQty)).toLocaleString("en-US", { maximumFractionDigits: 2 })}</span>
+                </p>
+              )}
+              <div className="flex gap-3 pt-1">
+                <Button variant="outline" onClick={() => setEditingOrder(null)} className="flex-1">Cancel</Button>
+                <Button onClick={handleEditSave} disabled={editSaving} className="flex-1">
+                  {editSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  Save Changes
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

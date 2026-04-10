@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import {
@@ -6,6 +6,7 @@ import {
   Eye, EyeOff, Copy, CheckCircle2, Building2, Wallet2,
   ArrowDownLeft, ArrowUpRight, Clock, Loader2, Send,
 } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/AuthContext";
 import { usePortfolio } from "@/contexts/PortfolioContext";
@@ -23,18 +24,42 @@ const TYPE_ICON    = { card: CreditCard, bank_account: Building2, paypal: Wallet
 const STATUS_COLOR = { completed: "text-primary", pending: "text-yellow-400", processing: "text-blue-400", failed: "text-destructive", cancelled: "text-muted-foreground" };
 const STATUS_LABEL = { completed: "Completed", pending: "Pending", processing: "Processing", failed: "Failed", cancelled: "Cancelled" };
 
+function generateCardDetails(userId) {
+  const hex = userId.replace(/-/g, "");
+  const hexToDigit = (c) => (parseInt(c, 16) % 10).toString();
+  const digits = hex.split("").map(hexToDigit).join("");
+  const cardDigits = "4" + digits.slice(0, 15);
+  const cardNo = `${cardDigits.slice(0,4)} ${cardDigits.slice(4,8)} ${cardDigits.slice(8,12)} ${cardDigits.slice(12,16)}`;
+  const expYear = 2028 + (parseInt(digits[16] || "0") % 5);
+  const monthNum = (parseInt(digits[17] || "0") % 12) + 1;
+  const expiry = `${String(monthNum).padStart(2, "0")}/${String(expYear).slice(-2)}`;
+  const cvv = digits.slice(18, 21).padStart(3, "0");
+  const last4 = cardDigits.slice(12, 16);
+  return { cardNo, expiry, cvv, last4 };
+}
+
 function VirtualCardDisplay({ user, cashBalance }) {
   const [showDetails, setShowDetails] = useState(false);
   const [copied, setCopied]           = useState(false);
+  const [cardDetails, setCardDetails] = useState(null);
 
-  // Generate a consistent card number from user ID
-  const seed  = user?.id?.replace(/-/g, "") ?? "0000000000000000";
-  const last4  = seed.slice(-4).replace(/[^0-9]/g, "").padStart(4, "7");
-  const cardNo = `4532 ${seed.slice(0, 4).replace(/[^0-9]/g, "").padStart(4, "1")} ${seed.slice(4,8).replace(/[^0-9]/g,"").padStart(4,"2")} ${last4}`;
+  useEffect(() => {
+    if (!user?.id) return;
+    const saved = user?.user_metadata?.virtual_card;
+    if (saved?.cardNo && saved?.expiry && saved?.cvv) {
+      setCardDetails(saved);
+      return;
+    }
+    const details = generateCardDetails(user.id);
+    setCardDetails(details);
+    supabase.auth.updateUser({ data: { virtual_card: details } }).catch(() => {});
+  }, [user?.id]);
 
+  const cardNo  = cardDetails?.cardNo  || "•••• •••• •••• ••••";
+  const last4   = cardDetails?.last4   || "••••";
+  const expiry  = cardDetails?.expiry  || "••/••";
+  const cvv     = cardDetails?.cvv     || "•••";
   const fullName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User";
-  const expYear  = new Date().getFullYear() + 5;
-  const expiry   = `${String(new Date().getMonth() + 1).padStart(2, "0")}/${String(expYear).slice(-2)}`;
 
   const copy = () => {
     navigator.clipboard.writeText(cardNo.replace(/\s/g, ""));
@@ -77,7 +102,7 @@ function VirtualCardDisplay({ user, cashBalance }) {
         </p>
 
         {/* Footer row */}
-        <div className="flex items-end justify-between">
+        <div className="flex items-end justify-between gap-3">
           <div>
             <p className="text-xs opacity-60 uppercase tracking-wider mb-0.5">Card Holder</p>
             <p className="font-semibold">{fullName.toUpperCase()}</p>
@@ -85,6 +110,10 @@ function VirtualCardDisplay({ user, cashBalance }) {
           <div className="text-center">
             <p className="text-xs opacity-60 uppercase tracking-wider mb-0.5">Expires</p>
             <p className="font-mono font-semibold">{expiry}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-xs opacity-60 uppercase tracking-wider mb-0.5">CVV</p>
+            <p className="font-mono font-semibold">{showDetails ? cvv : "•••"}</p>
           </div>
           <div className="text-right">
             <p className="text-xs opacity-60 uppercase tracking-wider mb-0.5">Balance</p>
