@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useLivePrices } from "@/hooks/useLivePrices";
 import { usePortfolio } from "@/contexts/PortfolioContext";
@@ -61,21 +61,26 @@ function OrderBook({ coin }) {
   const price = coin?.price || 0;
   const rows = 8;
 
-  const asks = Array.from({ length: rows }, (_, i) => {
-    const spread = price * (0.0002 + i * 0.00015);
-    const p = price + spread * (i + 1);
-    const a = parseFloat((Math.random() * 2 + 0.01).toFixed(4));
-    return { price: p, amount: a, total: p * a };
-  }).reverse();
-
-  const bids = Array.from({ length: rows }, (_, i) => {
-    const spread = price * (0.0002 + i * 0.00015);
-    const p = price - spread * (i + 1);
-    const a = parseFloat((Math.random() * 2 + 0.01).toFixed(4));
-    return { price: p, amount: a, total: p * a };
-  });
-
-  const maxTotal = Math.max(...asks.map(r => r.total), ...bids.map(r => r.total));
+  const { asks, bids, maxTotal } = useMemo(() => {
+    const seed = (n) => {
+      let x = Math.sin(n + price * 1000) * 10000;
+      return x - Math.floor(x);
+    };
+    const asks = Array.from({ length: rows }, (_, i) => {
+      const spread = price * (0.0002 + i * 0.00015);
+      const p = price + spread * (i + 1);
+      const a = parseFloat((seed(i + 1) * 2 + 0.01).toFixed(4));
+      return { price: p, amount: a, total: p * a };
+    }).reverse();
+    const bids = Array.from({ length: rows }, (_, i) => {
+      const spread = price * (0.0002 + i * 0.00015);
+      const p = price - spread * (i + 1);
+      const a = parseFloat((seed(i + rows + 1) * 2 + 0.01).toFixed(4));
+      return { price: p, amount: a, total: p * a };
+    });
+    const maxTotal = Math.max(...asks.map(r => r.total), ...bids.map(r => r.total));
+    return { asks, bids, maxTotal };
+  }, [price]);
 
   return (
     <div className="space-y-0.5">

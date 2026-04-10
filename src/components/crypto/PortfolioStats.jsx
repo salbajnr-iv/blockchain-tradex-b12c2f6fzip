@@ -1,13 +1,18 @@
 import React from "react";
-import { TrendingUp, TrendingDown, DollarSign, BarChart3, ArrowUpRight, Wallet } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, BarChart3, Wallet } from "lucide-react";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { listTransactions } from "@/lib/api/transactions";
 import { listTrades } from "@/lib/api/portfolio";
 import { usePortfolio } from "@/contexts/PortfolioContext";
+import { useTheme } from "@/contexts/ThemeContext";
+import { fmtUsd } from "@/lib/formatters";
 
 export default function PortfolioStats({ portfolioTotal, portfolioChange24h, isLoading }) {
   const { portfolioId, cashBalance } = usePortfolio();
+  const { displayPrefs } = useTheme();
+  const compact = displayPrefs?.compactNumbers ?? true;
+  const animated = displayPrefs?.animatedCharts ?? true;
 
   const { data: transactions = [] } = useQuery({
     queryKey: ["transactions", portfolioId],
@@ -24,7 +29,6 @@ export default function PortfolioStats({ portfolioTotal, portfolioChange24h, isL
   });
 
   const withdrawals = transactions.filter((t) => t.type === "WITHDRAWAL");
-  const totalWithdrawn = withdrawals.reduce((sum, t) => sum + (t.total_amount || 0), 0);
   const pendingWithdrawals = withdrawals.filter((t) => t.status === "pending").length;
 
   const todayTrades = trades.filter((t) => {
@@ -37,14 +41,14 @@ export default function PortfolioStats({ portfolioTotal, portfolioChange24h, isL
   const stats = [
     {
       label: "Portfolio Value",
-      value: isLoading ? "Loading..." : `$${portfolioTotal.toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
+      value: isLoading ? "Loading..." : fmtUsd(portfolioTotal, compact),
       change: isLoading ? "..." : `${portfolioChange24h >= 0 ? "+" : ""}${portfolioChange24h}%`,
       isPositive: portfolioChange24h >= 0,
       icon: DollarSign,
     },
     {
       label: "24h P&L",
-      value: isLoading ? "Loading..." : `${pnl24h >= 0 ? "+" : ""}$${Math.abs(pnl24h).toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
+      value: isLoading ? "Loading..." : `${pnl24h >= 0 ? "+" : ""}${fmtUsd(Math.abs(pnl24h), compact)}`,
       change: isLoading ? "..." : `${portfolioChange24h >= 0 ? "+" : ""}${portfolioChange24h}%`,
       isPositive: pnl24h >= 0,
       icon: pnl24h >= 0 ? TrendingUp : TrendingDown,
@@ -58,7 +62,7 @@ export default function PortfolioStats({ portfolioTotal, portfolioChange24h, isL
     },
     {
       label: "Cash Balance",
-      value: `$${cashBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
+      value: fmtUsd(cashBalance, compact),
       change: pendingWithdrawals > 0 ? `${pendingWithdrawals} withdrawal pending` : "available",
       isPositive: true,
       icon: Wallet,
@@ -70,9 +74,9 @@ export default function PortfolioStats({ portfolioTotal, portfolioChange24h, isL
       {stats.map((stat, i) => (
         <motion.div
           key={stat.label}
-          initial={{ opacity: 0, y: 20 }}
+          initial={animated ? { opacity: 0, y: 20 } : false}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: i * 0.1 }}
+          transition={{ delay: animated ? i * 0.1 : 0 }}
           className="bg-card rounded-xl p-5 border border-border/50 hover:border-primary/30 transition-colors"
         >
           <div className="flex items-center justify-between mb-3">

@@ -9,6 +9,8 @@ import { usePortfolio } from "@/contexts/PortfolioContext";
 import { useQuery } from "@tanstack/react-query";
 import { listTrades } from "@/lib/api/portfolio";
 import { listTransactions } from "@/lib/api/transactions";
+import { useTheme } from "@/contexts/ThemeContext";
+import { fmtPrice, fmtUsd } from "@/lib/formatters";
 import { motion } from "framer-motion";
 import {
   TrendingUp, TrendingDown, ArrowUpRight, ArrowDownLeft, Zap,
@@ -18,6 +20,9 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 
 function MarketTicker({ cryptoList }) {
+  const { displayPrefs } = useTheme();
+  const compact = displayPrefs?.compactNumbers ?? true;
+  const showBadges = displayPrefs?.percentageBadges ?? true;
   return (
     <div className="bg-card border border-border/50 rounded-xl overflow-hidden">
       <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/30">
@@ -37,12 +42,18 @@ function MarketTicker({ cryptoList }) {
                   <span className="text-base">{coin.icon}</span>
                   <span className="text-xs font-bold text-foreground">{coin.symbol}</span>
                 </div>
-                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${isPos ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive"}`}>
-                  {isPos ? "+" : ""}{coin.change24h?.toFixed(2)}%
-                </span>
+                {showBadges ? (
+                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${isPos ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive"}`}>
+                    {isPos ? "+" : ""}{coin.change24h?.toFixed(2)}%
+                  </span>
+                ) : (
+                  <span className={`text-[10px] font-semibold ${isPos ? "text-primary" : "text-destructive"}`}>
+                    {isPos ? "+" : ""}{coin.change24h?.toFixed(2)}%
+                  </span>
+                )}
               </div>
               <p className="text-sm font-bold text-foreground tabular-nums">
-                ${coin.price?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {fmtPrice(coin.price, compact)}
               </p>
               <p className="text-[10px] text-muted-foreground">{coin.name}</p>
             </Link>
@@ -54,6 +65,8 @@ function MarketTicker({ cryptoList }) {
 }
 
 function TopMovers({ cryptoList }) {
+  const { displayPrefs } = useTheme();
+  const compact = displayPrefs?.compactNumbers ?? true;
   const sorted = [...cryptoList].sort((a, b) => Math.abs(b.change24h || 0) - Math.abs(a.change24h || 0));
   const gainers = sorted.filter(c => (c.change24h || 0) > 0).slice(0, 3);
   const losers = sorted.filter(c => (c.change24h || 0) < 0).slice(0, 3);
@@ -77,7 +90,7 @@ function TopMovers({ cryptoList }) {
               </div>
               <div className="text-right">
                 <p className="text-sm font-bold text-primary">+{coin.change24h?.toFixed(2)}%</p>
-                <p className="text-[10px] text-muted-foreground">${coin.price?.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+                <p className="text-[10px] text-muted-foreground">{fmtPrice(coin.price, compact)}</p>
               </div>
             </Link>
           ))}
@@ -101,7 +114,7 @@ function TopMovers({ cryptoList }) {
               </div>
               <div className="text-right">
                 <p className="text-sm font-bold text-destructive">{coin.change24h?.toFixed(2)}%</p>
-                <p className="text-[10px] text-muted-foreground">${coin.price?.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+                <p className="text-[10px] text-muted-foreground">{fmtPrice(coin.price, compact)}</p>
               </div>
             </Link>
           ))}

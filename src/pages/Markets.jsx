@@ -6,6 +6,8 @@ import { getWatchlist, addToWatchlist, removeFromWatchlist } from "@/lib/api/wat
 import { TrendingUp, TrendingDown, Loader2, Search, RefreshCw, ArrowUpDown, ArrowUp, ArrowDown, Star, ExternalLink } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
+import { useTheme } from "@/contexts/ThemeContext";
+import { fmtPrice, fmtUsd } from "@/lib/formatters";
 
 const SORT_OPTIONS = [
   { key: "rank", label: "#" },
@@ -51,6 +53,10 @@ export default function Markets() {
   const { coins, isLoading, error, lastUpdated, refetch } = useMarketCoins();
   const { holdingsMap, portfolioId } = usePortfolio();
   const navigate = useNavigate();
+  const { displayPrefs } = useTheme();
+  const compact = displayPrefs?.compactNumbers ?? true;
+  const showBadges = displayPrefs?.percentageBadges ?? true;
+  const animated = displayPrefs?.animatedCharts ?? true;
 
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
@@ -192,7 +198,7 @@ export default function Markets() {
 
       {/* Table */}
       <motion.div
-        initial={{ opacity: 0, y: 16 }}
+        initial={animated ? { opacity: 0, y: 16 } : false}
         animate={{ opacity: 1, y: 0 }}
         className="bg-card border border-border/50 rounded-xl overflow-hidden"
       >
@@ -245,9 +251,9 @@ export default function Markets() {
                     return (
                       <motion.tr
                         key={coin.id}
-                        initial={{ opacity: 0 }}
+                        initial={animated ? { opacity: 0 } : false}
                         animate={{ opacity: 1 }}
-                        transition={{ delay: i * 0.01 }}
+                        transition={{ delay: animated ? i * 0.01 : 0 }}
                         onClick={() => navigate(`/asset/${coin.id}`)}
                         className="border-b border-border/20 hover:bg-secondary/30 transition-colors cursor-pointer group"
                       >
@@ -282,34 +288,42 @@ export default function Markets() {
 
                         {/* Price */}
                         <td className="text-right px-4 py-3">
-                          <span className="font-semibold text-sm tabular-nums">{priceFmt(coin.price)}</span>
+                          <span className="font-semibold text-sm tabular-nums">{fmtPrice(coin.price, compact)}</span>
                         </td>
 
                         {/* 24h % */}
                         <td className="text-right px-4 py-3">
-                          <ChangeBadge value={coin.change24h} />
+                          {showBadges ? <ChangeBadge value={coin.change24h} /> : (
+                            <span className={`text-xs tabular-nums ${coin.change24h >= 0 ? "text-emerald-500" : "text-red-500"}`}>
+                              {coin.change24h >= 0 ? "+" : ""}{coin.change24h?.toFixed(2)}%
+                            </span>
+                          )}
                         </td>
 
                         {/* 7d % */}
                         <td className="text-right px-4 py-3 hidden sm:table-cell">
-                          <ChangeBadge value={coin.change7d} />
+                          {showBadges ? <ChangeBadge value={coin.change7d} /> : (
+                            <span className={`text-xs tabular-nums ${coin.change7d >= 0 ? "text-emerald-500" : "text-red-500"}`}>
+                              {coin.change7d != null ? `${coin.change7d >= 0 ? "+" : ""}${coin.change7d?.toFixed(2)}%` : "—"}
+                            </span>
+                          )}
                         </td>
 
                         {/* Volume */}
                         <td className="text-right px-4 py-3 text-sm text-muted-foreground hidden md:table-cell">
-                          ${coin.volume}
+                          {compact ? fmtUsd(coin.volumeRaw, true) : `$${coin.volume}`}
                         </td>
 
                         {/* Market Cap */}
                         <td className="text-right px-4 py-3 text-sm text-muted-foreground hidden lg:table-cell">
-                          ${coin.marketCap}
+                          {compact ? fmtUsd(coin.marketCapRaw, true) : `$${coin.marketCap}`}
                         </td>
 
                         {/* Holdings */}
                         <td className="text-right px-4 py-3 hidden sm:table-cell">
                           {holding && holdingValue > 0 ? (
                             <div>
-                              <p className="text-sm font-semibold tabular-nums">${holdingValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+                              <p className="text-sm font-semibold tabular-nums">{fmtUsd(holdingValue, compact)}</p>
                               <p className="text-xs text-muted-foreground">{holding.amount.toFixed(6)} {coin.symbol}</p>
                             </div>
                           ) : (

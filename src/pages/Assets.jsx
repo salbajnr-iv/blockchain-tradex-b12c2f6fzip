@@ -6,9 +6,11 @@ import { useAuth } from "@/lib/AuthContext";
 import { usePortfolio } from "@/contexts/PortfolioContext";
 import { useLivePrices } from "@/hooks/useLivePrices";
 import { getUserCryptoBalances } from "@/lib/api/cryptoDeposits";
+import { useTheme } from "@/contexts/ThemeContext";
+import { fmtUsd, fmtPrice } from "@/lib/formatters";
 import {
   Wallet, Search, ChevronRight, TrendingUp, TrendingDown,
-  DollarSign, Bitcoin,
+  DollarSign, Bitcoin, ArrowUpDown, ArrowUp, ArrowDown,
 } from "lucide-react";
 
 // ── All supported crypto assets ───────────────────────────────────────────────
@@ -69,13 +71,28 @@ export const FIAT_CURRENCIES = [
 
 const STABLECOIN_PRICE = { USDT: 1.0, USDC: 1.0 };
 
+const SORT_OPTIONS = [
+  { key: "default", label: "Default" },
+  { key: "name",    label: "Name" },
+  { key: "value",   label: "Value" },
+  { key: "change",  label: "24h %" },
+  { key: "price",   label: "Price" },
+];
+
 export default function AssetsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { cashBalance } = usePortfolio();
   const { cryptoList } = useLivePrices();
+  const { displayPrefs } = useTheme();
+  const compact = displayPrefs?.compactNumbers ?? true;
+  const showBadges = displayPrefs?.percentageBadges ?? true;
+  const animated = displayPrefs?.animatedCharts ?? true;
+
   const [tab, setTab] = useState("crypto");
   const [search, setSearch] = useState("");
+  const [sortKey, setSortKey] = useState("default");
+  const [sortDir, setSortDir] = useState("desc");
 
   const { data: cryptoBalances = [] } = useQuery({
     queryKey: ["user_crypto_balances", user?.id],
@@ -93,15 +110,62 @@ export default function AssetsPage() {
       ? { price: STABLECOIN_PRICE[symbol], change24h: 0 }
       : cryptoList.find((c) => c.symbol === symbol) || null;
 
-  const filteredCrypto = useMemo(
-    () =>
-      CRYPTO_ASSETS.filter(
-        (a) =>
-          a.symbol.toLowerCase().includes(search.toLowerCase()) ||
-          a.name.toLowerCase().includes(search.toLowerCase())
-      ),
-    [search]
-  );
+  const totalCryptoUsd = useMemo(() => {
+    return cryptoBalances.reduce((sum, b) => {
+      const price = getPriceData(b.asset)?.price ?? 0;
+      return sum + parseFloat(b.balance) * price;
+    }, 0);
+  }, [cryptoBalances, cryptoList]);
+
+  const handleSort = (key) => {
+    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortKey(key); setSortDir(key === "name" ? "asc" : "desc"); }
+  };
+
+  const filteredAndSorted = useMemo(() => {
+    let list = CRYPTO_ASSETS.filter(
+      (a) =>
+        a.symbol.toLowerCase().includes(search.toLowerCase()) ||
+        a.name.toLowerCase().includes(search.toLowerCase())
+    );
+
+    if (sortKey !== "default") {
+      list = [...list].sort((a, b) => {
+        const priceA = getPriceData(a.symbol);
+        const priceB = getPriceData(b.symbol);
+        const balA = balanceMap[a.symbol] ?? 0;
+        const balB = balanceMap[b.symbol] ?? 0;
+
+        let va, vb;
+        switch (sortKey) {
+          case "name":   va = a.name; vb = b.name; break;
+          case "value":  va = balA * (priceA?.price ?? 0); vb = balB * (priceB?.price ?? 0); break;
+          case "change": va = priceA?.change24h ?? 0; vb = priceB?.change24h ?? 0; break;
+          case "price":  va = priceA?.price ?? 0; vb = priceB?.price ?? 0; break;
+          default:       va = 0; vb = 0;
+        }
+
+        if (typeof va === "string") {
+          return sortDir === "asc" ? va.localeCompare(vb) : vb.localeCompare(va);
+        }
+        return sortDir === "asc" ? va - vb : vb - va;
+      });
+    } else {
+      // Default: assets with a balance come first
+      list = [...list].sort((a, b) => {
+        const balA = balanceMap[a.symbol] ?? 0;
+        const balB = balanceMap[b.symbol] ?? 0;
+        const priceA = getPriceData(a.symbol);
+        const priceB = getPriceData(b.symbol);
+        const valA = balA * (priceA?.price ?? 0);
+        const valB = balB * (priceB?.price ?? 0);
+        if (valA !== valB) return valB - valA;
+        return 0;
+      });
+    }
+
+    return list;
+  }, [search, sortKey, sortDir, balanceMap, cryptoList]);
 
   const filteredFiat = useMemo(
     () =>
@@ -113,20 +177,10 @@ export default function AssetsPage() {
     [search]
   );
 
-  const totalCryptoUsd = useMemo(() => {
-    return cryptoBalances.reduce((sum, b) => {
-      const price = getPriceData(b.asset)?.price ?? 0;
-      return sum + parseFloat(b.balance) * price;
-    }, 0);
-  }, [cryptoBalances, cryptoList]);
-
-  const fmtUsd = (v) =>
-    new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(v ?? 0);
+  const SortIcon = ({ k }) => {
+    if (sortKey !== k) return <ArrowUpDown className="w-3 h-3 opacity-30" />;
+    return sortDir === "asc" ? <ArrowUp className="w-3 h-3 text-primary" /> : <ArrowDown className="w-3 h-3 text-primary" />;
+  };
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
@@ -145,12 +199,12 @@ export default function AssetsPage() {
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-card border border-border rounded-2xl p-4">
           <p className="text-xs text-muted-foreground mb-1">Fiat Balance</p>
-          <p className="text-xl font-bold text-foreground tabular-nums">{fmtUsd(cashBalance)}</p>
+          <p className="text-xl font-bold text-foreground tabular-nums">{fmtUsd(cashBalance, compact)}</p>
           <p className="text-xs text-muted-foreground mt-0.5">Available USD</p>
         </div>
         <div className="bg-card border border-border rounded-2xl p-4">
           <p className="text-xs text-muted-foreground mb-1">Crypto Balance</p>
-          <p className="text-xl font-bold text-foreground tabular-nums">{fmtUsd(totalCryptoUsd)}</p>
+          <p className="text-xl font-bold text-foreground tabular-nums">{fmtUsd(totalCryptoUsd, compact)}</p>
           <p className="text-xs text-muted-foreground mt-0.5">{cryptoBalances.length} asset{cryptoBalances.length !== 1 ? "s" : ""}</p>
         </div>
       </div>
@@ -190,13 +244,30 @@ export default function AssetsPage() {
       {/* Crypto list */}
       {tab === "crypto" && (
         <div className="bg-card border border-border rounded-2xl overflow-hidden">
-          <div className="px-5 py-3 border-b border-border/50">
+          <div className="px-5 py-3 border-b border-border/50 flex items-center justify-between gap-2 flex-wrap">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              {filteredCrypto.length} Cryptocurrencies
+              {filteredAndSorted.length} Cryptocurrencies
             </p>
+            {/* Sort controls */}
+            <div className="flex items-center gap-1 flex-wrap">
+              {SORT_OPTIONS.map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => handleSort(key)}
+                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold transition-all ${
+                    sortKey === key
+                      ? "bg-primary/15 text-primary"
+                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                  }`}
+                >
+                  {label}
+                  <SortIcon k={key} />
+                </button>
+              ))}
+            </div>
           </div>
           <div className="divide-y divide-border/30">
-            {filteredCrypto.map((asset, idx) => {
+            {filteredAndSorted.map((asset, idx) => {
               const priceData = getPriceData(asset.symbol);
               const balance = balanceMap[asset.symbol] ?? 0;
               const usdValue = balance * (priceData?.price ?? 0);
@@ -206,9 +277,9 @@ export default function AssetsPage() {
               return (
                 <motion.button
                   key={asset.symbol}
-                  initial={{ opacity: 0, y: 8 }}
+                  initial={animated ? { opacity: 0, y: 8 } : false}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.02 }}
+                  transition={{ delay: animated ? idx * 0.02 : 0 }}
                   onClick={() => navigate(`/assets/crypto/${asset.symbol}`)}
                   className="w-full flex items-center gap-4 px-5 py-4 hover:bg-secondary/20 transition-colors text-left"
                 >
@@ -218,27 +289,37 @@ export default function AssetsPage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-foreground">{asset.name}</p>
                     <p className="text-xs text-muted-foreground">{asset.symbol}</p>
+                    {balance > 0 && (
+                      <p className="text-xs text-muted-foreground/70 mt-0.5">
+                        {balance.toLocaleString(undefined, { maximumFractionDigits: 6 })} {asset.symbol}
+                      </p>
+                    )}
                   </div>
                   <div className="text-right shrink-0">
                     {priceData ? (
                       <>
                         <p className="text-sm font-semibold text-foreground tabular-nums">
-                          {priceData.price >= 1000
-                            ? `$${priceData.price.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
-                            : priceData.price >= 1
-                            ? `$${priceData.price.toFixed(4)}`
-                            : `$${priceData.price.toFixed(6)}`}
+                          {fmtPrice(priceData.price, compact)}
                         </p>
-                        <p className={`text-xs font-medium flex items-center justify-end gap-0.5 ${isPos ? "text-emerald-500" : "text-red-500"}`}>
-                          {isPos ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                          {isPos ? "+" : ""}{change.toFixed(2)}%
-                        </p>
+                        {showBadges ? (
+                          <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full mt-0.5 ${
+                            isPos ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-500"
+                          }`}>
+                            {isPos ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
+                            {isPos ? "+" : ""}{change.toFixed(2)}%
+                          </span>
+                        ) : (
+                          <p className={`text-xs font-medium flex items-center justify-end gap-0.5 mt-0.5 ${isPos ? "text-emerald-500" : "text-red-500"}`}>
+                            {isPos ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                            {isPos ? "+" : ""}{change.toFixed(2)}%
+                          </p>
+                        )}
                       </>
                     ) : (
                       <p className="text-xs text-muted-foreground">—</p>
                     )}
                     {balance > 0 && (
-                      <p className="text-xs text-primary font-medium mt-0.5">{fmtUsd(usdValue)}</p>
+                      <p className="text-xs text-primary font-medium mt-0.5">{fmtUsd(usdValue, compact)}</p>
                     )}
                   </div>
                   <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
@@ -263,9 +344,9 @@ export default function AssetsPage() {
               return (
                 <motion.button
                   key={currency.symbol}
-                  initial={{ opacity: 0, y: 8 }}
+                  initial={animated ? { opacity: 0, y: 8 } : false}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.02 }}
+                  transition={{ delay: animated ? idx * 0.02 : 0 }}
                   onClick={() => navigate(`/assets/fiat/${currency.symbol}`)}
                   className="w-full flex items-center gap-4 px-5 py-4 hover:bg-secondary/20 transition-colors text-left"
                 >
@@ -278,7 +359,7 @@ export default function AssetsPage() {
                   </div>
                   <div className="text-right shrink-0">
                     {isUsd && cashBalance > 0 ? (
-                      <p className="text-sm font-semibold text-primary tabular-nums">{fmtUsd(cashBalance)}</p>
+                      <p className="text-sm font-semibold text-primary tabular-nums">{fmtUsd(cashBalance, compact)}</p>
                     ) : (
                       <p className="text-xs text-muted-foreground">—</p>
                     )}
