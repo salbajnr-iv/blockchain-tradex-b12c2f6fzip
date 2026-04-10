@@ -1,15 +1,27 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import {
   Bell, CheckCheck, Trash2, X, TrendingUp, TrendingDown, BarChart2,
   Zap, ArrowUpRight, Info, ClipboardList, History, Megaphone, ShieldCheck,
-  Filter, RefreshCw,
+  RefreshCw, ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSystemNotifications } from "@/hooks/useSystemNotifications";
 import { useLivePrices } from "@/hooks/useLivePrices";
 import { fetchAdminNotifications } from "@/lib/api/adminNotifications";
 import { supabase } from "@/lib/supabaseClient";
+
+const DETAIL_CACHE_KEY = "bt_notif_detail_cache";
+function saveDetailCache(notif) {
+  try {
+    const existing = JSON.parse(localStorage.getItem(DETAIL_CACHE_KEY) || "{}");
+    existing[notif.id] = { ...notif, timestamp: notif.timestamp?.toString() };
+    const keys = Object.keys(existing);
+    if (keys.length > 50) delete existing[keys[0]];
+    localStorage.setItem(DETAIL_CACHE_KEY, JSON.stringify(existing));
+  } catch {}
+}
 
 const READ_KEY = "bt_notif_read_ids";
 
@@ -67,6 +79,7 @@ function getIconBg(n) {
 const FILTERS = ["all", "market", "portfolio", "transaction", "admin"];
 
 export default function Notifications() {
+  const navigate = useNavigate();
   const { cryptoList } = useLivePrices();
   const { notifications: sysNotifs, dismiss, clearAll } = useSystemNotifications({ cryptoList });
   const [adminNotifs, setAdminNotifs] = useState([]);
@@ -138,6 +151,12 @@ export default function Notifications() {
   const handleDismiss = (n) => {
     markOneRead(n.id);
     if (n.source !== "admin") dismiss(n.id);
+  };
+
+  const handleNotifClick = (n) => {
+    markOneRead(n.id);
+    saveDetailCache(n);
+    navigate(`/notifications/${n.id}`, { state: { notif: n } });
   };
 
   const handleClearAll = () => {
@@ -225,7 +244,7 @@ export default function Notifications() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, x: 40 }}
                   transition={{ duration: 0.2 }}
-                  onClick={() => markOneRead(n.id)}
+                  onClick={() => handleNotifClick(n)}
                   className={`relative flex items-start gap-3 p-4 rounded-xl border transition-colors cursor-pointer group ${
                     isUnread
                       ? "bg-primary/5 border-primary/20 hover:bg-primary/8"
@@ -249,13 +268,18 @@ export default function Notifications() {
                       </p>
                       <span className="text-[10px] text-muted-foreground/60 shrink-0 mt-0.5">{fmtTime(n.timestamp)}</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{n.message}</p>
-                    {n.source === "admin" && (
-                      <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-medium text-violet-400 bg-violet-500/10 px-1.5 py-0.5 rounded-full">
-                        <Megaphone className="w-2.5 h-2.5" />
-                        Admin
+                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed line-clamp-2">{n.message}</p>
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                      {n.source === "admin" && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-violet-400 bg-violet-500/10 px-1.5 py-0.5 rounded-full">
+                          <Megaphone className="w-2.5 h-2.5" />
+                          Admin
+                        </span>
+                      )}
+                      <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground/50 group-hover:text-primary/60 transition-colors">
+                        View details <ChevronRight className="w-3 h-3" />
                       </span>
-                    )}
+                    </div>
                   </div>
                   <button
                     onClick={(e) => { e.stopPropagation(); handleDismiss(n); }}

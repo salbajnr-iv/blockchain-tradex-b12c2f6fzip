@@ -138,7 +138,9 @@ export const getAllWithdrawals = async () => {
 
 // ── Approve or reject a withdrawal ───────────────────────────────────────────
 export const adminUpdateWithdrawal = async (transactionId, status, adminMessage = null) => {
-  // Try the RPC first (works when the migration has been applied)
+  const actionKey = status === 'completed' ? 'withdrawal_approved' : 'withdrawal_rejected'
+
+  // 1. Try the RPC first (works when withdrawal-migration.sql has been applied)
   const { error: rpcError } = await supabase.rpc('fn_admin_update_withdrawal', {
     p_transaction_id: transactionId,
     p_status: status,
@@ -146,18 +148,14 @@ export const adminUpdateWithdrawal = async (transactionId, status, adminMessage 
   })
 
   if (!rpcError) {
-    await logAdminAction(
-      status === 'completed' ? 'withdrawal_approved' : 'withdrawal_rejected',
-      'withdrawal',
-      transactionId,
-      { status, admin_message: adminMessage }
-    )
+    await logAdminAction(actionKey, 'withdrawal', transactionId, { status, admin_message: adminMessage })
     return
   }
 
-  // Fallback: direct table update (works via the admin RLS policy)
+  // 2. Fallback: direct update with extended columns (requires migration + is_admin RLS)
   const { data: { user } } = await supabase.auth.getUser()
-  const { data: updated, error } = await supabase
+
+  const { data: fullUpdate, error: fullError } = await supabase
     .from('transactions')
     .update({
       status,
@@ -169,22 +167,39 @@ export const adminUpdateWithdrawal = async (transactionId, status, adminMessage 
     .eq('type', 'WITHDRAWAL')
     .select('id')
 
-  if (error) throw new Error(`Could not update withdrawal: ${error.message}`)
+  if (!fullError) {
+    if (!fullUpdate || fullUpdate.length === 0) {
+      throw new Error(
+        'Permission denied — 0 rows updated. Ensure your account has is_admin = true and the admin RLS policies are applied.'
+      )
+    }
+    await logAdminAction(actionKey, 'withdrawal', transactionId, { status, admin_message: adminMessage, fallback: 'full' })
+    return
+  }
 
-  // If RLS silently blocked the update, updated will be an empty array
-  if (!updated || updated.length === 0) {
+  // 3. Last-resort fallback: update only the status column (no migration columns needed)
+  //    This works as long as the admin can write to transactions via any existing RLS policy.
+  const isColumnError = fullError.code === '42703' || fullError.message?.toLowerCase().includes('column')
+  if (!isColumnError) {
+    throw new Error(`Could not update withdrawal: ${fullError.message}`)
+  }
+
+  const { data: minUpdate, error: minError } = await supabase
+    .from('transactions')
+    .update({ status })
+    .eq('id', transactionId)
+    .eq('type', 'WITHDRAWAL')
+    .select('id')
+
+  if (minError) throw new Error(`Could not update withdrawal: ${minError.message}`)
+
+  if (!minUpdate || minUpdate.length === 0) {
     throw new Error(
-      'Permission denied — 0 rows updated. Run sql/withdrawal-migration.sql in your Supabase SQL Editor ' +
-      'and ensure your account has is_admin = true.'
+      'Permission denied — 0 rows updated. Run sql/withdrawal-migration.sql in your Supabase SQL Editor and ensure is_admin = true.'
     )
   }
 
-  await logAdminAction(
-    status === 'completed' ? 'withdrawal_approved' : 'withdrawal_rejected',
-    'withdrawal',
-    transactionId,
-    { status, admin_message: adminMessage, fallback: true }
-  )
+  await logAdminAction(actionKey, 'withdrawal', transactionId, { status, admin_message: adminMessage, fallback: 'minimal' })
 }
 
 // ── Fetch all pending KYC submissions (admin only) ───────────────────────────

@@ -49,6 +49,7 @@ import AssetDetail from './pages/AssetDetail';
 import AdminDeposits from './pages/admin/AdminDeposits';
 import AdminNotifications from './pages/admin/AdminNotifications';
 import Notifications from './pages/Notifications';
+import NotificationDetail from './pages/NotificationDetail';
 import Support from './pages/Support';
 
 function App() {
@@ -104,6 +105,7 @@ function App() {
                     <Route path="/assets" element={<Assets />} />
                     <Route path="/assets/:type/:id" element={<AssetDetail />} />
                     <Route path="/notifications" element={<Notifications />} />
+                    <Route path="/notifications/:id" element={<NotificationDetail />} />
                     <Route path="/support" element={<Support />} />
 
                     <Route path="/settings" element={<SettingsLayout />}>
