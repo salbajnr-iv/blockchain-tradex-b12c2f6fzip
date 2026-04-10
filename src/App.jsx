@@ -69,10 +69,10 @@ function App() {
                 <code style={{ background: 'rgba(0,0,0,0.25)', borderRadius: 4, padding: '1px 6px' }}>VITE_SUPABASE_URL</code>{' '}
                 and{' '}
                 <code style={{ background: 'rgba(0,0,0,0.25)', borderRadius: 4, padding: '1px 6px' }}>VITE_SUPABASE_ANON_KEY</code>{' '}
-                to your Vercel Environment Variables, then redeploy.
+                to your Replit Secrets, then restart the app.
               </div>
             )}
-            <Router>
+            <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
               <Routes>
                 <Route path="/login" element={
                   <AuthRedirectWrapper>
