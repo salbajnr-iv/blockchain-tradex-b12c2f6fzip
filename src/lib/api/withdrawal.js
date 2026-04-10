@@ -2,12 +2,41 @@ import { supabase } from '@/lib/supabaseClient';
 
 export const createWithdrawalRequest = async (portfolioId, { amount, method, withdrawalDetails, notes }) => {
   if (!portfolioId) throw new Error('Portfolio ID required');
+  const parsedAmount = parseFloat(amount);
+  if (!parsedAmount || parsedAmount <= 0) throw new Error('Invalid withdrawal amount');
+
+  // Step 1: Deduct the amount from the portfolio cash_balance.
+  // We use a conditional update (cash_balance >= amount) to prevent overdraft.
+  const { data: portfolio, error: fetchErr } = await supabase
+    .from('portfolios')
+    .select('cash_balance')
+    .eq('id', portfolioId)
+    .single();
+
+  if (fetchErr) throw new Error('Could not verify portfolio balance');
+
+  const currentBalance = Number(portfolio?.cash_balance ?? 0);
+  if (currentBalance < parsedAmount) {
+    throw new Error('Insufficient balance for this withdrawal');
+  }
+
+  const { error: deductErr } = await supabase
+    .from('portfolios')
+    .update({ cash_balance: currentBalance - parsedAmount })
+    .eq('id', portfolioId)
+    .gte('cash_balance', parsedAmount);
+
+  if (deductErr) {
+    throw new Error('Failed to hold withdrawal funds — please try again');
+  }
+
+  // Step 2: Create the withdrawal transaction record.
   const { data, error } = await supabase
     .from('transactions')
     .insert({
       portfolio_id: portfolioId,
       type: 'WITHDRAWAL',
-      total_amount: parseFloat(amount),
+      total_amount: parsedAmount,
       status: 'pending',
       payment_method: method,
       withdrawal_details: withdrawalDetails,
@@ -16,7 +45,16 @@ export const createWithdrawalRequest = async (portfolioId, { amount, method, wit
     })
     .select()
     .single();
-  if (error) throw error;
+
+  if (error) {
+    // If the transaction insert fails, restore the deducted balance
+    await supabase
+      .from('portfolios')
+      .update({ cash_balance: currentBalance })
+      .eq('id', portfolioId);
+    throw error;
+  }
+
   return data;
 };
 

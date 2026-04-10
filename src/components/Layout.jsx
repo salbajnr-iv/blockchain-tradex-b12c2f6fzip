@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Link, useLocation, useNavigate, Outlet } from "react-router-dom";
 import {
-  LayoutDashboard, BarChart3, ArrowUpDown, Bell, CreditCard, History,
+  LayoutDashboard, BarChart3, ArrowUpDown, Bell, BellRing, CreditCard, History,
   ArrowUpRight, Menu, X, RefreshCw, LogOut, PlusCircle, LineChart, Search,
   ChevronDown, Wallet, TrendingUp, ShieldCheck, Settings, ChevronRight,
   Info, BarChart2, Zap, TrendingDown, CheckCheck, ClipboardList, LifeBuoy, Megaphone,
@@ -44,7 +44,7 @@ const NAV_SECTIONS = [
       { label: "Trade",         icon: ArrowUpDown,    path: "/trade" },
       { label: "Open Orders",   icon: ClipboardList,  path: "/orders" },
       { label: "Recurring/DCA", icon: RefreshCw,      path: "/recurring" },
-      { label: "Price Alerts",  icon: Bell,           path: "/alerts" },
+      { label: "Price Alerts",  icon: BellRing,       path: "/alerts" },
     ],
   },
   {

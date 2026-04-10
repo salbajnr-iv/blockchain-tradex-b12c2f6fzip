@@ -136,9 +136,49 @@ export const getAllWithdrawals = async () => {
   })
 }
 
+// ── Helper: refund portfolio cash_balance when a withdrawal is rejected ────────
+const refundBalanceDirect = async (transactionId) => {
+  try {
+    const { data: tx } = await supabase
+      .from('transactions')
+      .select('portfolio_id, total_amount')
+      .eq('id', transactionId)
+      .single()
+
+    if (!tx?.portfolio_id || !tx?.total_amount) return
+
+    // Try RPC first
+    const { error: rpcErr } = await supabase.rpc('fn_admin_adjust_balance', {
+      p_portfolio_id: tx.portfolio_id,
+      p_operation:    'add',
+      p_amount:       Number(tx.total_amount),
+      p_note:         'Withdrawal rejected — balance refunded',
+    })
+
+    if (rpcErr) {
+      // Fallback: read current balance then increment
+      const { data: portfolio } = await supabase
+        .from('portfolios')
+        .select('cash_balance')
+        .eq('id', tx.portfolio_id)
+        .single()
+
+      if (portfolio) {
+        await supabase
+          .from('portfolios')
+          .update({ cash_balance: (Number(portfolio.cash_balance) || 0) + Number(tx.total_amount) })
+          .eq('id', tx.portfolio_id)
+      }
+    }
+  } catch {
+    // Swallow — refund is best-effort; admin can adjust manually if needed
+  }
+}
+
 // ── Approve or reject a withdrawal ───────────────────────────────────────────
 export const adminUpdateWithdrawal = async (transactionId, status, adminMessage = null) => {
   const actionKey = status === 'completed' ? 'withdrawal_approved' : 'withdrawal_rejected'
+  const isRejected = status === 'rejected'
 
   // 1. Try the RPC first (works when withdrawal-migration.sql has been applied)
   const { error: rpcError } = await supabase.rpc('fn_admin_update_withdrawal', {
@@ -148,6 +188,7 @@ export const adminUpdateWithdrawal = async (transactionId, status, adminMessage 
   })
 
   if (!rpcError) {
+    if (isRejected) await refundBalanceDirect(transactionId)
     await logAdminAction(actionKey, 'withdrawal', transactionId, { status, admin_message: adminMessage })
     return
   }
@@ -173,6 +214,7 @@ export const adminUpdateWithdrawal = async (transactionId, status, adminMessage 
         'Permission denied — 0 rows updated. Ensure your account has is_admin = true and the admin RLS policies are applied.'
       )
     }
+    if (isRejected) await refundBalanceDirect(transactionId)
     await logAdminAction(actionKey, 'withdrawal', transactionId, { status, admin_message: adminMessage, fallback: 'full' })
     return
   }
@@ -199,6 +241,7 @@ export const adminUpdateWithdrawal = async (transactionId, status, adminMessage 
     )
   }
 
+  if (isRejected) await refundBalanceDirect(transactionId)
   await logAdminAction(actionKey, 'withdrawal', transactionId, { status, admin_message: adminMessage, fallback: 'minimal' })
 }
 
@@ -264,14 +307,56 @@ export const getKycDocumentUrls = async (submission) => {
   return urls
 }
 
-// ── Call fn_admin_review_kyc RPC ─────────────────────────────────────────────
+// ── Call fn_admin_review_kyc RPC (with direct-update fallback) ───────────────
 export const adminReviewKyc = async (submissionId, status, reviewerNotes = null) => {
-  const { error } = await supabase.rpc('fn_admin_review_kyc', {
+  // Tier 1: try the dedicated RPC
+  const { error: rpcError } = await supabase.rpc('fn_admin_review_kyc', {
     p_submission_id: submissionId,
     p_status: status,
     p_reviewer_notes: reviewerNotes,
   })
-  if (error) throw error
+
+  if (rpcError) {
+    // Tier 2: direct table update fallback
+    const now = new Date().toISOString()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    const { error: updateError } = await supabase
+      .from('kyc_submissions')
+      .update({
+        status,
+        reviewer_notes: reviewerNotes,
+        reviewed_at: now,
+        reviewed_by: user?.id ?? null,
+        updated_at: now,
+      })
+      .eq('id', submissionId)
+
+    if (updateError) {
+      throw new Error(
+        `KYC review failed. Please run sql/kyc-admin-review.sql in your Supabase SQL Editor, then try again. (${updateError.message})`
+      )
+    }
+
+    // If approved, also update the user's kyc_verified flag
+    if (status === 'approved') {
+      const { data: submission } = await supabase
+        .from('kyc_submissions')
+        .select('user_id, tier')
+        .eq('id', submissionId)
+        .single()
+
+      if (submission?.user_id) {
+        await supabase
+          .from('users')
+          .update({
+            kyc_verified: true,
+            kyc_tier: submission.tier ?? 1,
+          })
+          .eq('id', submission.user_id)
+      }
+    }
+  }
 
   const actionType =
     status === 'approved' ? 'kyc_approved' :

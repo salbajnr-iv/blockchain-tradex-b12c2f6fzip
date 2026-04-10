@@ -48,6 +48,7 @@ import Assets from './pages/Assets';
 import AssetDetail from './pages/AssetDetail';
 import AdminDeposits from './pages/admin/AdminDeposits';
 import AdminNotifications from './pages/admin/AdminNotifications';
+import AdminSupport from './pages/admin/AdminSupport';
 import Notifications from './pages/Notifications';
 import NotificationDetail from './pages/NotificationDetail';
 import Support from './pages/Support';
@@ -133,6 +134,7 @@ function App() {
                     <Route path="deposits" element={<AdminDeposits />} />
                     <Route path="audit-log" element={<AdminAuditLog />} />
                     <Route path="notifications" element={<AdminNotifications />} />
+                    <Route path="support" element={<AdminSupport />} />
                   </Route>
                 </Route>
 
