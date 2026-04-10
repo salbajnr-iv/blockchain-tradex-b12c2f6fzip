@@ -49,6 +49,9 @@ function getIcon(n) {
     case "transaction_deposit":    return <ArrowUpRight className="w-4 h-4 text-emerald-500" />;
     case "transaction_withdrawal": return <ArrowUpRight className="w-4 h-4 text-orange-500 rotate-90" />;
     case "transaction":            return <History className="w-4 h-4 text-muted-foreground" />;
+    case "trade":                  return n.side === "buy" || n.message?.toLowerCase().includes("bought")
+      ? <TrendingUp className="w-4 h-4 text-emerald-500" />
+      : <TrendingDown className="w-4 h-4 text-red-500" />;
     case "order_filled":           return <CheckCheck className="w-4 h-4 text-emerald-500" />;
     case "order":                  return <ClipboardList className="w-4 h-4 text-primary" />;
     case "announcement":
@@ -69,6 +72,9 @@ function getIconBg(n) {
     case "volatility":             return "bg-yellow-400/10";
     case "transaction_deposit":    return "bg-emerald-500/10";
     case "transaction_withdrawal": return "bg-orange-500/10";
+    case "trade":                  return n.message?.toLowerCase().includes("bought") ? "bg-emerald-500/10" : "bg-red-500/10";
+    case "order":                  return "bg-primary/10";
+    case "order_filled":           return "bg-emerald-500/10";
     case "announcement":
     case "admin":                  return "bg-violet-500/10";
     case "security":               return "bg-blue-500/10";
