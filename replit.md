@@ -492,3 +492,7 @@ npm run dev   # Runs on port 5000
 
 ## Last Updated
 April 6, 2026
+  # next major priority
+  - implementation of real time purchase of crypto using external api
+  - implementation of live chat functionality between user and admin
+  - 
