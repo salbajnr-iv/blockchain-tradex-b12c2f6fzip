@@ -262,8 +262,8 @@ function FiatDepositFlow({ currency, userId, portfolioId, onClose, onSuccess }) 
     try {
       await createTransaction(portfolioId, {
         type: "DEPOSIT",
-        asset: currency.symbol,
-        amount: parsed,
+        symbol: currency.symbol,
+        total_amount: parsed,
         status: "pending",
         notes: `Fiat deposit — ${currency.symbol} via ${method} — Ref: ${reference}`,
       });
@@ -459,8 +459,8 @@ function WithdrawFlow({ asset, isFiat, balance, portfolioId, onClose, onSuccess 
     try {
       await createTransaction(portfolioId, {
         type: "WITHDRAWAL",
-        asset: isFiat ? asset.symbol : asset.symbol,
-        amount: parsed,
+        symbol: asset.symbol,
+        total_amount: parsed,
         status: "pending",
         notes: `Withdrawal — ${asset.symbol} via ${selectedMethod.label}`,
         withdrawal_details: {
@@ -614,8 +614,8 @@ function TransferFlow({ asset, isFiat, balance, portfolioId, allCryptoAssets, on
     try {
       await createTransaction(portfolioId, {
         type: "WITHDRAWAL",
-        asset: asset.symbol,
-        amount: parsed,
+        symbol: asset.symbol,
+        total_amount: parsed,
         status: "pending",
         notes: `Internal transfer to: ${recipient}${note ? ` — ${note}` : ""}`,
       });
@@ -729,8 +729,8 @@ function ConvertFlow({ asset, isFiat, balance, portfolioId, cryptoList, onClose,
     try {
       await createTransaction(portfolioId, {
         type: "WITHDRAWAL",
-        asset: asset.symbol,
-        amount: parsed,
+        symbol: asset.symbol,
+        total_amount: usdValue,
         status: "pending",
         notes: `Convert ${parsed} ${asset.symbol} → ${toAmount.toFixed(6)} ${toAsset.symbol}`,
       });

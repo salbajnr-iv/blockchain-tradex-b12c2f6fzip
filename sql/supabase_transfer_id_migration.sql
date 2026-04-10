@@ -5,6 +5,21 @@
 
 
 -- ──────────────────────────────────────────────────────────
+-- 0. ADD transfer_id COLUMN TO users TABLE (if not present)
+--    Each user gets a unique UUID used to receive transfers
+-- ──────────────────────────────────────────────────────────
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS transfer_id UUID DEFAULT gen_random_uuid() UNIQUE;
+
+-- Backfill any existing rows that don't have a transfer_id yet
+UPDATE public.users
+  SET transfer_id = gen_random_uuid()
+  WHERE transfer_id IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_users_transfer_id ON public.users(transfer_id);
+
+
+-- ──────────────────────────────────────────────────────────
 -- 1. LOOKUP FUNCTION
 --    Finds a user by their transfer_id (UUID)
 --    Returns: found, username, display_name, transfer_id
@@ -15,12 +30,19 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
+  v_caller_id uuid := auth.uid();
   v_user   public.users%ROWTYPE;
 BEGIN
+  IF v_caller_id IS NULL THEN
+    RETURN jsonb_build_object('found', false, 'error', 'Not authenticated');
+  END IF;
+
   SELECT *
   INTO   v_user
   FROM   public.users
   WHERE  transfer_id = p_transfer_id
+    AND  id <> v_caller_id
+    AND  status = 'active'
   LIMIT  1;
 
   IF NOT FOUND THEN
@@ -30,7 +52,7 @@ BEGIN
   RETURN jsonb_build_object(
     'found',        true,
     'username',     v_user.username,
-    'display_name', v_user.display_name,
+    'display_name', COALESCE(v_user.full_name, v_user.username),
     'transfer_id',  v_user.transfer_id
   );
 END;
@@ -79,6 +101,7 @@ BEGIN
   SELECT * INTO v_recipient_user
   FROM   public.users
   WHERE  transfer_id = p_to_transfer_id
+    AND  status = 'active'
   LIMIT  1;
 
   IF NOT FOUND THEN
@@ -121,13 +144,13 @@ BEGIN
          updated_at   = now()
   WHERE  id = v_recipient_portfolio_id;
 
-  -- Log outgoing transaction
+  -- Log outgoing transaction (TRANSFER is valid per CHECK constraint)
   INSERT INTO public.transactions (
     portfolio_id, type, total_amount, status,
     transaction_date, notes
   )
   VALUES (
-    p_from_portfolio_id, 'TRANSFER_OUT', p_amount, 'completed',
+    p_from_portfolio_id, 'TRANSFER', p_amount, 'completed',
     now(),
     COALESCE(p_note, 'Transfer to ' || COALESCE(v_recipient_user.username, 'user'))
   )
@@ -139,7 +162,7 @@ BEGIN
     transaction_date, notes
   )
   VALUES (
-    v_recipient_portfolio_id, 'TRANSFER_IN', p_amount, 'completed',
+    v_recipient_portfolio_id, 'TRANSFER', p_amount, 'completed',
     now(),
     COALESCE(p_note, 'Transfer from BlockTrade user')
   )

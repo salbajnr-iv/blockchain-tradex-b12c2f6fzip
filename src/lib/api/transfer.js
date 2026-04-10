@@ -3,22 +3,37 @@ import { supabase } from '@/lib/supabaseClient';
 export const getMyTransferId = async () => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
+
   const { data, error } = await supabase
     .from('users')
-    .select('transfer_id, username, display_name')
+    .select('transfer_id, username, full_name')
     .eq('id', user.id)
     .single();
+
   if (error) throw error;
-  return data;
+  if (!data?.transfer_id) throw new Error('Transfer ID not set up yet. Please contact support.');
+
+  return {
+    transfer_id: data.transfer_id,
+    username: data.username,
+    display_name: data.full_name || data.username,
+  };
 };
 
 export const lookupUserForTransfer = async (transferId) => {
   const trimmed = transferId.trim();
   if (!trimmed) throw new Error('Please enter a Transfer ID');
+
   const { data, error } = await supabase.rpc('fn_lookup_user_by_transfer_id', {
     p_transfer_id: trimmed,
   });
-  if (error) throw error;
+
+  if (error) throw new Error(error.message || 'Lookup failed. Please try again.');
+
+  if (!data?.found) {
+    return { found: false };
+  }
+
   return data;
 };
 
@@ -36,14 +51,15 @@ export const lookupUserByEmail = async (email) => {
     });
     if (error) throw error;
     return data;
-  } catch (rpcErr) {
+  } catch {
     // RPC not yet deployed — fall back to a direct table query
     const { data: { user: me } } = await supabase.auth.getUser();
     const { data, error } = await supabase
       .from('users')
-      .select('transfer_id, username, display_name, email')
+      .select('transfer_id, username, full_name, email')
       .ilike('email', trimmed)
       .neq('id', me?.id ?? '')
+      .eq('status', 'active')
       .limit(1)
       .maybeSingle();
 
@@ -59,7 +75,7 @@ export const lookupUserByEmail = async (email) => {
       found: true,
       transfer_id:  data.transfer_id,
       username:     data.username,
-      display_name: data.display_name,
+      display_name: data.full_name || data.username,
       email_hint:   emailHint,
     };
   }
@@ -72,7 +88,9 @@ export const executeTransfer = async (fromPortfolioId, toTransferId, amount, not
     p_amount:            parseFloat(amount),
     p_note:              note || null,
   });
-  if (error) throw error;
-  if (!data.success) throw new Error(data.error || 'Transfer failed');
+
+  if (error) throw new Error(error.message || 'Transfer failed. Please try again.');
+  if (!data?.success) throw new Error(data?.error || 'Transfer failed. Please try again.');
+
   return data;
 };
