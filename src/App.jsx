@@ -52,6 +52,8 @@ import AdminSupport from './pages/admin/AdminSupport';
 import Notifications from './pages/Notifications';
 import NotificationDetail from './pages/NotificationDetail';
 import Support from './pages/Support';
+import Leaderboard from './pages/Leaderboard';
+import AdminLeaderboard from './pages/admin/AdminLeaderboard';
 
 function App() {
   return (
@@ -108,6 +110,7 @@ function App() {
                     <Route path="/notifications" element={<Notifications />} />
                     <Route path="/notifications/:id" element={<NotificationDetail />} />
                     <Route path="/support" element={<Support />} />
+                    <Route path="/leaderboard" element={<Leaderboard />} />
 
                     <Route path="/settings" element={<SettingsLayout />}>
                       <Route index element={<ProfileSettings />} />
@@ -134,7 +137,11 @@ function App() {
                     <Route path="deposits" element={<AdminDeposits />} />
                     <Route path="audit-log" element={<AdminAuditLog />} />
                     <Route path="notifications" element={<AdminNotifications />} />
+<<<<<<< HEAD
                     <Route path="support" element={<AdminSupport />} />
+=======
+                    <Route path="leaderboard" element={<AdminLeaderboard />} />
+>>>>>>> bfd2199 (Add a community leaderboard and admin control panel)
                   </Route>
                 </Route>
 

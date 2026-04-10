@@ -4,6 +4,29 @@
 
 **Blockchain Tradex** is a full-featured cryptocurrency trading dashboard and portfolio management application built with React 18, Vite, and Tailwind CSS. Uses Supabase for authentication and PostgreSQL database, CoinGecko API for live market data.
 
+## Leaderboard System (Latest)
+
+### Public Leaderboard (`/leaderboard`)
+- 100 deterministic mock traders generated in `src/lib/api/leaderboard.js` with realistic names, portfolio values, profits, win rates, trade counts, avatars, badges, and country flags
+- Top 3 displayed as a visual podium with gold/silver/bronze medals; crown icon on 1st place
+- Time tabs: All Time / 30 Days / 7 Days (scales profit/portfolio values proportionally)
+- Full sortable table for ranks 4–100: sort by rank, portfolio, profit, win rate, trades
+- Search bar to filter by name or username
+- Injected entries are visually marked as "★ Featured"
+- Accessible via "Community → Leaderboard" in the main sidebar nav
+
+### Admin Leaderboard Control (`/admin/leaderboard`)
+- Full table of all 100 board entries with live override indicators (pinned 📌, edited ✏️, injected ➕, hidden)
+- **Pin to position**: enter any rank 1–100 and pin an entry there; unpin any time
+- **Edit stats**: full modal to change display name, username, avatar, badge, country, portfolio value, total profit, win rate, trades
+- **Hide/show**: toggle any entry off the public board
+- **Inject entry**: full modal to add a new admin-crafted entry to the board
+- **Remove injected**: delete any admin-created entry
+- **Reset all**: clear all overrides in one click (with confirmation)
+- Overrides stored in `platform_settings` table under key `leaderboard_overrides` as JSON
+- Stats row shows counts: Pinned / Hidden / Edited / Injected
+- Changes are live instantly on the public leaderboard
+
 ## Assets System (Latest)
 
 ### Assets List Page (`/assets`)

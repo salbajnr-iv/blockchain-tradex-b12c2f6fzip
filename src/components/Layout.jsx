@@ -4,7 +4,7 @@ import {
   LayoutDashboard, BarChart3, ArrowUpDown, Bell, BellRing, CreditCard, History,
   ArrowUpRight, Menu, X, RefreshCw, LogOut, PlusCircle, LineChart, Search,
   ChevronDown, Wallet, TrendingUp, ShieldCheck, Settings, ChevronRight,
-  Info, BarChart2, Zap, TrendingDown, CheckCheck, ClipboardList, LifeBuoy, Megaphone,
+  Info, BarChart2, Zap, TrendingDown, CheckCheck, ClipboardList, LifeBuoy, Megaphone, Trophy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import DepositDialog from "@/components/crypto/DepositDialog";
@@ -45,6 +45,12 @@ const NAV_SECTIONS = [
       { label: "Open Orders",   icon: ClipboardList,  path: "/orders" },
       { label: "Recurring/DCA", icon: RefreshCw,      path: "/recurring" },
       { label: "Price Alerts",  icon: BellRing,       path: "/alerts" },
+    ],
+  },
+  {
+    title: "Community",
+    items: [
+      { label: "Leaderboard",   icon: Trophy,   path: "/leaderboard" },
     ],
   },
   {
