@@ -510,6 +510,20 @@ export default function TransferDialog({ open, onClose }) {
                     <span>Recipient</span>
                     <span className="text-foreground font-semibold">{result?.recipient_username}</span>
                   </div>
+                  {(recipient?.email_hint) && (
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Recipient Email</span>
+                      <span className="font-mono text-xs text-foreground flex items-center gap-1">
+                        <Mail className="w-3 h-3" />{recipient.email_hint}
+                      </span>
+                    </div>
+                  )}
+                  {!recipient?.email_hint && recipient?.transfer_id && (
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Recipient Transfer ID</span>
+                      <span className="font-mono text-xs text-foreground truncate max-w-[160px]">{recipient.transfer_id}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-muted-foreground">
                     <span>Amount Sent</span>
                     <span className="text-foreground font-semibold">${parseFloat(result?.amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>

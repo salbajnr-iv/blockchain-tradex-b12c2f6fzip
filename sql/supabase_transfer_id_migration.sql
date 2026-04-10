@@ -76,12 +76,15 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
-  v_sender_user_id    uuid;
-  v_recipient_user    public.users%ROWTYPE;
+  v_sender_user_id         uuid;
+  v_sender_user            public.users%ROWTYPE;
+  v_recipient_user         public.users%ROWTYPE;
   v_recipient_portfolio_id uuid;
-  v_sender_cash       numeric;
-  v_tx_out_id         uuid;
-  v_tx_in_id          uuid;
+  v_sender_cash            numeric;
+  v_tx_out_id              uuid;
+  v_tx_in_id               uuid;
+  v_sender_email_hint      text;
+  v_recipient_email_hint   text;
 BEGIN
   -- Basic validation
   IF p_amount <= 0 THEN
@@ -96,6 +99,9 @@ BEGIN
   IF NOT FOUND THEN
     RETURN jsonb_build_object('success', false, 'error', 'Sender portfolio not found');
   END IF;
+
+  -- Load full sender user info (for notes and email hint)
+  SELECT * INTO v_sender_user FROM public.users WHERE id = v_sender_user_id;
 
   -- Look up recipient by transfer_id
   SELECT * INTO v_recipient_user
@@ -132,6 +138,15 @@ BEGIN
     RETURN jsonb_build_object('success', false, 'error', 'Insufficient balance');
   END IF;
 
+  -- Build masked email hints
+  v_sender_email_hint := left(v_sender_user.email, 2)
+    || repeat('*', greatest(length(v_sender_user.email) - 6, 3))
+    || right(v_sender_user.email, 4);
+
+  v_recipient_email_hint := left(v_recipient_user.email, 2)
+    || repeat('*', greatest(length(v_recipient_user.email) - 6, 3))
+    || right(v_recipient_user.email, 4);
+
   -- Deduct from sender
   UPDATE public.portfolios
   SET    cash_balance = cash_balance - p_amount,
@@ -144,7 +159,7 @@ BEGIN
          updated_at   = now()
   WHERE  id = v_recipient_portfolio_id;
 
-  -- Log outgoing transaction (TRANSFER is valid per CHECK constraint)
+  -- Log outgoing transaction — note shows recipient info for sender's history
   INSERT INTO public.transactions (
     portfolio_id, type, total_amount, status,
     transaction_date, notes
@@ -152,11 +167,15 @@ BEGIN
   VALUES (
     p_from_portfolio_id, 'TRANSFER', p_amount, 'completed',
     now(),
-    COALESCE(p_note, 'Transfer to ' || COALESCE(v_recipient_user.username, 'user'))
+    COALESCE(
+      p_note,
+      'Transfer to ' || COALESCE(v_recipient_user.username, 'user')
+        || ' (' || v_recipient_email_hint || ')'
+    )
   )
   RETURNING id INTO v_tx_out_id;
 
-  -- Log incoming transaction
+  -- Log incoming transaction — note shows sender info for recipient's history
   INSERT INTO public.transactions (
     portfolio_id, type, total_amount, status,
     transaction_date, notes
@@ -164,7 +183,12 @@ BEGIN
   VALUES (
     v_recipient_portfolio_id, 'TRANSFER', p_amount, 'completed',
     now(),
-    COALESCE(p_note, 'Transfer from BlockTrade user')
+    COALESCE(
+      p_note,
+      'Transfer from ' || COALESCE(v_sender_user.username, 'user')
+        || ' (' || v_sender_email_hint || ')'
+        || ' | Transfer ID: ' || COALESCE(v_sender_user.transfer_id::text, 'N/A')
+    )
   )
   RETURNING id INTO v_tx_in_id;
 
@@ -172,6 +196,7 @@ BEGIN
     'success',              true,
     'amount',               p_amount,
     'recipient_username',   COALESCE(v_recipient_user.username, 'user'),
+    'recipient_email_hint', v_recipient_email_hint,
     'out_transaction_id',   v_tx_out_id
   );
 
