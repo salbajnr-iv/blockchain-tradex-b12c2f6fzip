@@ -3,6 +3,20 @@
 // Admin can override price / change24h / enabled via platform_settings
 // key: investment_catalog_overrides  (JSON object keyed by instrument id)
 // ─────────────────────────────────────────────────────────────────────────────
+import {
+  TrendingUp, BarChart3, Shield, Percent, Flame, Clock,
+  Layers, Gem, Palette, Building2, Briefcase, Sparkles,
+} from "lucide-react";
+
+// Single source of truth: category icon name → Lucide component.
+// Add a new entry here whenever a new category icon is introduced.
+export const CATEGORY_ICONS = {
+  TrendingUp, BarChart3, Shield, Percent, Flame, Clock,
+  Layers, Gem, Palette, Building2, Briefcase, Sparkles,
+};
+
+// Resolve a category icon string to a component, with TrendingUp as fallback.
+export const getCategoryIcon = (iconName) => CATEGORY_ICONS[iconName] ?? TrendingUp;
 
 export const INVESTMENT_CATEGORIES = [
   // ── Original 9 ────────────────────────────────────────────────────────────

@@ -11,6 +11,7 @@ import {
   INVESTMENT_CATEGORIES,
   INVESTMENT_INSTRUMENTS,
   getCategoryById,
+  getCategoryIcon,
   REGIONS,
   getRegionById,
 } from '@/lib/investmentCatalog';
@@ -24,11 +25,6 @@ import {
   updateCustomInstrument,
 } from '@/lib/api/investments';
 import { logAdminAction } from '@/lib/api/admin';
-
-const ICON_MAP = {
-  TrendingUp, BarChart3, Shield, Percent, Flame, Clock, Layers, Gem, Palette,
-  Building2, Briefcase, Sparkles,
-};
 
 const STATUS_COLORS = {
   enabled:  'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
@@ -417,7 +413,7 @@ export default function AdminInvestments() {
           All ({stats.total})
         </button>
         {INVESTMENT_CATEGORIES.map((cat) => {
-          const Icon = ICON_MAP[cat.icon] ?? TrendingUp;
+          const Icon = getCategoryIcon(cat.icon);
           const active = category === cat.id;
           return (
             <button key={cat.id} onClick={() => setCategory(cat.id)}
@@ -475,7 +471,7 @@ export default function AdminInvestments() {
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                 {displayed.map((inst) => {
                   const cat = getCategoryById(inst.category);
-                  const Icon = cat ? (ICON_MAP[cat.icon] ?? TrendingUp) : TrendingUp;
+                  const Icon = getCategoryIcon(cat?.icon);
                   const up = (inst.changePct24h ?? 0) >= 0;
                   const enabled = inst.enabled !== false;
                   const custom = isCustom(inst);
@@ -596,7 +592,7 @@ export default function AdminInvestments() {
         <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Instruments by Category</h3>
         <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
           {INVESTMENT_CATEGORIES.map((cat) => {
-            const Icon = ICON_MAP[cat.icon] ?? TrendingUp;
+            const Icon = getCategoryIcon(cat.icon);
             const count = stats.byCat[cat.id] ?? 0;
             return (
               <button key={cat.id} onClick={() => setCategory(cat.id === category ? 'all' : cat.id)}

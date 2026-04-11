@@ -20,6 +20,7 @@ import {
   getCategoryById,
   getInstrumentById,
   getRegionById,
+  getCategoryIcon,
 } from "@/lib/investmentCatalog";
 import {
   getInvestmentCatalog,
@@ -38,11 +39,6 @@ import {
   convertFromUSD,
 } from "@/lib/exchangeRates";
 
-// ─── Icon map ────────────────────────────────────────────────────────────────
-const ICON_MAP = {
-  TrendingUp, BarChart3, Shield, Percent, Flame, Clock, Layers, Gem, Palette,
-  Building2, Briefcase, Sparkles,
-};
 
 // ─── Format helpers (USD-based, then optionally converted) ───────────────────
 const fmtUsd = (n) => {
@@ -156,7 +152,7 @@ function CategoryBar({ selected, onChange }) {
         All
       </button>
       {INVESTMENT_CATEGORIES.map((cat) => {
-        const Icon = ICON_MAP[cat.icon] ?? TrendingUp;
+        const Icon = getCategoryIcon(cat.icon);
         const active = selected === cat.id;
         return (
           <button
@@ -1041,7 +1037,7 @@ export default function Investments() {
         >
           {(() => {
             const cat = getCategoryById(category);
-            const Icon = ICON_MAP[cat?.icon] ?? TrendingUp;
+            const Icon = getCategoryIcon(cat?.icon);
             return <Icon className={`w-4 h-4 ${cat?.text}`} />;
           })()}
           <p className="text-xs text-muted-foreground">{getCategoryById(category)?.description}</p>
