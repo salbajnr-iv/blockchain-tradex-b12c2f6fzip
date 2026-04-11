@@ -8,38 +8,42 @@
 
 ### User-facing: Investments Hub (`/invest`)
 - Accessible via "Markets → Invest" in the main sidebar nav
-- **9 investment categories**: Stocks, ETFs, Bonds, Fixed Income, Commodities, Futures, Options, Metals, NFTs
-- **70+ pre-seeded instruments** across all categories with realistic prices, 24h changes, market caps, and metadata
+- **12 investment categories**: Stocks, ETFs, Bonds, Fixed Income, Commodities, Futures, Options, Metals, NFTs, REITs, Private Equity, Alternatives/Crowdfunding
+- **120+ pre-seeded instruments** across all categories with realistic prices, 24h changes, market caps, and metadata
+- **International market coverage**: US, UK, Europe, Japan, China, India, Canada, Australia, South Korea, Brazil, Singapore
+- **Region filter bar**: Globe / US / UK / EU / JP / CN / IN / CA / AU / KR / BR / GLOBAL chips for regional filtering
+- **Multi-currency display**: 10-currency picker (USD/EUR/GBP/JPY/CAD/AUD/CNY/INR/BRL/KRW) — prices converted via static exchange rates; preference persisted to localStorage
+- **Fractional investing**: instruments with minInvestment ≤ $10 show "Fractional" badge; BuyFlow shows scissors icon + fractional info; fraction % shown when units < 1
 - Category chips (horizontal scroll) for filtering; full-text search; 6 sort options (name, price asc/desc, change, held first)
-- **Summary bar**: Cash Available, Invested Value (live from positions), Total Instruments shown, Category count
-- Category descriptions shown as colored banners when a specific category is selected
-- **Instrument cards**: icon, name, symbol, category badge, price, 24h change %, "Held" badge and position details if user holds units
-- **InstrumentSheet slide-up modal** on instrument click — shows all metadata (yield, maturity, rating, strike, expiry, contract size, floor price, supply, etc. depending on category)
-- **Buy Flow (2-step)**: amount input with USD presets ($100/$500/$1K/$5K), min-investment enforcement, 0.5% fee display, units received preview → review summary → confirm → creates `INVESTMENT_BUY` transaction
-- **Sell Flow (2-step)**: shows held position, sell-all shortcut, units input, 0.5% fee, net proceeds preview → review → confirm → creates `INVESTMENT_SELL` transaction
+- **Summary bar**: Cash Available, Invested Value (in display currency), Total Instruments shown, Asset Classes count (12)
+- **Global Expansion Banner**: country flags, instrument count and currency name displayed
+- **Feature Banner row**: Fractional Shares, Multi-Currency, Alt Assets
+- **Instrument cards**: icon, name, symbol, category badge, region flag, fractional badge, price (in display currency), 24h change %, "Held" badge and position details
+- **InstrumentSheet slide-up modal** on instrument click — shows all metadata (yield, maturity, rating, region, exchange, etc.); BuyFlow/SellFlow propagate display currency
+- **Buy Flow (2-step)**: USD amount input, currency conversion note when non-USD, fractional indicator, 0.5% fee → review → confirm
+- **Sell Flow (2-step)**: held position in display currency, fractional indicator, net proceeds → review → confirm
 - Positions derived live from transaction history (INVESTMENT_BUY - INVESTMENT_SELL)
-- Regulatory disclaimer shown at page bottom
+- Regulatory disclaimer with currency rate note
 
 ### Admin: Investment Catalog Management (`/admin/investments`)
 - Accessible via "Investments" in admin sidebar
 - **Stats bar**: Total instruments, Active, Disabled, Custom Added
-- **Category filter tabs** with per-category instrument counts
-- **Instrument table**: icon, name, symbol (mono), category badge, price, 24h change (with trend icon), min investment, Active/Disabled status badge, actions
-- **Edit Price modal**: update price + 24h change % for any instrument (static or custom)
-- **Toggle Enable/Disable**: single-click to show/hide any instrument from the user-facing catalog
-- **Add New Instrument modal**: full form with name, symbol, category, icon, price, 24h change, min investment, exchange, market cap, description, and bond-specific fields (yield, maturity, rating) when bonds/fixed income is selected
+- **Category filter tabs** with per-category instrument counts (now 12 categories)
+- **Instrument table**: icon, name, symbol (mono), category badge, price, 24h change, min investment, status badge, actions
+- **Edit Price modal**: update price + 24h change % for any instrument
+- **Toggle Enable/Disable**: single-click to show/hide any instrument
+- **Add New Instrument modal**: name, symbol, category (12 options), region selector, icon, price, 24h change, min investment, exchange, market cap, yield, bond-specific fields (maturity, rating), description
 - **Edit / Delete**: for admin-created custom instruments only
-- **Delete confirmation dialog**: prevents accidental deletion
-- **Category breakdown grid** at bottom for quick visual overview
 - All changes stored in `platform_settings` table under key `investment_catalog_overrides` (JSON)
-- Changes propagate instantly to the user-facing catalog
 
 ### Data Architecture
-- Static catalog in `src/lib/investmentCatalog.js`
+- Static catalog in `src/lib/investmentCatalog.js` (12 categories, 120+ instruments, REGIONS array, region field per instrument)
+- Exchange rates in `src/lib/exchangeRates.js` (18 currencies, RATES map, CURRENCIES list, formatPrice/formatAmount, localStorage persistence)
 - API layer in `src/lib/api/investments.js`
 - Admin overrides in `platform_settings.investment_catalog_overrides`
 - User transactions in existing `transactions` table using types `INVESTMENT_BUY` / `INVESTMENT_SELL`
 - Positions derived client-side from transaction history
+- SQL seeds: `sql/investment-extension.sql` (base) + `sql/investment-international.sql` (70 new instruments)
 
 ## Leaderboard System (Latest)
 

@@ -5,12 +5,14 @@ import {
   Plus, Search, Edit2, Trash2, ToggleLeft, ToggleRight,
   TrendingUp, TrendingDown, BarChart3, Shield, Percent, Flame,
   Clock, Layers, Gem, Palette, Loader2, X, Package, ChevronDown,
-  RefreshCw, AlertCircle, CheckCircle,
+  RefreshCw, AlertCircle, CheckCircle, Building2, Briefcase, Sparkles,
 } from 'lucide-react';
 import {
   INVESTMENT_CATEGORIES,
   INVESTMENT_INSTRUMENTS,
   getCategoryById,
+  REGIONS,
+  getRegionById,
 } from '@/lib/investmentCatalog';
 import {
   getInvestmentCatalog,
@@ -25,6 +27,7 @@ import { logAdminAction } from '@/lib/api/admin';
 
 const ICON_MAP = {
   TrendingUp, BarChart3, Shield, Percent, Flame, Clock, Layers, Gem, Palette,
+  Building2, Briefcase, Sparkles,
 };
 
 const STATUS_COLORS = {
@@ -98,7 +101,7 @@ function EditPriceModal({ instrument, onClose, onSave }) {
 
 // ─── Add / Edit Custom Instrument Modal ─────────────────────────────────────
 const EMPTY_CUSTOM = {
-  category: 'stocks', name: '', symbol: '', icon: '★', price: '',
+  category: 'stocks', region: 'US', name: '', symbol: '', icon: '★', price: '',
   changePct24h: '', marketCap: '', volume24h: '', exchange: '',
   minInvestment: '1', description: '', yield: '', maturity: '', rating: '',
 };
@@ -166,8 +169,23 @@ function CustomInstrumentModal({ existing, onClose, onSave }) {
               </select>
             </div>
             <div>
+              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Region</label>
+              <select value={form.region ?? 'US'} onChange={(e) => set('region', e.target.value)}
+                className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500">
+                {REGIONS.filter(r => r.id !== 'all').map((r) => <option key={r.id} value={r.id}>{r.flag} {r.label}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
               <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Icon (emoji / text)</label>
               <input value={form.icon} onChange={(e) => set('icon', e.target.value)} placeholder="🍎"
+                className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Yield (optional)</label>
+              <input value={form.yield ?? ''} onChange={(e) => set('yield', e.target.value)} placeholder="4.5%"
                 className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500" />
             </div>
           </div>
@@ -209,14 +227,9 @@ function CustomInstrumentModal({ existing, onClose, onSave }) {
             </div>
           </div>
 
-          {/* Bond / Fixed income fields */}
+          {/* Bond / Fixed income extra fields */}
           {(form.category === 'bonds' || form.category === 'fixed_income') && (
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Yield</label>
-                <input value={form.yield} onChange={(e) => set('yield', e.target.value)} placeholder="4.5%"
-                  className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500" />
-              </div>
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Maturity</label>
                 <input value={form.maturity} onChange={(e) => set('maturity', e.target.value)} placeholder="10 Years"

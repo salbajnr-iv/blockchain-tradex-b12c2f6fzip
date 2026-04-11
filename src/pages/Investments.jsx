@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -7,7 +7,8 @@ import {
   ArrowUpRight, ArrowDownLeft, Loader2, CheckCircle2,
   BarChart3, Shield, Percent, Flame, Clock, Layers, Gem, Palette,
   Info, AlertCircle, Wallet, RefreshCw, Star, SlidersHorizontal,
-  ChevronDown, Package,
+  ChevronDown, Package, Building2, Briefcase, Sparkles,
+  Globe, DollarSign, Scissors,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,8 +16,10 @@ import { useAuth } from "@/lib/AuthContext";
 import { usePortfolio } from "@/contexts/PortfolioContext";
 import {
   INVESTMENT_CATEGORIES,
+  REGIONS,
   getCategoryById,
   getInstrumentById,
+  getRegionById,
 } from "@/lib/investmentCatalog";
 import {
   getInvestmentCatalog,
@@ -24,12 +27,24 @@ import {
   createInvestmentTransaction,
   deriveInvestmentPositions,
 } from "@/lib/api/investments";
+import {
+  CURRENCIES,
+  POPULAR_CURRENCIES,
+  getCurrencyMeta,
+  formatPrice,
+  formatAmount,
+  getStoredCurrency,
+  setStoredCurrency,
+  convertFromUSD,
+} from "@/lib/exchangeRates";
 
 // ─── Icon map ────────────────────────────────────────────────────────────────
 const ICON_MAP = {
   TrendingUp, BarChart3, Shield, Percent, Flame, Clock, Layers, Gem, Palette,
+  Building2, Briefcase, Sparkles,
 };
 
+// ─── Format helpers (USD-based, then optionally converted) ───────────────────
 const fmtUsd = (n) => {
   if (n == null || isNaN(n)) return "$0.00";
   if (n >= 1e12) return `$${(n / 1e12).toFixed(2)}T`;
@@ -40,12 +55,91 @@ const fmtUsd = (n) => {
   return `$${n.toFixed(6)}`;
 };
 
-const fmtPrice = (n) => {
-  if (!n) return "$0.00";
-  if (n >= 100)  return `$${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
-  if (n >= 1)    return `$${n.toFixed(4)}`;
-  return `$${n.toFixed(6)}`;
-};
+// ─── Currency Selector ───────────────────────────────────────────────────────
+function CurrencySelector({ currency, onChange }) {
+  const [open, setOpen] = useState(false);
+  const meta = getCurrencyMeta(currency);
+  const popular = CURRENCIES.filter((c) => POPULAR_CURRENCIES.includes(c.code));
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-1.5 px-3 py-2 bg-secondary/50 border border-border rounded-xl text-sm font-semibold text-foreground hover:border-primary/40 transition-all"
+      >
+        <span className="text-base leading-none">{meta.flag}</span>
+        <span className="text-xs">{currency}</span>
+        <ChevronDown className="w-3 h-3 text-muted-foreground" />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+            <motion.div
+              initial={{ opacity: 0, y: -6, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -6, scale: 0.97 }}
+              transition={{ duration: 0.12 }}
+              className="absolute right-0 top-full mt-2 z-50 bg-card border border-border rounded-2xl shadow-2xl overflow-hidden min-w-[200px]"
+            >
+              <div className="px-3 pt-3 pb-2">
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Display Currency</p>
+                <div className="grid grid-cols-2 gap-1">
+                  {popular.map((c) => (
+                    <button
+                      key={c.code}
+                      onClick={() => { onChange(c.code); setOpen(false); }}
+                      className={`flex items-center gap-2 px-2.5 py-2 rounded-xl text-xs font-semibold transition-all ${
+                        currency === c.code
+                          ? "bg-primary text-primary-foreground"
+                          : "hover:bg-secondary/60 text-foreground"
+                      }`}
+                    >
+                      <span className="text-sm">{c.flag}</span>
+                      <span>{c.code}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {currency !== "USD" && (
+                <div className="px-3 pb-3">
+                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-2.5 mt-1">
+                    <p className="text-[10px] text-blue-600 dark:text-blue-400">
+                      Prices shown in {getCurrencyMeta(currency).name}. All transactions execute in USD.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ─── Region filter bar ───────────────────────────────────────────────────────
+function RegionBar({ selected, onChange }) {
+  return (
+    <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+      {REGIONS.map((r) => (
+        <button
+          key={r.id}
+          onClick={() => onChange(r.id)}
+          className={`shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all ${
+            selected === r.id
+              ? "bg-foreground text-background border-foreground"
+              : "bg-secondary/40 text-muted-foreground border-border hover:border-primary/30 hover:text-foreground"
+          }`}
+        >
+          <span className="text-xs">{r.flag}</span>
+          <span>{r.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
 
 // ─── Category chip bar ───────────────────────────────────────────────────────
 function CategoryBar({ selected, onChange }) {
@@ -84,10 +178,12 @@ function CategoryBar({ selected, onChange }) {
 }
 
 // ─── Instrument card ─────────────────────────────────────────────────────────
-function InstrumentCard({ instrument, position, onClick }) {
+function InstrumentCard({ instrument, position, currency, onClick }) {
   const cat = getCategoryById(instrument.category);
+  const region = getRegionById(instrument.region ?? "US");
   const up = instrument.changePct24h >= 0;
   const hasPosition = position && position.units > 0;
+  const isFractional = instrument.minInvestment <= 10;
 
   return (
     <motion.div
@@ -105,14 +201,20 @@ function InstrumentCard({ instrument, position, onClick }) {
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">
               <p className="text-sm font-bold text-foreground truncate leading-tight">{instrument.name}</p>
-              <div className="flex items-center gap-1.5 mt-0.5">
+              <div className="flex flex-wrap items-center gap-1 mt-0.5">
                 <span className="text-[10px] font-bold text-muted-foreground bg-secondary/60 px-1.5 py-0.5 rounded">{instrument.symbol}</span>
                 {cat && <span className={`text-[10px] font-semibold ${cat.text}`}>{cat.label}</span>}
+                {instrument.region && instrument.region !== "US" && (
+                  <span className="text-[10px]">{region.flag}</span>
+                )}
+                {isFractional && (
+                  <span className="text-[10px] font-semibold text-violet-500 bg-violet-500/10 px-1 py-0.5 rounded">Fractional</span>
+                )}
                 {hasPosition && <span className="text-[10px] font-semibold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded">Held</span>}
               </div>
             </div>
             <div className="text-right shrink-0">
-              <p className="text-sm font-bold text-foreground tabular-nums">{fmtPrice(instrument.price)}</p>
+              <p className="text-sm font-bold text-foreground tabular-nums">{formatPrice(instrument.price, currency)}</p>
               <p className={`text-xs font-semibold flex items-center justify-end gap-0.5 ${up ? "text-emerald-500" : "text-red-500"}`}>
                 {up ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
                 {up ? "+" : ""}{instrument.changePct24h?.toFixed(2)}%
@@ -126,7 +228,7 @@ function InstrumentCard({ instrument, position, onClick }) {
               <span className="font-semibold text-foreground">
                 {position.units < 1 ? position.units.toFixed(6) : position.units.toFixed(4)} units
                 <span className="text-muted-foreground ml-1">
-                  ≈ {fmtUsd(position.units * instrument.price)}
+                  ≈ {formatAmount(position.units * instrument.price, currency)}
                 </span>
               </span>
             </div>
@@ -141,7 +243,7 @@ function InstrumentCard({ instrument, position, onClick }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // BUY FLOW
 // ─────────────────────────────────────────────────────────────────────────────
-function BuyFlow({ instrument, cashBalance, portfolioId, onClose, onSuccess }) {
+function BuyFlow({ instrument, cashBalance, portfolioId, currency, onClose, onSuccess }) {
   const [step, setStep] = useState(1);
   const [amountStr, setAmountStr] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -151,6 +253,8 @@ function BuyFlow({ instrument, cashBalance, portfolioId, onClose, onSuccess }) {
   const fee = amount * 0.005;
   const totalCost = amount + fee;
   const units = instrument.price > 0 ? amount / instrument.price : 0;
+  const currMeta = getCurrencyMeta(currency);
+  const showConversion = currency !== "USD";
 
   const handleSubmit = async () => {
     setSubmitting(true);
@@ -199,12 +303,25 @@ function BuyFlow({ instrument, cashBalance, portfolioId, onClose, onSuccess }) {
                 <p className="text-xs text-muted-foreground">{instrument.symbol} · {cat?.label}</p>
               </div>
               <div className="text-right">
-                <p className="text-sm font-bold text-foreground">{fmtPrice(instrument.price)}</p>
+                <p className="text-sm font-bold text-foreground">{formatPrice(instrument.price, currency)}</p>
+                {showConversion && (
+                  <p className="text-[10px] text-muted-foreground">${instrument.price.toFixed(2)} USD</p>
+                )}
                 <p className={`text-xs font-semibold ${instrument.changePct24h >= 0 ? "text-emerald-500" : "text-red-500"}`}>
                   {instrument.changePct24h >= 0 ? "+" : ""}{instrument.changePct24h?.toFixed(2)}%
                 </p>
               </div>
             </div>
+
+            {/* Fractional investing note */}
+            {instrument.minInvestment <= 10 && (
+              <div className="bg-violet-500/10 border border-violet-500/20 rounded-xl p-2.5 flex items-center gap-2">
+                <Scissors className="w-3.5 h-3.5 text-violet-500 shrink-0" />
+                <p className="text-[11px] text-violet-700 dark:text-violet-400 font-medium">
+                  Fractional investing — start with as little as {fmtUsd(instrument.minInvestment)} and own a fraction of this asset.
+                </p>
+              </div>
+            )}
 
             {/* Amount input */}
             <div className="space-y-1.5">
@@ -223,6 +340,12 @@ function BuyFlow({ instrument, cashBalance, portfolioId, onClose, onSuccess }) {
                   className="bg-secondary/40 border-border pl-7 text-lg font-semibold"
                 />
               </div>
+              {showConversion && amount > 0 && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Globe className="w-3 h-3" />
+                  ≈ {formatAmount(amount, currency)} {currency}
+                </p>
+              )}
               {amount < instrument.minInvestment && amount > 0 && (
                 <p className="text-xs text-amber-500 flex items-center gap-1">
                   <Info className="w-3.5 h-3.5" />Minimum investment: {fmtUsd(instrument.minInvestment)}
@@ -253,6 +376,12 @@ function BuyFlow({ instrument, cashBalance, portfolioId, onClose, onSuccess }) {
                 <div className="flex justify-between"><span className="text-muted-foreground">Platform fee (0.5%)</span><span className="font-semibold">{fmtUsd(fee)}</span></div>
                 <div className="flex justify-between border-t border-border/40 pt-1.5 font-semibold"><span>Total</span><span>{fmtUsd(totalCost)}</span></div>
                 <div className="flex justify-between text-emerald-500 font-semibold"><span>Units received ≈</span><span>{units < 1 ? units.toFixed(8) : units.toFixed(6)} {instrument.symbol}</span></div>
+                {units < 1 && (
+                  <div className="flex items-center gap-1 text-violet-500">
+                    <Scissors className="w-3 h-3" />
+                    <span className="text-[10px]">You're buying a fractional share — {(units * 100).toFixed(4)}% of one unit</span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -286,7 +415,10 @@ function BuyFlow({ instrument, cashBalance, portfolioId, onClose, onSuccess }) {
                 <div className="flex justify-between"><span className="text-muted-foreground">Platform fee (0.5%)</span><span className="font-semibold">{fmtUsd(fee)}</span></div>
                 <div className="flex justify-between border-t border-border/40 pt-2 font-bold"><span>Total deducted</span><span>{fmtUsd(totalCost)}</span></div>
                 <div className="flex justify-between font-semibold text-emerald-500"><span>Units received ≈</span><span>{units.toFixed(6)} {instrument.symbol}</span></div>
-                <div className="flex justify-between text-xs"><span className="text-muted-foreground">Price per unit</span><span className="font-mono">{fmtPrice(instrument.price)}</span></div>
+                <div className="flex justify-between text-xs"><span className="text-muted-foreground">Price per unit</span><span className="font-mono">{formatPrice(instrument.price, currency)}</span></div>
+                {showConversion && (
+                  <div className="flex justify-between text-xs text-muted-foreground"><span>Total in {currency}</span><span>{formatAmount(totalCost, currency)}</span></div>
+                )}
               </div>
             </div>
 
@@ -313,7 +445,7 @@ function BuyFlow({ instrument, cashBalance, portfolioId, onClose, onSuccess }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // SELL FLOW
 // ─────────────────────────────────────────────────────────────────────────────
-function SellFlow({ instrument, position, portfolioId, onClose, onSuccess }) {
+function SellFlow({ instrument, position, portfolioId, currency, onClose, onSuccess }) {
   const [step, setStep] = useState(1);
   const [unitsStr, setUnitsStr] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -324,6 +456,7 @@ function SellFlow({ instrument, position, portfolioId, onClose, onSuccess }) {
   const proceeds = units * instrument.price;
   const fee = proceeds * 0.005;
   const netProceeds = proceeds - fee;
+  const showConversion = currency !== "USD";
 
   const handleSubmit = async () => {
     setSubmitting(true);
@@ -377,10 +510,12 @@ function SellFlow({ instrument, position, portfolioId, onClose, onSuccess }) {
               <div>
                 <p className="text-xs text-muted-foreground">Your position</p>
                 <p className="text-sm font-bold text-foreground">{held < 1 ? held.toFixed(6) : held.toFixed(4)} {instrument.symbol}</p>
+                {held < 1 && <p className="text-[10px] text-violet-500 mt-0.5">Fractional holding</p>}
               </div>
               <div className="text-right">
                 <p className="text-xs text-muted-foreground">Current value</p>
-                <p className="text-sm font-bold text-foreground">{fmtUsd(held * instrument.price)}</p>
+                <p className="text-sm font-bold text-foreground">{formatAmount(held * instrument.price, currency)}</p>
+                {showConversion && <p className="text-[10px] text-muted-foreground">{fmtUsd(held * instrument.price)}</p>}
               </div>
             </div>
 
@@ -408,6 +543,9 @@ function SellFlow({ instrument, position, portfolioId, onClose, onSuccess }) {
                 <div className="flex justify-between"><span className="text-muted-foreground">Gross proceeds</span><span className="font-semibold">{fmtUsd(proceeds)}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Platform fee (0.5%)</span><span className="font-semibold text-destructive">-{fmtUsd(fee)}</span></div>
                 <div className="flex justify-between border-t border-border/40 pt-1.5 font-semibold text-emerald-500"><span>Net proceeds</span><span>{fmtUsd(netProceeds)}</span></div>
+                {showConversion && (
+                  <div className="flex justify-between text-muted-foreground"><span>≈ in {currency}</span><span>{formatAmount(netProceeds, currency)}</span></div>
+                )}
               </div>
             )}
 
@@ -430,10 +568,11 @@ function SellFlow({ instrument, position, portfolioId, onClose, onSuccess }) {
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Sell Order Summary</p>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between"><span className="text-muted-foreground">You sell</span><span className="font-semibold">{units < 1 ? units.toFixed(6) : units.toFixed(4)} {instrument.symbol}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Price per unit</span><span className="font-mono">{fmtPrice(instrument.price)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Price per unit</span><span className="font-mono">{formatPrice(instrument.price, currency)}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Gross proceeds</span><span className="font-semibold">{fmtUsd(proceeds)}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Platform fee (0.5%)</span><span className="font-semibold text-destructive">-{fmtUsd(fee)}</span></div>
                 <div className="flex justify-between border-t border-border/40 pt-2 font-bold text-emerald-500"><span>Net proceeds</span><span>{fmtUsd(netProceeds)}</span></div>
+                {showConversion && <div className="flex justify-between text-xs text-muted-foreground"><span>≈ in {currency}</span><span>{formatAmount(netProceeds, currency)}</span></div>}
               </div>
             </div>
             <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 flex gap-2">
@@ -456,9 +595,10 @@ function SellFlow({ instrument, position, portfolioId, onClose, onSuccess }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // INSTRUMENT DETAIL SHEET
 // ─────────────────────────────────────────────────────────────────────────────
-function InstrumentSheet({ instrument, position, cashBalance, portfolioId, onClose, onSuccess }) {
+function InstrumentSheet({ instrument, position, cashBalance, portfolioId, currency, onClose, onSuccess }) {
   const [tab, setTab] = useState("buy");
   const cat = getCategoryById(instrument.category);
+  const region = getRegionById(instrument.region ?? "US");
   const up = instrument.changePct24h >= 0;
 
   return (
@@ -484,12 +624,17 @@ function InstrumentSheet({ instrument, position, cashBalance, portfolioId, onClo
             </div>
             <div>
               <h2 className="text-sm font-bold text-foreground">{instrument.name}</h2>
-              <p className={`text-xs font-semibold ${cat?.text || "text-muted-foreground"}`}>{instrument.symbol} · {cat?.label}</p>
+              <div className="flex items-center gap-1.5">
+                <p className={`text-xs font-semibold ${cat?.text || "text-muted-foreground"}`}>{instrument.symbol} · {cat?.label}</p>
+                {instrument.region && instrument.region !== "US" && (
+                  <span className="text-sm">{region.flag}</span>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <div className="text-right">
-              <p className="text-sm font-bold text-foreground">{fmtPrice(instrument.price)}</p>
+              <p className="text-sm font-bold text-foreground">{formatPrice(instrument.price, currency)}</p>
               <p className={`text-xs font-semibold ${up ? "text-emerald-500" : "text-red-500"}`}>
                 {up ? "+" : ""}{instrument.changePct24h?.toFixed(2)}%
               </p>
@@ -517,7 +662,7 @@ function InstrumentSheet({ instrument, position, cashBalance, portfolioId, onClo
             )}
             {instrument.yield && (
               <div className="bg-secondary/30 rounded-xl p-3">
-                <p className="text-muted-foreground mb-0.5">Yield</p>
+                <p className="text-muted-foreground mb-0.5">Yield / Income</p>
                 <p className="font-bold text-emerald-500">{instrument.yield}</p>
               </div>
             )}
@@ -537,6 +682,14 @@ function InstrumentSheet({ instrument, position, cashBalance, portfolioId, onClo
               <div className="bg-secondary/30 rounded-xl p-3">
                 <p className="text-muted-foreground mb-0.5">Exchange</p>
                 <p className="font-bold text-foreground">{instrument.exchange}</p>
+              </div>
+            )}
+            {instrument.region && (
+              <div className="bg-secondary/30 rounded-xl p-3">
+                <p className="text-muted-foreground mb-0.5">Region</p>
+                <p className="font-bold text-foreground flex items-center gap-1">
+                  <span>{region.flag}</span> {region.label}
+                </p>
               </div>
             )}
             {instrument.optionType && (
@@ -581,6 +734,12 @@ function InstrumentSheet({ instrument, position, cashBalance, portfolioId, onClo
                 <p className="font-bold text-foreground">{instrument.supply}</p>
               </div>
             )}
+            {instrument.unit && (
+              <div className="bg-secondary/30 rounded-xl p-3">
+                <p className="text-muted-foreground mb-0.5">Unit</p>
+                <p className="font-bold text-foreground">{instrument.unit}</p>
+              </div>
+            )}
             <div className="bg-secondary/30 rounded-xl p-3">
               <p className="text-muted-foreground mb-0.5">Min. Investment</p>
               <p className="font-bold text-foreground">{fmtUsd(instrument.minInvestment)}</p>
@@ -594,56 +753,43 @@ function InstrumentSheet({ instrument, position, cashBalance, portfolioId, onClo
             </div>
           )}
 
+          {/* Fractional investing highlight */}
+          {instrument.minInvestment <= 10 && (
+            <div className="bg-violet-500/10 border border-violet-500/20 rounded-xl p-3 flex items-center gap-2">
+              <Scissors className="w-4 h-4 text-violet-500 shrink-0" />
+              <div>
+                <p className="text-xs font-semibold text-violet-600 dark:text-violet-400">Fractional Investing Available</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Start with as little as {fmtUsd(instrument.minInvestment)}. You don't need to buy a whole unit — own exactly as much as you want.</p>
+              </div>
+            </div>
+          )}
+
           {/* Position card */}
           {position && position.units > 0 && (
             <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 flex items-center justify-between">
               <div>
                 <p className="text-xs text-muted-foreground">Your position</p>
                 <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{position.units < 1 ? position.units.toFixed(6) : position.units.toFixed(4)} {instrument.symbol}</p>
+                {position.units < 1 && <p className="text-[10px] text-violet-500">Fractional holding</p>}
               </div>
               <div className="text-right">
                 <p className="text-xs text-muted-foreground">Current value</p>
-                <p className="text-sm font-bold text-foreground">{fmtUsd(position.units * instrument.price)}</p>
+                <p className="text-sm font-bold text-foreground">{formatAmount(position.units * instrument.price, currency)}</p>
+                {currency !== "USD" && <p className="text-[10px] text-muted-foreground">{fmtUsd(position.units * instrument.price)}</p>}
               </div>
             </div>
           )}
 
           {/* Buy / Sell tabs */}
           <div className="flex border border-border rounded-xl overflow-hidden">
-            <button
-              onClick={() => setTab("buy")}
-              className={`flex-1 py-2.5 text-sm font-semibold transition-colors ${
-                tab === "buy" ? "bg-emerald-500 text-white" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Buy
-            </button>
-            <button
-              onClick={() => setTab("sell")}
-              className={`flex-1 py-2.5 text-sm font-semibold transition-colors ${
-                tab === "sell" ? "bg-red-500 text-white" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Sell
-            </button>
+            <button onClick={() => setTab("buy")} className={`flex-1 py-2.5 text-sm font-semibold transition-colors ${tab === "buy" ? "bg-emerald-500 text-white" : "text-muted-foreground hover:text-foreground"}`}>Buy</button>
+            <button onClick={() => setTab("sell")} className={`flex-1 py-2.5 text-sm font-semibold transition-colors ${tab === "sell" ? "bg-red-500 text-white" : "text-muted-foreground hover:text-foreground"}`}>Sell</button>
           </div>
 
           {tab === "buy" ? (
-            <BuyFlow
-              instrument={instrument}
-              cashBalance={cashBalance}
-              portfolioId={portfolioId}
-              onClose={onClose}
-              onSuccess={onSuccess}
-            />
+            <BuyFlow instrument={instrument} cashBalance={cashBalance} portfolioId={portfolioId} currency={currency} onClose={onClose} onSuccess={onSuccess} />
           ) : (
-            <SellFlow
-              instrument={instrument}
-              position={position}
-              portfolioId={portfolioId}
-              onClose={onClose}
-              onSuccess={onSuccess}
-            />
+            <SellFlow instrument={instrument} position={position} portfolioId={portfolioId} currency={currency} onClose={onClose} onSuccess={onSuccess} />
           )}
         </div>
       </motion.div>
@@ -669,10 +815,18 @@ export default function Investments() {
   const queryClient = useQueryClient();
 
   const [category, setCategory] = useState("all");
+  const [region, setRegion] = useState("all");
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("default");
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [selected, setSelected] = useState(null);
+  const [displayCurrency, setDisplayCurrency] = useState(() => getStoredCurrency());
+
+  // Persist currency preference
+  const handleCurrencyChange = useCallback((code) => {
+    setDisplayCurrency(code);
+    setStoredCurrency(code);
+  }, []);
 
   // Fetch catalog (static + admin overrides)
   const { data: catalog = [], isLoading } = useQuery({
@@ -703,6 +857,7 @@ export default function Investments() {
     let list = catalog.filter((i) => i.enabled !== false);
 
     if (category !== "all") list = list.filter((i) => i.category === category);
+    if (region !== "all")   list = list.filter((i) => i.region === region);
 
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -725,7 +880,7 @@ export default function Investments() {
     });
 
     return list;
-  }, [catalog, category, search, sort, positions]);
+  }, [catalog, category, region, search, sort, positions]);
 
   const handleSuccess = useCallback(() => {
     setSelected(null);
@@ -734,24 +889,74 @@ export default function Investments() {
 
   const selectedPosition = selected ? positions[selected.symbol] : null;
 
+  const currMeta = getCurrencyMeta(displayCurrency);
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
       {/* Page header */}
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-2xl font-bold text-foreground">Investments</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Diversify your portfolio across stocks, ETFs, bonds, commodities, metals, NFTs and more.
-        </p>
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Investments</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Diversify globally across stocks, ETFs, bonds, REITs, alternatives and more.
+          </p>
+        </div>
+        <CurrencySelector currency={displayCurrency} onChange={handleCurrencyChange} />
+      </motion.div>
+
+      {/* Global Expansion Banner */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.03 }}
+        className="bg-gradient-to-r from-blue-500/10 via-violet-500/10 to-emerald-500/10 border border-primary/20 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center gap-3"
+      >
+        <div className="flex items-center gap-3 flex-1">
+          <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center text-xl shrink-0">🌍</div>
+          <div>
+            <p className="text-sm font-bold text-foreground">Global Investment Platform</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Access {catalog.filter(i => i.enabled !== false).length}+ instruments across {INVESTMENT_CATEGORIES.length} asset classes and {REGIONS.length - 1} global markets — with prices in {currMeta.name}.
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          {["🇺🇸", "🇬🇧", "🇪🇺", "🇯🇵", "🇨🇳", "🇮🇳", "🇨🇦", "🇦🇺"].map((f, i) => (
+            <span key={i} className="text-xl">{f}</span>
+          ))}
+        </div>
+      </motion.div>
+
+      {/* Fractional Investing Banner */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.05 }}
+        className="grid grid-cols-1 sm:grid-cols-3 gap-3"
+      >
+        {[
+          { icon: <Scissors className="w-4 h-4 text-violet-500" />, title: "Fractional Shares", desc: "Start with as little as $1. Own a fraction of any high-value asset.", bg: "bg-violet-500/10 border-violet-500/20" },
+          { icon: <Globe className="w-4 h-4 text-blue-500" />,      title: "Multi-Currency",   desc: `View prices in ${currMeta.name} (${currMeta.symbol}). Transactions execute in USD.`, bg: "bg-blue-500/10 border-blue-500/20" },
+          { icon: <Sparkles className="w-4 h-4 text-rose-500" />,   title: "Alt Assets",       desc: "Invest in art, farmland, collectibles, and startup equity — previously inaccessible.", bg: "bg-rose-500/10 border-rose-500/20" },
+        ].map(({ icon, title, desc, bg }) => (
+          <div key={title} className={`border rounded-2xl p-3.5 ${bg} flex items-start gap-3`}>
+            <div className="mt-0.5 shrink-0">{icon}</div>
+            <div>
+              <p className="text-xs font-bold text-foreground">{title}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{desc}</p>
+            </div>
+          </div>
+        ))}
       </motion.div>
 
       {/* Summary bar */}
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.07 }}
         className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: "Cash Available", value: fmtUsd(cashBalance), sub: "Ready to invest", color: "text-emerald-500" },
-          { label: "Invested Value", value: fmtUsd(totalInvested), sub: `${Object.keys(positions).length} positions`, color: "text-blue-500" },
-          { label: "Total Instruments", value: displayed.length.toString(), sub: category === "all" ? "All categories" : getCategoryById(category)?.label, color: "text-violet-500" },
-          { label: "Categories", value: "9", sub: "Investment types", color: "text-amber-500" },
+          { label: "Invested Value",  value: formatAmount(totalInvested, displayCurrency), sub: `${Object.keys(positions).length} positions`, color: "text-blue-500" },
+          { label: "Instruments",     value: displayed.length.toString(), sub: category === "all" ? "Across all categories" : getCategoryById(category)?.label, color: "text-violet-500" },
+          { label: "Asset Classes",   value: INVESTMENT_CATEGORIES.length.toString(), sub: "12 investment types", color: "text-amber-500" },
         ].map(({ label, value, sub, color }) => (
           <div key={label} className="bg-card border border-border rounded-2xl p-4">
             <p className="text-xs text-muted-foreground">{label}</p>
@@ -762,8 +967,13 @@ export default function Investments() {
       </motion.div>
 
       {/* Category tabs */}
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}>
-        <CategoryBar selected={category} onChange={setCategory} />
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.09 }}>
+        <CategoryBar selected={category} onChange={(c) => { setCategory(c); }} />
+      </motion.div>
+
+      {/* Region filter */}
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.11 }}>
+        <RegionBar selected={region} onChange={setRegion} />
       </motion.div>
 
       {/* Category description */}
@@ -784,14 +994,14 @@ export default function Investments() {
       )}
 
       {/* Search + sort */}
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}
         className="flex gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search instruments..."
+            placeholder="Search instruments, symbols..."
             className="w-full bg-secondary/50 border border-border rounded-xl py-2 pl-9 pr-3 text-sm outline-none focus:border-primary/40 transition-colors text-foreground placeholder:text-muted-foreground"
           />
           {search && (
@@ -827,6 +1037,21 @@ export default function Investments() {
         </div>
       </motion.div>
 
+      {/* Currency note when non-USD */}
+      {displayCurrency !== "USD" && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 rounded-xl px-3 py-2"
+        >
+          <Globe className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+          <p className="text-xs text-blue-600 dark:text-blue-400">
+            Prices displayed in <strong>{getCurrencyMeta(displayCurrency).name} ({displayCurrency})</strong>. Transactions are executed in USD at the current exchange rate.
+          </p>
+          <button onClick={() => handleCurrencyChange("USD")} className="ml-auto text-xs text-blue-500 hover:underline shrink-0">Switch to USD</button>
+        </motion.div>
+      )}
+
       {/* Instrument list */}
       {isLoading ? (
         <div className="py-16 text-center space-y-3">
@@ -837,7 +1062,12 @@ export default function Investments() {
         <div className="py-16 text-center space-y-3">
           <Search className="w-10 h-10 text-muted-foreground/30 mx-auto" />
           <p className="text-sm text-muted-foreground">No instruments found</p>
-          {search && <button onClick={() => setSearch("")} className="text-xs text-primary hover:underline">Clear search</button>}
+          {(search || region !== "all") && (
+            <div className="flex gap-2 justify-center">
+              {search && <button onClick={() => setSearch("")} className="text-xs text-primary hover:underline">Clear search</button>}
+              {region !== "all" && <button onClick={() => setRegion("all")} className="text-xs text-primary hover:underline">Show all regions</button>}
+            </div>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -846,6 +1076,7 @@ export default function Investments() {
               key={inst.id}
               instrument={inst}
               position={positions[inst.symbol]}
+              currency={displayCurrency}
               onClick={() => setSelected(inst)}
             />
           ))}
@@ -860,6 +1091,7 @@ export default function Investments() {
             position={selectedPosition}
             cashBalance={cashBalance}
             portfolioId={portfolioId}
+            currency={displayCurrency}
             onClose={() => setSelected(null)}
             onSuccess={handleSuccess}
           />
@@ -868,8 +1100,8 @@ export default function Investments() {
 
       {/* Disclaimer */}
       <p className="text-[11px] text-muted-foreground/60 text-center pb-4">
-        Prices are indicative and may differ from live market rates. All investments carry risk.
-        Past performance does not guarantee future results. BlockTrade does not provide investment advice.
+        Prices are indicative and may differ from live market rates. Currency conversions use static rates and are for display purposes only.
+        All investments carry risk. Past performance does not guarantee future results. BlockTrade does not provide investment advice.
       </p>
     </div>
   );
