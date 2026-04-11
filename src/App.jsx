@@ -53,6 +53,8 @@ import NotificationDetail from './pages/NotificationDetail';
 import Support from './pages/Support';
 import Leaderboard from './pages/Leaderboard';
 import AdminLeaderboard from './pages/admin/AdminLeaderboard';
+import Investments from './pages/Investments';
+import AdminInvestments from './pages/admin/AdminInvestments';
 
 function App() {
   return (
@@ -110,6 +112,7 @@ function App() {
                     <Route path="/notifications/:id" element={<NotificationDetail />} />
                     <Route path="/support" element={<Support />} />
                     <Route path="/leaderboard" element={<Leaderboard />} />
+                    <Route path="/invest" element={<Investments />} />
 
                     <Route path="/settings" element={<SettingsLayout />}>
                       <Route index element={<ProfileSettings />} />
@@ -138,6 +141,7 @@ function App() {
                     <Route path="notifications" element={<AdminNotifications />} />
                     <Route path="support" element={<AdminSupport />} />
                     <Route path="leaderboard" element={<AdminLeaderboard />} />
+                    <Route path="investments" element={<AdminInvestments />} />
                   </Route>
                 </Route>
 

@@ -1,8 +1,45 @@
-# Blockchain Tradex - Project Documentation
+# BlockTrade - Project Documentation
 
 ## Project Summary
 
-**Blockchain Tradex** is a full-featured cryptocurrency trading dashboard and portfolio management application built with React 18, Vite, and Tailwind CSS. Uses Supabase for authentication and PostgreSQL database, CoinGecko API for live market data.
+**BlockTrade** is a full-featured cryptocurrency trading dashboard, portfolio management, and multi-asset investment platform built with React 18, Vite, and Tailwind CSS. Uses Supabase for authentication and PostgreSQL database, CoinGecko API for live market data.
+
+## Investment System (Latest)
+
+### User-facing: Investments Hub (`/invest`)
+- Accessible via "Markets → Invest" in the main sidebar nav
+- **9 investment categories**: Stocks, ETFs, Bonds, Fixed Income, Commodities, Futures, Options, Metals, NFTs
+- **70+ pre-seeded instruments** across all categories with realistic prices, 24h changes, market caps, and metadata
+- Category chips (horizontal scroll) for filtering; full-text search; 6 sort options (name, price asc/desc, change, held first)
+- **Summary bar**: Cash Available, Invested Value (live from positions), Total Instruments shown, Category count
+- Category descriptions shown as colored banners when a specific category is selected
+- **Instrument cards**: icon, name, symbol, category badge, price, 24h change %, "Held" badge and position details if user holds units
+- **InstrumentSheet slide-up modal** on instrument click — shows all metadata (yield, maturity, rating, strike, expiry, contract size, floor price, supply, etc. depending on category)
+- **Buy Flow (2-step)**: amount input with USD presets ($100/$500/$1K/$5K), min-investment enforcement, 0.5% fee display, units received preview → review summary → confirm → creates `INVESTMENT_BUY` transaction
+- **Sell Flow (2-step)**: shows held position, sell-all shortcut, units input, 0.5% fee, net proceeds preview → review → confirm → creates `INVESTMENT_SELL` transaction
+- Positions derived live from transaction history (INVESTMENT_BUY - INVESTMENT_SELL)
+- Regulatory disclaimer shown at page bottom
+
+### Admin: Investment Catalog Management (`/admin/investments`)
+- Accessible via "Investments" in admin sidebar
+- **Stats bar**: Total instruments, Active, Disabled, Custom Added
+- **Category filter tabs** with per-category instrument counts
+- **Instrument table**: icon, name, symbol (mono), category badge, price, 24h change (with trend icon), min investment, Active/Disabled status badge, actions
+- **Edit Price modal**: update price + 24h change % for any instrument (static or custom)
+- **Toggle Enable/Disable**: single-click to show/hide any instrument from the user-facing catalog
+- **Add New Instrument modal**: full form with name, symbol, category, icon, price, 24h change, min investment, exchange, market cap, description, and bond-specific fields (yield, maturity, rating) when bonds/fixed income is selected
+- **Edit / Delete**: for admin-created custom instruments only
+- **Delete confirmation dialog**: prevents accidental deletion
+- **Category breakdown grid** at bottom for quick visual overview
+- All changes stored in `platform_settings` table under key `investment_catalog_overrides` (JSON)
+- Changes propagate instantly to the user-facing catalog
+
+### Data Architecture
+- Static catalog in `src/lib/investmentCatalog.js`
+- API layer in `src/lib/api/investments.js`
+- Admin overrides in `platform_settings.investment_catalog_overrides`
+- User transactions in existing `transactions` table using types `INVESTMENT_BUY` / `INVESTMENT_SELL`
+- Positions derived client-side from transaction history
 
 ## Leaderboard System (Latest)
 

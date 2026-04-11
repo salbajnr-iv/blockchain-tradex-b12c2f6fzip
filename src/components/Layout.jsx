@@ -42,6 +42,7 @@ const NAV_SECTIONS = [
     items: [
       { label: "Markets",       icon: BarChart3,      path: "/markets" },
       { label: "Trade",         icon: ArrowUpDown,    path: "/trade" },
+      { label: "Invest",        icon: TrendingUp,     path: "/invest" },
       { label: "Open Orders",   icon: ClipboardList,  path: "/orders" },
       { label: "Recurring/DCA", icon: RefreshCw,      path: "/recurring" },
     ],
