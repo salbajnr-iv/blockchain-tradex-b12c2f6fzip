@@ -49,6 +49,14 @@ export async function fetchAllTickets() {
 
 export async function replyToTicket(ticketId, reply) {
   const { data: { user } } = await supabase.auth.getUser();
+
+  // Fetch ticket owner before updating so we can notify them
+  const { data: ticket } = await supabase
+    .from("support_tickets")
+    .select("user_id, subject")
+    .eq("id", ticketId)
+    .single();
+
   const { error } = await supabase
     .from("support_tickets")
     .update({
@@ -60,6 +68,20 @@ export async function replyToTicket(ticketId, reply) {
     })
     .eq("id", ticketId);
   if (error) throw error;
+
+  // Create a targeted in-app notification for the ticket owner
+  if (ticket?.user_id) {
+    await supabase.from("admin_notifications").insert({
+      title: "Support Team Replied",
+      message: `We've responded to your support ticket: "${ticket.subject || "your inquiry"}". Open the Support page to read our reply.`,
+      type: "support_reply",
+      icon: "💬",
+      target_type: "specific",
+      target_user_ids: [ticket.user_id],
+      created_by: user?.id,
+      is_active: true,
+    });
+  }
 }
 
 export async function closeTicket(ticketId) {

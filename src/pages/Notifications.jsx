@@ -6,7 +6,7 @@ import {
   Bell, CheckCheck, Trash2, X, TrendingUp, TrendingDown, BarChart2,
   Zap, ArrowUpRight, ArrowDownLeft, Info, ClipboardList, History,
   Megaphone, ShieldCheck, RefreshCw, ChevronRight, DollarSign,
-  BellRing, Filter,
+  BellRing, Filter, LifeBuoy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSystemNotifications } from "@/hooks/useSystemNotifications";
@@ -68,6 +68,7 @@ function getIcon(n) {
     case "order":                  return <ClipboardList className="w-4 h-4 text-primary" />;
     case "announcement":
     case "admin":                  return <Megaphone className="w-4 h-4 text-violet-400" />;
+    case "support_reply":          return <LifeBuoy className="w-4 h-4 text-emerald-500" />;
     case "security":               return <ShieldCheck className="w-4 h-4 text-blue-400" />;
     default:                       return <Info className="w-4 h-4 text-muted-foreground" />;
   }
@@ -93,6 +94,7 @@ function getIconBg(n) {
     case "order_filled":           return "bg-emerald-500/10";
     case "announcement":
     case "admin":                  return "bg-violet-500/10";
+    case "support_reply":          return "bg-emerald-500/10";
     case "security":               return "bg-blue-500/10";
     default:                       return "bg-secondary/60";
   }

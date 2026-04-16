@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Link, useLocation, useNavigate, Outlet } from "react-router-dom";
 import {
-  LayoutDashboard, BarChart3, ArrowUpDown, Bell, CreditCard, History,
+  LayoutDashboard, BarChart3, ArrowUpDown, Bell, BellRing, CreditCard, History,
   ArrowUpRight, Menu, X, RefreshCw, LogOut, PlusCircle, LineChart, Search,
   ChevronDown, Wallet, TrendingUp, ShieldCheck, Settings, ChevronRight,
   Info, BarChart2, Zap, TrendingDown, CheckCheck, ClipboardList, LifeBuoy, Megaphone, Trophy,
@@ -57,7 +57,8 @@ const NAV_SECTIONS = [
     title: "Account",
     items: [
       { label: "Settings",      icon: Settings,  path: "/settings" },
-      { label: "Notifications", icon: Bell,       path: "/notifications" },
+      { label: "Notifications", icon: Bell,      path: "/notifications" },
+      { label: "Price Alerts",  icon: BellRing,  path: "/alerts" },
       { label: "Support",       icon: LifeBuoy,  path: "/support" },
     ],
   },

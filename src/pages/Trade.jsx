@@ -29,10 +29,28 @@ const COIN_COLORS = {
 };
 
 function CoinIcon({ symbol, size = 32 }) {
+  const [imgError, setImgError] = useState(false);
   const ICONS = { BTC: "₿", ETH: "Ξ", SOL: "◎", BNB: "◆", XRP: "✕", ADA: "₳", DOGE: "Ð", AVAX: "▲" };
+  const imgUrl = `https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/32/color/${symbol.toLowerCase()}.png`;
+
+  if (!imgError) {
+    return (
+      <div style={{ width: size, height: size }} className="rounded-full overflow-hidden shrink-0 bg-secondary/40 flex items-center justify-center">
+        <img
+          src={imgUrl}
+          alt={symbol}
+          width={size}
+          height={size}
+          onError={() => setImgError(true)}
+          className="object-contain"
+        />
+      </div>
+    );
+  }
+
   return (
     <div
-      style={{ width: size, height: size, backgroundColor: `${COIN_COLORS[symbol]}20`, color: COIN_COLORS[symbol] }}
+      style={{ width: size, height: size, backgroundColor: `${COIN_COLORS[symbol] || "#888"}20`, color: COIN_COLORS[symbol] || "#888" }}
       className="rounded-full flex items-center justify-center font-bold text-sm shrink-0"
     >
       {ICONS[symbol] || symbol[0]}

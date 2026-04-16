@@ -177,7 +177,64 @@ function CategoryBar({ selected, onChange }) {
   );
 }
 
-// ─── Instrument card ─────────────────────────────────────────────────────────
+// ─── Stock / ETF logo domain map (for Clearbit CDN) ─────────────────────────
+const STOCK_LOGO_DOMAINS = {
+  // US stocks
+  AAPL:  "apple.com",    MSFT:  "microsoft.com",  TSLA:  "tesla.com",
+  GOOGL: "google.com",   AMZN:  "amazon.com",     NVDA:  "nvidia.com",
+  META:  "meta.com",     "BRK-B": "berkshirehathaway.com", NFLX: "netflix.com",
+  JPM:   "jpmorganchase.com",
+  // UK stocks
+  HSBA: "hsbc.com",      SHEL: "shell.com",   BP:  "bp.com",
+  AZN:  "astrazeneca.com", UL: "unilever.com",
+  // European stocks
+  ASML:  "asml.com",     SAP:   "sap.com",    LVMUY: "lvmh.com",
+  SIEGY: "siemens.com",  NSRGY: "nestle.com", TTE:   "totalenergies.com",
+  // Japanese stocks
+  TM:   "toyota.com",    SONY:  "sony.com",   HMC:   "honda.com",
+  SFTBY: "softbank.com",
+  // Chinese / HK stocks
+  BABA: "alibaba.com",   TCEHY: "tencent.com",  JD: "jd.com",
+  PDD:  "pinduoduo.com",
+  // Indian stocks
+  INFY: "infosys.com",   HDB: "hdfcbank.com",   WIT: "wipro.com",
+  // Canadian stocks
+  SHOP: "shopify.com",   RY: "rbc.com",          BNS: "scotiabank.com",
+  // Australian stocks
+  BHP:  "bhp.com",       RIO: "riotinto.com",
+  // Korean stocks
+  SSNLF: "samsung.com",
+  // Singapore stocks
+  SE:    "sea.com",      DBSGY: "dbs.com",
+  // Brazilian stocks
+  VALE:  "vale.com",
+};
+
+function InstrumentLogo({ instrument }) {
+  const [imgError, setImgError] = useState(false);
+  const cat = getCategoryById(instrument.category);
+  const domain = STOCK_LOGO_DOMAINS[instrument.symbol];
+
+  if (domain && !imgError) {
+    return (
+      <div className={`w-11 h-11 rounded-xl ${cat?.bg || "bg-secondary/40"} flex items-center justify-center shrink-0 overflow-hidden p-1.5`}>
+        <img
+          src={`https://logo.clearbit.com/${domain}`}
+          alt={instrument.name}
+          className="w-full h-full object-contain rounded-md"
+          onError={() => setImgError(true)}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className={`w-11 h-11 rounded-xl ${cat?.bg || "bg-secondary/40"} flex items-center justify-center shrink-0 text-base font-bold`}>
+      {instrument.icon}
+    </div>
+  );
+}
+
 function InstrumentCard({ instrument, position, currency, onClick }) {
   const cat = getCategoryById(instrument.category);
   const region = getRegionById(instrument.region ?? "US");
@@ -194,9 +251,7 @@ function InstrumentCard({ instrument, position, currency, onClick }) {
       className="bg-card border border-border rounded-2xl p-4 cursor-pointer hover:border-primary/30 hover:shadow-lg transition-all group"
     >
       <div className="flex items-start gap-3">
-        <div className={`w-11 h-11 rounded-xl ${cat?.bg || "bg-secondary/40"} flex items-center justify-center shrink-0 text-base font-bold`}>
-          {instrument.icon}
-        </div>
+        <InstrumentLogo instrument={instrument} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">

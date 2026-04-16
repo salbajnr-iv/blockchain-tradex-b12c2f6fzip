@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import {
   Bell, ArrowLeft, TrendingUp, TrendingDown, BarChart2, Zap,
   ArrowUpRight, Info, ClipboardList, History, Megaphone, ShieldCheck,
-  CheckCheck, Clock, ExternalLink,
+  CheckCheck, Clock, ExternalLink, LifeBuoy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { fetchAdminNotifications } from "@/lib/api/adminNotifications";
@@ -49,6 +49,7 @@ function getTypeConfig(n) {
     trade:                  { icon: ClipboardList, bg: "bg-primary/10",       color: "text-primary",       label: "Trade" },
     announcement:           { icon: Megaphone,     bg: "bg-violet-500/10",    color: "text-violet-400",    label: "Announcement" },
     admin:                  { icon: Megaphone,     bg: "bg-violet-500/10",    color: "text-violet-400",    label: "Admin" },
+    support_reply:          { icon: LifeBuoy,      bg: "bg-emerald-500/10",   color: "text-emerald-500",   label: "Support Reply" },
     security:               { icon: ShieldCheck,   bg: "bg-blue-500/10",      color: "text-blue-400",      label: "Security" },
   };
   return map[n?.type] || { icon: Info, bg: "bg-secondary/60", color: "text-muted-foreground", label: "Notification" };
@@ -83,6 +84,156 @@ function getRelatedLink(n) {
   if (n.type === "portfolio_change") {
     return { label: "View Portfolio", path: "/assets" };
   }
+  if (n.type === "support_reply") {
+    return { label: "View Support Tickets", path: "/support" };
+  }
+  return null;
+}
+
+function TypeSpecificContent({ notif }) {
+  if (!notif) return null;
+  const { type, symbol, side, message } = notif;
+
+  if (["price_above", "price_below", "price_volatility", "volatility"].includes(type)) {
+    const direction = type === "price_above" ? "above" : type === "price_below" ? "below" : "volatile";
+    const priceMatch = message?.match(/\$[\d,]+\.?\d*/);
+    const threshold = priceMatch?.[0];
+    return (
+      <div className="bg-card border border-border/40 rounded-2xl overflow-hidden">
+        <div className="px-5 py-3 border-b border-border/30 bg-secondary/20">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Alert Details</p>
+        </div>
+        <div className="divide-y divide-border/40">
+          {symbol && (
+            <div className="px-5 py-3.5 flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Asset</span>
+              <span className="text-sm font-bold text-foreground">{symbol}</span>
+            </div>
+          )}
+          <div className="px-5 py-3.5 flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">Condition</span>
+            <span className={`text-sm font-semibold capitalize ${
+              type === "price_above" ? "text-primary" : type === "price_below" ? "text-destructive" : "text-yellow-400"
+            }`}>
+              Price {direction}
+            </span>
+          </div>
+          {threshold && (
+            <div className="px-5 py-3.5 flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Target Price</span>
+              <span className="text-sm font-bold text-foreground tabular-nums">{threshold}</span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (type === "market_mover") {
+    const pctMatch = message?.match(/(\d+\.?\d*)%/);
+    const pct = pctMatch?.[0];
+    const isUp = message?.toLowerCase().includes("up") || message?.toLowerCase().includes("surging") || message?.toLowerCase().includes("gained");
+    return (
+      <div className="bg-card border border-border/40 rounded-2xl overflow-hidden">
+        <div className="px-5 py-3 border-b border-border/30 bg-secondary/20">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Market Details</p>
+        </div>
+        <div className="divide-y divide-border/40">
+          {symbol && (
+            <div className="px-5 py-3.5 flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Asset</span>
+              <span className="text-sm font-bold text-foreground">{symbol}</span>
+            </div>
+          )}
+          <div className="px-5 py-3.5 flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">Movement</span>
+            <span className={`text-sm font-semibold ${isUp ? "text-emerald-500" : "text-destructive"}`}>
+              {isUp ? "↑ Moving Up" : "↓ Moving Down"}
+            </span>
+          </div>
+          {pct && (
+            <div className="px-5 py-3.5 flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Change</span>
+              <span className={`text-sm font-bold tabular-nums ${isUp ? "text-emerald-500" : "text-destructive"}`}>
+                {isUp ? "+" : "-"}{pct}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (type === "support_reply") {
+    return (
+      <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-2xl p-5">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0">
+            <LifeBuoy className="w-5 h-5 text-emerald-500" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-foreground">Support Team Replied</p>
+            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+              Open your Support page to view the full conversation and the admin's reply to your ticket.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (type === "trade") {
+    const isBuy = side === "buy" || message?.toLowerCase().includes("bought");
+    const amountMatch = message?.match(/\$[\d,]+\.?\d*/g);
+    return (
+      <div className="bg-card border border-border/40 rounded-2xl overflow-hidden">
+        <div className="px-5 py-3 border-b border-border/30 bg-secondary/20">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Trade Details</p>
+        </div>
+        <div className="divide-y divide-border/40">
+          <div className="px-5 py-3.5 flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">Action</span>
+            <span className={`text-sm font-semibold ${isBuy ? "text-primary" : "text-destructive"}`}>
+              {isBuy ? "Buy Order" : "Sell Order"}
+            </span>
+          </div>
+          {symbol && (
+            <div className="px-5 py-3.5 flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Asset</span>
+              <span className="text-sm font-bold text-foreground">{symbol}</span>
+            </div>
+          )}
+          {amountMatch?.[0] && (
+            <div className="px-5 py-3.5 flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Value</span>
+              <span className="text-sm font-bold text-foreground tabular-nums">{amountMatch[0]}</span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (type === "order_filled" || type === "order") {
+    return (
+      <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-2xl p-5">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0">
+            <CheckCheck className="w-5 h-5 text-emerald-500" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-foreground">
+              {type === "order_filled" ? "Order Executed Successfully" : "Order Update"}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {symbol ? `Your ${symbol} order has been processed.` : "Your order has been processed."}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return null;
 }
 
@@ -226,6 +377,9 @@ export default function NotificationDetail() {
               <span>{fmtFull(notif.timestamp)}</span>
             </div>
           </div>
+
+          {/* Type-specific detail block */}
+          <TypeSpecificContent notif={notif} />
 
           {/* Meta details card */}
           <div className="bg-card border border-border/40 rounded-2xl divide-y divide-border/40 overflow-hidden">

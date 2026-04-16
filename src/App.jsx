@@ -55,6 +55,7 @@ import Leaderboard from './pages/Leaderboard';
 import AdminLeaderboard from './pages/admin/AdminLeaderboard';
 import Investments from './pages/Investments';
 import AdminInvestments from './pages/admin/AdminInvestments';
+import Alerts from './pages/Alerts';
 
 function App() {
   return (
@@ -100,7 +101,7 @@ function App() {
                     <Route path="/markets" element={<Markets />} />
                     <Route path="/asset/:coinId" element={<Asset />} />
                     <Route path="/orders" element={<Orders />} />
-                    <Route path="/alerts" element={<Navigate to="/notifications" replace />} />
+                    <Route path="/alerts" element={<Alerts />} />
                     <Route path="/card" element={<Card />} />
                     <Route path="/transactions" element={<Transactions />} />
                     <Route path="/analytics" element={<Analytics />} />
