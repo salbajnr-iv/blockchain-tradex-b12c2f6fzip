@@ -18,58 +18,12 @@ const FEATURES = [
 
 function BrandPanel() {
   return (
-    <div className="hidden lg:flex flex-col w-[460px] shrink-0 bg-[#080d14] relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-emerald-950/60 via-transparent to-emerald-900/20" />
-      <div className="absolute -top-32 -right-32 w-80 h-80 rounded-full bg-emerald-500/8 blur-3xl" />
-      <div className="absolute -bottom-32 -left-32 w-80 h-80 rounded-full bg-emerald-500/6 blur-3xl" />
-      {/* grid pattern */}
-      <div
-        className="absolute inset-0 opacity-[0.03]"
-        style={{ backgroundImage: "linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px)", backgroundSize: "40px 40px" }}
+    <div className="hidden lg:flex flex-col w-[460px] shrink-0 relative overflow-hidden">
+      <img
+        src="/loginpagephoto.svg"
+        alt="BlockTrade"
+        className="absolute inset-0 w-full h-full object-cover"
       />
-
-      <div className="relative z-10 flex flex-col h-full p-10">
-        <div className="mb-14">
-          <img src="/logo.png" alt="BlockTrade" className="h-9 w-auto mix-blend-screen" />
-        </div>
-
-        <div className="mb-10">
-          <p className="text-xs uppercase tracking-widest text-emerald-400 font-semibold mb-3">Professional Trading Platform</p>
-          <h2 className="text-3xl font-bold text-white leading-tight mb-4">
-            Trade crypto with confidence
-          </h2>
-          <p className="text-gray-400 text-sm leading-relaxed">
-            Access real-time markets, portfolio management, and advanced analytics — all in one place.
-          </p>
-        </div>
-
-        <div className="space-y-5 flex-1">
-          {FEATURES.map(({ icon: Icon, title, desc }) => (
-            <div key={title} className="flex items-start gap-4">
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0 mt-0.5">
-                <Icon className="w-4.5 h-4.5 text-emerald-400" />
-              </div>
-              <div>
-                <p className="text-white font-semibold text-sm">{title}</p>
-                <p className="text-gray-500 text-xs mt-0.5 leading-relaxed">{desc}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-3 gap-4 pt-8 border-t border-white/8">
-          {[
-            { label: "Active Traders", value: "50K+" },
-            { label: "Daily Volume",   value: "$2.4B" },
-            { label: "Uptime",         value: "99.9%" },
-          ].map(({ label, value }) => (
-            <div key={label} className="text-center">
-              <p className="text-white font-bold text-lg">{value}</p>
-              <p className="text-gray-600 text-[11px] mt-0.5">{label}</p>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }
@@ -105,7 +59,7 @@ export default function Login() {
           {/* Mobile logo */}
           <div className="flex items-center lg:hidden">
             <img
-              src="/logo.png"
+              src="/logo.svg"
               alt="BlockTrade"
               className="h-8 w-auto invert mix-blend-multiply dark:invert-0 dark:mix-blend-screen"
             />
