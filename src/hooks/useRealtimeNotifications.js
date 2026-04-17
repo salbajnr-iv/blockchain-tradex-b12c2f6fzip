@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import { supabase, supabaseMisconfigured } from "@/lib/supabaseClient";
 import { emitSystemNotif } from "./useSystemNotifications";
+import { enqueueEmail } from "@/lib/emailQueue";
+import { format } from "date-fns";
 
 let pushPermissionRequested = false;
 
@@ -25,12 +27,70 @@ function showBrowserNotification(title, body) {
   }
 }
 
-export function useRealtimeNotifications({ portfolioId } = {}) {
-  const channelRef = useRef(null);
+function today() {
+  return format(new Date(), "MMM d, yyyy • h:mm a");
+}
+
+export function useRealtimeNotifications({ portfolioId, userId } = {}) {
+  const channelRef    = useRef(null);
+  const adminChanRef  = useRef(null);
 
   useEffect(() => {
     requestPushPermission();
   }, []);
+
+  // ── Admin notification emails ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (!userId || supabaseMisconfigured) return;
+
+    if (adminChanRef.current) {
+      supabase.removeChannel(adminChanRef.current);
+      adminChanRef.current = null;
+    }
+
+    const adminChan = supabase
+      .channel(`rt-admin-notif-${userId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "admin_notifications" },
+        (payload) => {
+          const notif = payload.new;
+          if (!notif?.is_active) return;
+
+          const targetType = notif.target_type;
+          const targetIds  = notif.target_user_ids;
+
+          const isForMe =
+            targetType === "all" ||
+            targetType == null ||
+            (Array.isArray(targetIds) && targetIds.includes(userId));
+
+          if (!isForMe) return;
+
+          const title   = notif.title   || "Message from BlockTrade";
+          const message = notif.message || "";
+
+          emitSystemNotif({ type: "admin_message", title, message, icon: notif.icon || "📢" });
+          showBrowserNotification(title, message);
+
+          enqueueEmail(
+            "admin_message",
+            title,
+            { message, date: today() }
+          );
+        }
+      )
+      .subscribe();
+
+    adminChanRef.current = adminChan;
+
+    return () => {
+      if (adminChanRef.current) {
+        supabase.removeChannel(adminChanRef.current);
+        adminChanRef.current = null;
+      }
+    };
+  }, [userId]);
 
   useEffect(() => {
     if (!portfolioId || supabaseMisconfigured) return;
@@ -43,7 +103,7 @@ export function useRealtimeNotifications({ portfolioId } = {}) {
     const channel = supabase
       .channel(`rt-notifications-${portfolioId}`)
 
-      // ── New transactions (deposits credited, withdrawals initiated) ──────────
+      // ── New transactions ──────────────────────────────────────────────────────
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "transactions", filter: `portfolio_id=eq.${portfolioId}` },
@@ -76,7 +136,7 @@ export function useRealtimeNotifications({ portfolioId } = {}) {
         }
       )
 
-      // ── Withdrawal status updates (admin approved / rejected) ───────────────
+      // ── Withdrawal status updates (admin approved / rejected) ─────────────────
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "transactions", filter: `portfolio_id=eq.${portfolioId}` },
@@ -93,25 +153,37 @@ export function useRealtimeNotifications({ portfolioId } = {}) {
           const amount = Number(updated.total_amount || updated.amount || 0);
           const fmt = amount.toLocaleString(undefined, { maximumFractionDigits: 2 });
 
-          let title, message, icon;
+          let title, message, icon, emailType, emailSubject;
           if (newStatus === "approved" || newStatus === "completed") {
             title = "Withdrawal Approved";
             message = `Your $${fmt} withdrawal has been approved and is on its way.`;
             icon = "✅";
+            emailType = "withdrawal_approved";
+            emailSubject = `Your $${fmt} withdrawal has been approved`;
           } else if (newStatus === "rejected" || newStatus === "failed") {
             title = "Withdrawal Rejected";
             message = `Your $${fmt} withdrawal was rejected. Funds have been returned to your account.`;
             icon = "❌";
+            emailType = "withdrawal_rejected";
+            emailSubject = `Your $${fmt} withdrawal was not processed`;
           } else {
             return;
           }
 
           emitSystemNotif({ type: "transaction_withdrawal", title, message, icon });
           showBrowserNotification(title, message);
+
+          if (emailType) {
+            enqueueEmail(emailType, emailSubject, {
+              amount: fmt,
+              method: updated.payment_method ?? undefined,
+              date: today(),
+            });
+          }
         }
       )
 
-      // ── New deposit requests submitted ───────────────────────────────────────
+      // ── New deposit requests ──────────────────────────────────────────────────
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "deposit_requests", filter: `portfolio_id=eq.${portfolioId}` },
@@ -122,14 +194,13 @@ export function useRealtimeNotifications({ portfolioId } = {}) {
 
           const title = "Deposit Submitted";
           const message = `Your $${fmt} deposit request is being processed.`;
-          const icon = "⏳";
 
-          emitSystemNotif({ type: "transaction_deposit", title, message, icon });
+          emitSystemNotif({ type: "transaction_deposit", title, message, icon: "⏳" });
           showBrowserNotification(title, message);
         }
       )
 
-      // ── Deposit request status updates (approved / rejected) ─────────────────
+      // ── Deposit request status updates ────────────────────────────────────────
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "deposit_requests", filter: `portfolio_id=eq.${portfolioId}` },
@@ -143,25 +214,37 @@ export function useRealtimeNotifications({ portfolioId } = {}) {
           const amount = Number(updated.amount || 0);
           const fmt = amount.toLocaleString(undefined, { maximumFractionDigits: 2 });
 
-          let title, message, icon;
+          let title, message, icon, emailType, emailSubject;
           if (newStatus === "approved" || newStatus === "completed") {
             title = "Deposit Approved";
             message = `Your $${fmt} deposit has been approved and added to your portfolio.`;
             icon = "💰";
+            emailType = "deposit_approved";
+            emailSubject = `Your $${fmt} deposit has been approved`;
           } else if (newStatus === "rejected" || newStatus === "failed") {
             title = "Deposit Rejected";
             message = `Your $${fmt} deposit request was rejected. Please contact support.`;
             icon = "❌";
+            emailType = "deposit_rejected";
+            emailSubject = `Your $${fmt} deposit request was not approved`;
           } else {
             return;
           }
 
           emitSystemNotif({ type: "transaction_deposit", title, message, icon });
           showBrowserNotification(title, message);
+
+          if (emailType) {
+            enqueueEmail(emailType, emailSubject, {
+              amount: fmt,
+              method: updated.payment_method ?? undefined,
+              date: today(),
+            });
+          }
         }
       )
 
-      // ── New trades ───────────────────────────────────────────────────────────
+      // ── New trades ────────────────────────────────────────────────────────────
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "trades", filter: `portfolio_id=eq.${portfolioId}` },
@@ -171,18 +254,24 @@ export function useRealtimeNotifications({ portfolioId } = {}) {
           const symbol = trade.crypto_symbol || "";
           const qty = Number(trade.quantity || 0);
           const price = Number(trade.unit_price || 0);
+          const total = (qty * price).toFixed(2);
           const isBuy = side === "buy";
 
           const title = isBuy ? `Bought ${symbol}` : `Sold ${symbol}`;
           const message = `${isBuy ? "Bought" : "Sold"} ${qty.toLocaleString(undefined, { maximumFractionDigits: 6 })} ${symbol} at $${price.toLocaleString(undefined, { maximumFractionDigits: 2 })}.`;
-          const icon = isBuy ? "🟢" : "🔴";
 
-          emitSystemNotif({ type: "trade", title, message, icon, side, symbol });
+          emitSystemNotif({ type: "trade", title, message, icon: isBuy ? "🟢" : "🔴", side, symbol });
           showBrowserNotification(title, message);
+
+          enqueueEmail(
+            "trade_executed",
+            `${isBuy ? "Buy" : "Sell"} order executed: ${qty} ${symbol}`,
+            { symbol, side, quantity: qty, price: price.toLocaleString(undefined, { maximumFractionDigits: 2 }), total, date: today() }
+          );
         }
       )
 
-      // ── New pending / limit orders ───────────────────────────────────────────
+      // ── New pending / limit orders ─────────────────────────────────────────────
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "pending_orders", filter: `portfolio_id=eq.${portfolioId}` },
@@ -195,14 +284,13 @@ export function useRealtimeNotifications({ portfolioId } = {}) {
 
           const title = "Limit Order Placed";
           const message = `${isBuy ? "Buy" : "Sell"} order for ${symbol} set at $${price.toLocaleString(undefined, { maximumFractionDigits: 2 })}.`;
-          const icon = "📌";
 
-          emitSystemNotif({ type: "order", title, message, icon, side, symbol });
+          emitSystemNotif({ type: "order", title, message, icon: "📌", side, symbol });
           showBrowserNotification(title, message);
         }
       )
 
-      // ── Pending orders filled ────────────────────────────────────────────────
+      // ── Pending orders filled ──────────────────────────────────────────────────
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "pending_orders", filter: `portfolio_id=eq.${portfolioId}` },
@@ -217,15 +305,20 @@ export function useRealtimeNotifications({ portfolioId } = {}) {
 
             const title = `Order Filled: ${symbol}`;
             const message = `Your ${isBuy ? "buy" : "sell"} limit order for ${symbol} was filled at $${price.toLocaleString(undefined, { maximumFractionDigits: 2 })}.`;
-            const icon = "✅";
 
-            emitSystemNotif({ type: "order_filled", title, message, icon, side, symbol });
+            emitSystemNotif({ type: "order_filled", title, message, icon: "✅", side, symbol });
             showBrowserNotification(title, message);
+
+            enqueueEmail(
+              "order_filled",
+              `Limit order filled: ${symbol} at $${price.toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
+              { symbol, side, price: price.toLocaleString(undefined, { maximumFractionDigits: 2 }), date: today() }
+            );
           }
         }
       )
 
-      // ── Price alerts triggered ───────────────────────────────────────────────
+      // ── Price alerts triggered ─────────────────────────────────────────────────
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "alerts", filter: `portfolio_id=eq.${portfolioId}` },
@@ -257,6 +350,12 @@ export function useRealtimeNotifications({ portfolioId } = {}) {
 
             emitSystemNotif({ type: notifType, title, message, icon, symbol });
             showBrowserNotification(title, message);
+
+            enqueueEmail(
+              "price_alert",
+              `Price alert triggered: ${symbol}`,
+              { symbol, alertType, threshold: threshold.toLocaleString(), message, date: today() }
+            );
           }
         }
       )

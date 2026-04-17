@@ -372,7 +372,7 @@ export default function Layout() {
   useAlertEngine(cryptoPrices);
   usePendingOrderEngine(cryptoPrices);
   useRecurringOrderEngine(cryptoPrices);
-  useRealtimeNotifications({ portfolioId });
+  useRealtimeNotifications({ portfolioId, userId: user?.id });
 
   const handleLogout = async () => {
     try { await signOut(); } catch (err) { console.error("Logout error:", err); }
