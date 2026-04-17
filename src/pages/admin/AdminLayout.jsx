@@ -54,13 +54,12 @@ function Sidebar({ onClose }) {
       <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-800">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-md bg-emerald-500 flex items-center justify-center text-white font-bold text-sm select-none">
-              A
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-gray-900 dark:text-white leading-tight">BlockTrade</p>
-              <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium tracking-wide">Admin Panel</p>
-            </div>
+            <img
+              src="/logo.png"
+              alt="BlockTrade"
+              className="h-7 w-auto invert mix-blend-multiply dark:invert-0 dark:mix-blend-screen"
+            />
+            <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium tracking-wide border-l border-border pl-2">Admin</p>
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle size="sm" />
@@ -154,8 +153,12 @@ export default function AdminLayout() {
             <Menu size={18} />
           </button>
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md bg-emerald-500 flex items-center justify-center text-white font-bold text-xs">A</div>
-            <span className="text-sm font-semibold text-gray-900 dark:text-white">BlockTrade Admin</span>
+            <img
+              src="/logo.png"
+              alt="BlockTrade"
+              className="h-7 w-auto invert mix-blend-multiply dark:invert-0 dark:mix-blend-screen"
+            />
+            <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 border-l border-border pl-2">Admin</span>
           </div>
         </header>
 

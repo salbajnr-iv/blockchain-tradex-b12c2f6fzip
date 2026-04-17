@@ -29,13 +29,8 @@ function BrandPanel() {
       />
 
       <div className="relative z-10 flex flex-col h-full p-10">
-        <div className="flex items-center gap-2.5 mb-14">
-          <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center">
-            <span className="text-emerald-400 font-bold text-sm">BT</span>
-          </div>
-          <span className="text-xl font-bold text-white">
-            Block<span className="text-emerald-400">Trade</span>
-          </span>
+        <div className="mb-14">
+          <img src="/logo.png" alt="BlockTrade" className="h-9 w-auto mix-blend-screen" />
         </div>
 
         <div className="mb-10">
@@ -108,11 +103,12 @@ export default function Login() {
       <div className="flex-1 flex flex-col bg-background min-h-screen">
         <div className="flex items-center justify-between px-6 py-4">
           {/* Mobile logo */}
-          <div className="flex items-center gap-2 lg:hidden">
-            <div className="w-8 h-8 rounded-xl bg-primary/20 flex items-center justify-center">
-              <span className="text-primary font-bold text-sm">BT</span>
-            </div>
-            <span className="font-bold text-foreground">Block<span className="text-primary">Trade</span></span>
+          <div className="flex items-center lg:hidden">
+            <img
+              src="/logo.png"
+              alt="BlockTrade"
+              className="h-8 w-auto invert mix-blend-multiply dark:invert-0 dark:mix-blend-screen"
+            />
           </div>
           <div className="lg:hidden" />
           <div className="flex items-center gap-3 ml-auto">

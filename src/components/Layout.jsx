@@ -403,13 +403,12 @@ export default function Layout() {
 
         {/* Logo */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border/50">
-          <Link to="/" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
-              <span className="text-primary font-bold text-sm">BT</span>
-            </div>
-            <span className="text-base font-bold">
-              Block<span className="text-primary">Trade</span>
-            </span>
+          <Link to="/" className="flex items-center">
+            <img
+              src="/logo.png"
+              alt="BlockTrade"
+              className="h-8 w-auto invert mix-blend-multiply dark:invert-0 dark:mix-blend-screen"
+            />
           </Link>
           <button className="lg:hidden text-muted-foreground" onClick={() => setSidebarOpen(false)}>
             <X className="w-5 h-5" />

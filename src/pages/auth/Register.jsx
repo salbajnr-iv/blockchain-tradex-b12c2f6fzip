@@ -30,11 +30,8 @@ function BrandPanel() {
         style={{ backgroundImage: "linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px)", backgroundSize: "40px 40px" }}
       />
       <div className="relative z-10 flex flex-col h-full p-10">
-        <div className="flex items-center gap-2.5 mb-12">
-          <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center">
-            <span className="text-emerald-400 font-bold text-sm">BT</span>
-          </div>
-          <span className="text-xl font-bold text-white">Block<span className="text-emerald-400">Trade</span></span>
+        <div className="mb-12">
+          <img src="/logo.png" alt="BlockTrade" className="h-9 w-auto mix-blend-screen" />
         </div>
 
         <div className="mb-10">
@@ -148,11 +145,8 @@ export default function Register() {
 
       <div className="flex-1 flex flex-col bg-background">
         <div className="flex items-center px-6 py-4">
-          <div className="flex items-center gap-2 lg:hidden">
-            <div className="w-8 h-8 rounded-xl bg-primary/20 flex items-center justify-center">
-              <span className="text-primary font-bold text-sm">BT</span>
-            </div>
-            <span className="font-bold text-foreground">Block<span className="text-primary">Trade</span></span>
+          <div className="flex items-center lg:hidden">
+            <img src="/logo.png" alt="BlockTrade" className="h-8 w-auto invert mix-blend-multiply dark:invert-0 dark:mix-blend-screen" />
           </div>
           <div className="ml-auto flex items-center gap-3">
             <span className="text-sm text-muted-foreground hidden sm:block">Already have an account?</span>

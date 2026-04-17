@@ -31,11 +31,8 @@ export default function ForgotPassword() {
     <div className="min-h-screen flex flex-col bg-background">
       {/* Top bar */}
       <div className="flex items-center justify-between px-6 py-4">
-        <Link to="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-primary/20 flex items-center justify-center">
-            <span className="text-primary font-bold text-sm">BT</span>
-          </div>
-          <span className="font-bold text-foreground">Block<span className="text-primary">Trade</span></span>
+        <Link to="/" className="flex items-center">
+          <img src="/logo.png" alt="BlockTrade" className="h-8 w-auto invert mix-blend-multiply dark:invert-0 dark:mix-blend-screen" />
         </Link>
         <ThemeToggle />
       </div>
