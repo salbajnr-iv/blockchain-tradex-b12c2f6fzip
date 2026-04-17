@@ -113,7 +113,7 @@ export default function Register() {
       <div className="flex-1 flex flex-col bg-background">
         <div className="flex items-center px-6 py-4">
           <div className="flex items-center lg:hidden">
-            <img src="/logo.svg" alt="BlockTrade" className="h-8 w-auto invert mix-blend-multiply dark:invert-0 dark:mix-blend-screen" />
+            <img src="/logo.svg" alt="BlockTrade" className="h-8 w-auto dark:invert" />
           </div>
           <div className="ml-auto flex items-center gap-3">
             <span className="text-sm text-muted-foreground hidden sm:block">Already have an account?</span>

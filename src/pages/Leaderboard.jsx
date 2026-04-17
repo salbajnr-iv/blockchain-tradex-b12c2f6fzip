@@ -2,7 +2,7 @@ import React, { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
-import { generateMockUsers, getLeaderboardOverrides, applyOverrides } from "@/lib/api/leaderboard";
+import { generateMockUsers, getLeaderboardData, applyOverrides } from "@/lib/api/leaderboard";
 import { fmtUsd } from "@/lib/formatters";
 import {
   Trophy, Medal, TrendingUp, BarChart3, Users, ChevronUp, ChevronDown,
@@ -37,23 +37,34 @@ export default function Leaderboard() {
   const [sortKey, setSortKey] = useState("rank");
   const [sortDir, setSortDir] = useState("asc");
 
-  const { data: overrides, isLoading } = useQuery({
-    queryKey: ["leaderboard_overrides"],
-    queryFn: getLeaderboardOverrides,
+  const { data: leaderboardData, isLoading } = useQuery({
+    queryKey: ["leaderboard_data"],
+    queryFn: getLeaderboardData,
     staleTime: 30_000,
   });
 
   const board = useMemo(() => {
-    if (!overrides) return [];
+    if (!leaderboardData) return [];
+    const { overrides, realUsers } = leaderboardData;
+
+    // Build mock users, then replace/displace any mock slots taken by real users
     const mock = generateMockUsers();
-    const entries = applyOverrides(mock, overrides);
+
+    // Remove mock entries to make room for real users at top positions
+    const realCount = realUsers.length;
+    const trimmedMock = mock.slice(realCount); // keep remaining mock users
+
+    // Merge: real users first (sorted by portfolio desc), then mocks to fill to 100
+    const merged = [...realUsers, ...trimmedMock];
+    const entries = applyOverrides(merged, overrides);
+
     const f = TAB_FACTOR[tab];
     return entries.map(e => ({
       ...e,
-      totalProfit: Math.round(e.totalProfit * f),
-      profitPct:   Math.round(e.profitPct * f * 10) / 10,
+      totalProfit: e.isReal ? e.totalProfit : Math.round(e.totalProfit * f),
+      profitPct:   e.isReal ? e.profitPct   : Math.round(e.profitPct * f * 10) / 10,
     }));
-  }, [overrides, tab]);
+  }, [leaderboardData, tab]);
 
   const filtered = useMemo(() => {
     let list = search.trim()

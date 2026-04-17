@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
-import { getPlatformSettings, updatePlatformSetting } from '@/lib/api/admin';
+import { getPlatformSettings, updatePlatformSetting, getBankDetails, saveBankDetails } from '@/lib/api/admin';
 import { toast } from '@/lib/toast';
-import { Save, RefreshCw, Settings, Percent, DollarSign, ArrowDownToLine, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Save, RefreshCw, Settings, Percent, DollarSign, ArrowDownToLine, AlertTriangle, CheckCircle, Building2 } from 'lucide-react';
 
 const SETTING_DEFINITIONS = [
   {
@@ -187,8 +187,146 @@ function SettingRow({ def, currentValue, onSave }) {
   );
 }
 
+const BANK_CURRENCIES = [
+  {
+    currency: 'USD',
+    label: 'US Dollar (USD)',
+    fields: [
+      { key: 'bankName',       label: 'Bank Name',       placeholder: 'e.g. Chase Bank' },
+      { key: 'accountName',    label: 'Account Name',    placeholder: 'e.g. BlockTrade LLC' },
+      { key: 'accountNumber',  label: 'Account Number',  placeholder: '9-digit account number' },
+      { key: 'routingNumber',  label: 'Routing Number',  placeholder: '9-digit ABA routing number' },
+      { key: 'swift',          label: 'SWIFT / BIC',     placeholder: 'e.g. CHASUS33' },
+    ],
+  },
+  {
+    currency: 'EUR',
+    label: 'Euro (EUR)',
+    fields: [
+      { key: 'bankName',    label: 'Bank Name',    placeholder: 'e.g. Deutsche Bank' },
+      { key: 'accountName', label: 'Account Name', placeholder: 'e.g. BlockTrade EU GmbH' },
+      { key: 'iban',        label: 'IBAN',         placeholder: 'e.g. DE89370400440532013000' },
+      { key: 'bic',         label: 'BIC / SWIFT',  placeholder: 'e.g. DEUTDEDB' },
+    ],
+  },
+  {
+    currency: 'GBP',
+    label: 'British Pound (GBP)',
+    fields: [
+      { key: 'bankName',      label: 'Bank Name',      placeholder: 'e.g. Barclays' },
+      { key: 'accountName',   label: 'Account Name',   placeholder: 'e.g. BlockTrade UK Ltd' },
+      { key: 'sortCode',      label: 'Sort Code',      placeholder: 'XX-XX-XX' },
+      { key: 'accountNumber', label: 'Account Number', placeholder: '8-digit account number' },
+    ],
+  },
+];
+
+function BankDetailsSection({ bankDetails, onSaveBankDetails }) {
+  const [drafts, setDrafts] = useState({});
+  const [dirty, setDirty]   = useState({});
+  const [saving, setSaving] = useState({});
+
+  useEffect(() => {
+    const initial = {};
+    BANK_CURRENCIES.forEach(({ currency, fields }) => {
+      const existing = bankDetails[currency] ?? {};
+      fields.forEach(f => {
+        initial[`${currency}_${f.key}`] = existing[f.key] ?? '';
+      });
+    });
+    setDrafts(initial);
+    setDirty({});
+  }, [bankDetails]);
+
+  const handleChange = (currency, fieldKey, value) => {
+    const k = `${currency}_${fieldKey}`;
+    setDrafts(prev => ({ ...prev, [k]: value }));
+    const existing = (bankDetails[currency] ?? {})[fieldKey] ?? '';
+    setDirty(prev => ({ ...prev, [k]: value !== existing }));
+  };
+
+  const handleSave = async (currency) => {
+    setSaving(prev => ({ ...prev, [currency]: true }));
+    try {
+      const { fields } = BANK_CURRENCIES.find(c => c.currency === currency);
+      const payload = {};
+      fields.forEach(f => { payload[f.key] = drafts[`${currency}_${f.key}`] ?? ''; });
+      await onSaveBankDetails(currency, payload);
+      setDirty(prev => {
+        const next = { ...prev };
+        fields.forEach(f => { delete next[`${currency}_${f.key}`]; });
+        return next;
+      });
+      toast.success(`${currency} bank details saved`);
+    } catch (err) {
+      toast.error(err.message || 'Failed to save');
+    } finally {
+      setSaving(prev => ({ ...prev, [currency]: false }));
+    }
+  };
+
+  const isCurrencyDirty = (currency) => {
+    const { fields } = BANK_CURRENCIES.find(c => c.currency === currency);
+    return fields.some(f => dirty[`${currency}_${f.key}`]);
+  };
+
+  return (
+    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100 dark:border-gray-800">
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-purple-500/15 text-purple-500">
+          <Building2 size={16} />
+        </div>
+        <div>
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Bank Details for Deposits</h2>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Shown to users when they deposit via bank transfer</p>
+        </div>
+      </div>
+      <div className="p-5 space-y-6">
+        {BANK_CURRENCIES.map(({ currency, label, fields }) => (
+          <div key={currency}>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">{label}</p>
+              <button
+                onClick={() => handleSave(currency)}
+                disabled={!isCurrencyDirty(currency) || saving[currency]}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                {saving[currency] ? <RefreshCw size={11} className="animate-spin" /> : <Save size={11} />}
+                {saving[currency] ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {fields.map(f => {
+                const k = `${currency}_${f.key}`;
+                return (
+                  <div key={f.key}>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{f.label}</label>
+                    <input
+                      type="text"
+                      value={drafts[k] ?? ''}
+                      onChange={(e) => handleChange(currency, f.key, e.target.value)}
+                      placeholder={f.placeholder}
+                      className={`w-full bg-gray-50 dark:bg-gray-800 border rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-1 transition-colors placeholder:text-gray-300 dark:placeholder:text-gray-600 ${
+                        dirty[k]
+                          ? 'border-amber-400 dark:border-amber-500 focus:ring-amber-400'
+                          : 'border-gray-300 dark:border-gray-700 focus:ring-emerald-500'
+                      }`}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            {currency !== 'GBP' && <div className="mt-4 border-t border-gray-100 dark:border-gray-800" />}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminSettings() {
   const [settings, setSettings] = useState({});
+  const [bankDetails, setBankDetails] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -196,8 +334,9 @@ export default function AdminSettings() {
     setLoading(true);
     setError(null);
     try {
-      const data = await getPlatformSettings();
+      const [data, bank] = await Promise.all([getPlatformSettings(), getBankDetails()]);
       setSettings(data);
+      setBankDetails(bank);
     } catch (err) {
       setError(err.message || 'Failed to load settings');
     } finally {
@@ -214,6 +353,11 @@ export default function AdminSettings() {
       [key]: { ...(prev[key] ?? {}), value: String(value) },
     }));
     toast.success('Setting saved');
+  };
+
+  const handleSaveBankDetails = async (currency, fields) => {
+    await saveBankDetails(currency, fields);
+    setBankDetails(prev => ({ ...prev, [currency]: fields }));
   };
 
   return (
@@ -267,6 +411,7 @@ export default function AdminSettings() {
         </div>
       ) : (
         <div className="space-y-4">
+          <BankDetailsSection bankDetails={bankDetails} onSaveBankDetails={handleSaveBankDetails} />
           {SETTING_DEFINITIONS.map(({ group, icon: Icon, color, settings: defs }) => (
             <div
               key={group}

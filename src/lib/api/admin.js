@@ -651,6 +651,85 @@ export const getPlatformSettings = async () => {
   return map
 }
 
+// ── Bank details: read ────────────────────────────────────────────────────────
+export const getBankDetails = async () => {
+  const { data, error } = await supabase
+    .from('platform_settings')
+    .select('key, value')
+    .in('key', ['bank_details_usd', 'bank_details_eur', 'bank_details_gbp'])
+
+  if (error) return {}
+  const result = {}
+  ;(data ?? []).forEach(row => {
+    const currency = row.key.replace('bank_details_', '').toUpperCase()
+    try {
+      result[currency] = typeof row.value === 'string' ? JSON.parse(row.value) : row.value
+    } catch {
+      result[currency] = {}
+    }
+  })
+  return result
+}
+
+// ── Bank details: save one currency ──────────────────────────────────────────
+export const saveBankDetails = async (currency, fields) => {
+  const key = `bank_details_${currency.toLowerCase()}`
+  await updatePlatformSetting(key, fields)
+}
+
+// ── Leaderboard: fetch real user portfolio data ───────────────────────────────
+export const getRealLeaderboardUsers = async () => {
+  try {
+    const { data: portfolios, error } = await supabase
+      .from('portfolios')
+      .select('user_id, cash_balance, total_value')
+      .order('total_value', { ascending: false })
+      .limit(50)
+
+    if (error || !portfolios?.length) return []
+
+    const userIds = portfolios.map(p => p.user_id).filter(Boolean)
+    const { data: users } = await supabase
+      .from('users')
+      .select('id, full_name, username, country, created_at')
+      .in('id', userIds)
+
+    const userMap = {}
+    ;(users ?? []).forEach(u => { userMap[u.id] = u })
+
+    const AVATARS = ['🐯','🦊','🐺','🦁','🐻','🦅','🐉','🦄','🦋','🐧','🦜','🐸','🦩','🦒','🐳']
+    const FLAGS = { 'United States':'🇺🇸','United Kingdom':'🇬🇧','Germany':'🇩🇪','Japan':'🇯🇵','Singapore':'🇸🇬','Australia':'🇦🇺','Canada':'🇨🇦','South Korea':'🇰🇷','France':'🇫🇷','Netherlands':'🇳🇱' }
+
+    return portfolios.map((p, i) => {
+      const u = userMap[p.user_id] ?? {}
+      const portfolio = (p.total_value ?? 0) + (p.cash_balance ?? 0)
+      const displayName = u.full_name
+        ? u.full_name.split(' ').map((n, idx) => idx === 0 ? n : n[0] + '.').join(' ')
+        : u.username ?? 'Trader'
+      const joinedMs = u.created_at ? Date.now() - new Date(u.created_at).getTime() : 0
+      const joinedDaysAgo = Math.floor(joinedMs / 86400000)
+      return {
+        id: `real_${p.user_id}`,
+        isReal: true,
+        isMock: false,
+        name: u.username ?? `trader_${i + 1}`,
+        displayName,
+        avatar: AVATARS[i % AVATARS.length],
+        badge: portfolio > 1_000_000 ? '🦈 Whale' : portfolio > 100_000 ? '💎 Diamond' : null,
+        portfolio: Math.round(portfolio),
+        totalProfit: 0,
+        profitPct: 0,
+        winRate: 0,
+        trades: 0,
+        country: FLAGS[u.country] ?? '🌍',
+        joinedDaysAgo,
+      }
+    })
+  } catch {
+    return []
+  }
+}
+
 // ── Platform settings: update one key ─────────────────────────────────────────
 export const updatePlatformSetting = async (key, value) => {
   const { data: { user } } = await supabase.auth.getUser()

@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabaseClient';
+import { getRealLeaderboardUsers } from '@/lib/api/admin';
 
 const SETTING_KEY = 'leaderboard_overrides';
 
@@ -99,6 +100,15 @@ export async function saveLeaderboardOverrides(overrides) {
       updated_by: user?.id ?? null,
     }, { onConflict: 'key' });
   if (error) throw new Error(error.message);
+}
+
+// ── Fetch overrides + real users together ─────────────────────────────────────
+export async function getLeaderboardData() {
+  const [overrides, realUsers] = await Promise.all([
+    getLeaderboardOverrides(),
+    getRealLeaderboardUsers(),
+  ]);
+  return { overrides, realUsers };
 }
 
 // ── Build final sorted leaderboard applying overrides ─────────────────────────

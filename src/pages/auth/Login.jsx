@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { supabaseMisconfigured } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
@@ -31,6 +31,8 @@ function BrandPanel() {
 export default function Login() {
   const { signIn } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnTo = location.state?.from || '/';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -42,7 +44,7 @@ export default function Login() {
     setLoading(true);
     try {
       await signIn(email, password);
-      navigate('/');
+      navigate(returnTo, { replace: true });
     } catch (err) {
       toast.error(err.message || 'Invalid email or password');
     } finally {
@@ -61,7 +63,7 @@ export default function Login() {
             <img
               src="/logo.svg"
               alt="BlockTrade"
-              className="h-8 w-auto invert mix-blend-multiply dark:invert-0 dark:mix-blend-screen"
+              className="h-8 w-auto dark:invert"
             />
           </div>
           <div className="lg:hidden" />

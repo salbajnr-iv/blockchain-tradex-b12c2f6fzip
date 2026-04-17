@@ -12,6 +12,7 @@ import {
   getUserCryptoBalances,
   getDepositProofUrl,
 } from "@/lib/api/cryptoDeposits";
+import { getBankDetails } from "@/lib/api/admin";
 import { createTransaction } from "@/lib/api/transactions";
 import { toast } from '@/lib/toast';
 import { Button } from "@/components/ui/button";
@@ -150,10 +151,12 @@ function CryptoDepositFlow({ asset, wallet, userId, onClose, onSuccess }) {
                 </Button>
               </>
             ) : (
-              <div className="bg-secondary/40 rounded-xl p-6 text-center space-y-2">
-                <Wallet className="w-10 h-10 text-muted-foreground/30 mx-auto" />
-                <p className="text-sm font-semibold text-foreground">Wallet address coming soon</p>
-                <p className="text-xs text-muted-foreground">The {asset.symbol} deposit address is not yet configured. Please contact support.</p>
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-6 text-center space-y-2">
+                <Wallet className="w-10 h-10 text-amber-500/50 mx-auto" />
+                <p className="text-sm font-semibold text-foreground">{asset.symbol} deposit address not configured</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  The admin has not yet set up a {asset.symbol} deposit wallet. Please contact support and they will provide you with a deposit address directly.
+                </p>
               </div>
             )}
           </motion.div>
@@ -238,13 +241,13 @@ function FiatDepositFlow({ currency, userId, portfolioId, onClose, onSuccess }) 
   const [submitting, setSubmitting] = useState(false);
   const fileInputRef = useRef(null);
 
-  const BANK_DETAILS = {
-    USD: { bankName: "BlockTrade Financial", accountName: "BlockTrade LLC", accountNumber: "123456789", routingNumber: "021000021", swift: "BTFDUSY1" },
-    EUR: { bankName: "BlockTrade EU GmbH",   accountName: "BlockTrade EU",  iban: "DE89370400440532013000",  bic: "BTFDDEFFXXX" },
-    GBP: { bankName: "BlockTrade UK Ltd",    accountName: "BlockTrade UK",  sortCode: "20-00-00",  accountNumber: "12345678" },
-  };
+  const { data: allBankDetails } = useQuery({
+    queryKey: ["bank_details"],
+    queryFn: getBankDetails,
+    staleTime: 5 * 60_000,
+  });
 
-  const bankInfo = BANK_DETAILS[currency.symbol] || BANK_DETAILS.USD;
+  const bankInfo = (allBankDetails ?? {})[currency.symbol] ?? {};
 
   const handleFile = (e) => {
     const f = e.target.files?.[0];
@@ -345,15 +348,24 @@ function FiatDepositFlow({ currency, userId, portfolioId, onClose, onSuccess }) 
 
             <div className="bg-secondary/40 rounded-xl p-4 space-y-3">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Bank Transfer Details</p>
-              {Object.entries(bankInfo).map(([k, v]) => (
-                <div key={k} className="flex items-center justify-between gap-3">
-                  <span className="text-xs text-muted-foreground capitalize">{k.replace(/([A-Z])/g, " $1").trim()}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-semibold text-foreground">{v}</span>
-                    <CopyBtn value={v} />
-                  </div>
+              {Object.keys(bankInfo).length === 0 ? (
+                <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3">
+                  <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
+                    Bank details for {currency.symbol} have not been configured yet. Please contact support for wire transfer instructions.
+                  </p>
                 </div>
-              ))}
+              ) : (
+                Object.entries(bankInfo).filter(([, v]) => v).map(([k, v]) => (
+                  <div key={k} className="flex items-center justify-between gap-3">
+                    <span className="text-xs text-muted-foreground capitalize">{k.replace(/([A-Z])/g, " $1").trim()}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono font-semibold text-foreground">{v}</span>
+                      <CopyBtn value={String(v)} />
+                    </div>
+                  </div>
+                ))
+              )}
               <div className="border-t border-border/40 pt-3 flex items-center justify-between gap-3">
                 <span className="text-xs font-semibold text-foreground">Reference <span className="text-destructive">*</span></span>
                 <div className="flex items-center gap-2">

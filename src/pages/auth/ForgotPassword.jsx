@@ -46,7 +46,7 @@ export default function ForgotPassword() {
       <div className="flex-1 flex flex-col bg-background min-h-screen">
         <div className="flex items-center justify-between px-6 py-4">
           <div className="flex items-center lg:hidden">
-            <img src="/logo.svg" alt="BlockTrade" className="h-8 w-auto invert mix-blend-multiply dark:invert-0 dark:mix-blend-screen" />
+            <img src="/logo.svg" alt="BlockTrade" className="h-8 w-auto dark:invert" />
           </div>
           <div className="ml-auto">
             <ThemeToggle />

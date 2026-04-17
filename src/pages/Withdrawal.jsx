@@ -161,7 +161,7 @@ function BankFields({ country, values, onChange }) {
 
       {variant === "au" && (
         <>
-          {field("bsb", "BSB Number", "XXX-XXX (6 digits)")}
+          {field("bsb", "BSB Number", "000-000 (6 digits)")}
           {field("accountNumber", "Account Number", "Bank account number")}
         </>
       )}
