@@ -18,11 +18,11 @@ const FEATURES = [
 
 function BrandPanel() {
   return (
-    <div className="hidden lg:flex flex-col w-[460px] shrink-0 relative overflow-hidden">
+    <div className="hidden lg:flex w-[460px] shrink-0 sticky top-0 h-screen bg-white items-center justify-center overflow-hidden">
       <img
         src="/loginpagephoto.svg"
         alt="BlockTrade"
-        className="absolute inset-0 w-full h-full object-cover"
+        className="w-full h-full object-contain"
       />
     </div>
   );
