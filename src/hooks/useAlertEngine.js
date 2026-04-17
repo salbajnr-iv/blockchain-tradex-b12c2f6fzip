@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { listAlerts, updateAlert } from "@/lib/api/alerts";
 import { usePortfolio } from "@/contexts/PortfolioContext";
-import { toast } from "sonner";
+import { toast } from '@/lib/toast';
 
 /**
  * useAlertEngine

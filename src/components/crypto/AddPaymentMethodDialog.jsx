@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { addPaymentMethod, detectCardBrand, formatCardNumber, formatExpiry } from "@/lib/api/paymentMethods";
-import { toast } from "sonner";
+import { toast } from '@/lib/toast';
 
 const BRAND_COLORS = {
   visa:       "from-blue-600 to-blue-800",

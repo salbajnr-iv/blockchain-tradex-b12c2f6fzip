@@ -6,7 +6,7 @@ import { usePortfolio } from "@/contexts/PortfolioContext";
 import { CreditCard, Building2, Wallet2, PlusCircle, Trash2, Star, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AddPaymentMethodDialog from "@/components/crypto/AddPaymentMethodDialog";
-import { toast } from "sonner";
+import { toast } from '@/lib/toast';
 
 const TYPE_ICON = { card: CreditCard, bank_account: Building2, paypal: Wallet2 };
 const BRAND_LABEL = { visa: "Visa", mastercard: "Mastercard", amex: "Amex", discover: "Discover" };

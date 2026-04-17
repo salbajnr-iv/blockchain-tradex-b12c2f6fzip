@@ -8,7 +8,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { executeTrade } from "@/lib/api/portfolio";
 import { usePortfolio } from "@/contexts/PortfolioContext";
 import DepositDialog from "@/components/crypto/DepositDialog";
-import { toast } from "sonner";
+import { toast } from '@/lib/toast';
 
 export default function TradePanel({ cryptoList = [], initialCoin = null }) {
   const [side, setSide] = useState("buy");

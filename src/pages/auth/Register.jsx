@@ -8,7 +8,7 @@ import {
   Loader2, Eye, EyeOff, CheckCircle2, User, Mail, Lock,
   Phone, Globe, Calendar, ShieldCheck, TrendingUp, Zap, AlertTriangle,
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import ThemeToggle from '@/components/ThemeToggle';
 import SocialAuthButtons from '@/components/auth/SocialAuthButtons';
 import { COUNTRIES } from '@/lib/countries';

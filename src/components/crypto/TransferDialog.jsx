@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
 import { usePortfolio } from "@/contexts/PortfolioContext";
-import { toast } from "sonner";
+import { toast } from '@/lib/toast';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {

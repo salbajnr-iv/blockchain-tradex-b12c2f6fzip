@@ -4,7 +4,7 @@ import { usePortfolio } from "@/contexts/PortfolioContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabaseClient";
-import { toast } from "sonner";
+import { toast } from '@/lib/toast';
 import { User, Mail, Phone, Globe, Save, Loader2, Camera, Trash2 } from "lucide-react";
 
 const COUNTRIES = [

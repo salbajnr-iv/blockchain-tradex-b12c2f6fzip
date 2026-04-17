@@ -14,7 +14,7 @@ import { format, startOfDay, startOfWeek, startOfMonth } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { toast } from "sonner";
+import { toast } from '@/lib/toast';
 import DepositDialog from "@/components/crypto/DepositDialog";
 import TransferDialog from "@/components/crypto/TransferDialog";
 import { useNavigate } from "react-router-dom";

@@ -16,7 +16,7 @@ import { useLivePrices } from "@/hooks/useLivePrices";
 import { createDepositRequest, processDeposit } from "@/lib/api/deposits";
 import { executeTrade } from "@/lib/api/portfolio";
 import AddPaymentMethodDialog from "./AddPaymentMethodDialog";
-import { toast } from "sonner";
+import { toast } from '@/lib/toast';
 import { useQueryClient } from "@tanstack/react-query";
 
 // ── Constants ──────────────────────────────────────────────────────────────────

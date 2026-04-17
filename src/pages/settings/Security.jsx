@@ -3,7 +3,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabaseClient";
-import { toast } from "sonner";
+import { toast } from '@/lib/toast';
 import {
   Shield, Lock, Key, AlertTriangle, CheckCircle2, Eye, EyeOff,
   Loader2, LogOut, Smartphone, QrCode, Trash2, X,

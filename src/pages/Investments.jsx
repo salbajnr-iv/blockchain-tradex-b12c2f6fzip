@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from '@/lib/toast';
 import {
   TrendingUp, TrendingDown, Search, ChevronRight, X,
   ArrowUpRight, ArrowDownLeft, Loader2, CheckCircle2,

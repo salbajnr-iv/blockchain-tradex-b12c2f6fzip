@@ -7,7 +7,7 @@ import {
   Mail, Inbox, Filter,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import { toast } from '@/lib/toast';
 import { fetchAllTickets, replyToTicket, closeTicket } from "@/lib/api/support";
 
 const STATUS_CONFIG = {

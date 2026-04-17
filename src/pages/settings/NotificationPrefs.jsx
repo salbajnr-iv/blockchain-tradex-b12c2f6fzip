@@ -3,7 +3,7 @@ import { Bell, TrendingUp, Zap, CreditCard, Shield, Mail, Loader2, Info } from "
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabaseClient";
 import { loadEmailPrefs, saveEmailPrefs, DEFAULT_EMAIL_PREFS } from "@/lib/emailQueue";
-import { toast } from "sonner";
+import { toast } from '@/lib/toast';
 
 // ── In-app notification groups ────────────────────────────────────────────────
 const INAPP_GROUPS = [

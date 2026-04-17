@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { listPendingOrders, fillPendingOrder } from "@/lib/api/pendingOrders";
 import { executeTrade } from "@/lib/api/portfolio";
 import { usePortfolio } from "@/contexts/PortfolioContext";
-import { toast } from "sonner";
+import { toast } from '@/lib/toast';
 
 /**
  * usePendingOrderEngine

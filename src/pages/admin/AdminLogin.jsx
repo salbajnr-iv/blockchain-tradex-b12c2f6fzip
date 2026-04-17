@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { getAdminStatus } from '@/lib/api/admin';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { Eye, EyeOff, Lock, Mail, Shield } from 'lucide-react';
 import ThemeToggle from '@/components/ThemeToggle';
 

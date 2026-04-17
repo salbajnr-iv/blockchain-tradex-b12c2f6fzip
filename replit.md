@@ -4,6 +4,31 @@
 
 **BlockTrade** is a full-featured cryptocurrency trading dashboard, portfolio management, and multi-asset investment platform built with React 18, Vite, and Tailwind CSS. Uses Supabase for authentication and PostgreSQL database, CoinGecko API for live market data.
 
+## Error Notification System
+
+### Architecture
+- **`src/lib/errorStore.js`** — Framework-agnostic store (no React needed). Call `showError(message, { title })` from anywhere.
+- **`src/lib/toast.js`** — Unified toast wrapper. `toast.error(...)` routes to `AppErrors`; `.success()`, `.info()`, `.warning()` still use Sonner.
+- **`src/components/AppErrors.jsx`** — Fixed bottom-right renderer mounted once in `App.jsx`.
+
+### Key Behaviours
+- **Deduplication**: Identical message text will never stack — the existing card's countdown timer resets instead.
+- **Auto-dismiss**: Each card auto-dismisses after 6 seconds with an animated red progress bar.
+- **Stack cap**: Maximum 4 visible errors; oldest is dropped when the cap is reached.
+- **Solid design**: Fully opaque card (`bg-white` / `dark:bg-gray-900`), red gradient top stripe, `AlertTriangle` icon, manual X dismiss.
+- **All `toast.error()` calls** across the codebase (39 files) now route through this system automatically.
+
+### Usage
+```js
+// From any file — React or plain JS:
+import { showError } from "@/lib/errorStore";
+showError("Something went wrong", { title: "Trade Failed" });
+
+// Or via the toast wrapper (same as before):
+import { toast } from "@/lib/toast";
+toast.error("Insufficient balance");
+```
+
 ## Investment System (Latest)
 
 ### User-facing: Investments Hub (`/invest`)

@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { toast } from "sonner";
+import { toast } from '@/lib/toast';
 import { sendAdminNotification, fetchAdminNotifications, deleteAdminNotification, fetchAllAdminUsers } from "@/lib/api/adminNotifications";
 
 const NOTIF_TYPES = [

@@ -10,7 +10,7 @@ import { getWatchlist, addToWatchlist, removeFromWatchlist } from "@/lib/api/wat
 import CandlestickChart from "@/components/crypto/CandlestickChart";
 import DepositDialog from "@/components/crypto/DepositDialog";
 import TradeConfirmModal from "@/components/crypto/TradeConfirmModal";
-import { toast } from "sonner";
+import { toast } from '@/lib/toast';
 import { motion } from "framer-motion";
 import {
   ArrowLeft, Star, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownLeft,

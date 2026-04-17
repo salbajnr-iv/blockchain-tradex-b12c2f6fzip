@@ -18,7 +18,7 @@ import {
   Trophy,
   TrendingUp,
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import ThemeToggle from '@/components/ThemeToggle';
 
 const navItems = [

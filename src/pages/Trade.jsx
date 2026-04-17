@@ -7,7 +7,7 @@ import { executeTrade, listTrades } from "@/lib/api/portfolio";
 import { createPendingOrder, listPendingOrders, cancelPendingOrder } from "@/lib/api/pendingOrders";
 import { supabase } from "@/lib/supabaseClient";
 import { motion, AnimatePresence } from "framer-motion";
-import { toast } from "sonner";
+import { toast } from '@/lib/toast';
 import DepositDialog from "@/components/crypto/DepositDialog";
 import TradeConfirmModal from "@/components/crypto/TradeConfirmModal";
 import {

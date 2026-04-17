@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import {
   Plus, Search, Edit2, Trash2, ToggleLeft, ToggleRight,
   TrendingUp, TrendingDown, BarChart3, Shield, Percent, Flame,

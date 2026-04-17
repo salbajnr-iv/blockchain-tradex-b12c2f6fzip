@@ -11,7 +11,7 @@ import {
   adminGetUserCryptoBalances,
   adminAdjustCryptoBalance,
 } from '@/lib/api/cryptoDeposits';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import {
   RefreshCw, Search, Shield, ShieldOff, X,
   PlusCircle, MinusCircle, SlidersHorizontal, Lock, Unlock,

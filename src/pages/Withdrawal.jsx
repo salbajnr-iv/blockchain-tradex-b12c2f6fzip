@@ -8,7 +8,7 @@ import { useLivePrices } from "@/hooks/useLivePrices";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { toast } from "sonner";
+import { toast } from '@/lib/toast';
 import {
   ArrowLeft, Wallet, ShieldCheck, AlertCircle, CheckCircle2,
   Clock, XCircle, Send, Lock, CreditCard, Globe, Building2,

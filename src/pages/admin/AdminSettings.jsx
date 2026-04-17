@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { getPlatformSettings, updatePlatformSetting } from '@/lib/api/admin';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { Save, RefreshCw, Settings, Percent, DollarSign, ArrowDownToLine, AlertTriangle, CheckCircle } from 'lucide-react';
 
 const SETTING_DEFINITIONS = [

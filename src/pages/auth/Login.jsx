@@ -5,7 +5,7 @@ import { supabaseMisconfigured } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader2, Eye, EyeOff, TrendingUp, ShieldCheck, Zap, BarChart2, AlertTriangle } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import ThemeToggle from '@/components/ThemeToggle';
 import SocialAuthButtons from '@/components/auth/SocialAuthButtons';
 

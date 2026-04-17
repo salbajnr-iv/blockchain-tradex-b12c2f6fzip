@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { toast } from "sonner";
+import { toast } from '@/lib/toast';
 import {
   Trophy, Pin, Pencil, Trash2, Plus, Save, X, RotateCcw,
   EyeOff, Eye, Users, Crown, Search, AlertTriangle, ChevronUp, ChevronDown,

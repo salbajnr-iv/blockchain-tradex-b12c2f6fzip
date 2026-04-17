@@ -15,7 +15,7 @@ import { listDepositRequests } from "@/lib/api/deposits";
 import AddPaymentMethodDialog from "@/components/crypto/AddPaymentMethodDialog";
 import AddFundsFlow from "@/components/crypto/AddFundsFlow";
 import WithdrawalSidebar from "@/components/crypto/WithdrawalSidebar";
-import { toast } from "sonner";
+import { toast } from '@/lib/toast';
 import { format, parseISO } from "date-fns";
 
 const BRAND_LABEL  = { visa: "Visa", mastercard: "Mastercard", amex: "Amex", discover: "Discover" };

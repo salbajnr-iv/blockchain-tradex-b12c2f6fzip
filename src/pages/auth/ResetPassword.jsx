@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader2, Eye, EyeOff, CheckCircle2, AlertCircle, Lock } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import ThemeToggle from '@/components/ThemeToggle';
 
 export default function ResetPassword() {

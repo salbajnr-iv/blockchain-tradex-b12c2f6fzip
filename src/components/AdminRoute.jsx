@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { getAdminStatus } from '@/lib/api/admin';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 
 export default function AdminRoute() {
   const { isAuthenticated, isLoadingAuth } = useAuth();

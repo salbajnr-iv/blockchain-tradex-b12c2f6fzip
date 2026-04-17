@@ -4,7 +4,7 @@ import { usePortfolio } from "@/contexts/PortfolioContext";
 import { useMarketCoins } from "@/hooks/useMarketCoins";
 import { listPendingOrders, cancelPendingOrder, updatePendingOrder } from "@/lib/api/pendingOrders";
 import { supabase } from "@/lib/supabaseClient";
-import { toast } from "sonner";
+import { toast } from '@/lib/toast';
 import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getAllKycSubmissions, getKycDocumentUrls, adminReviewKyc } from '@/lib/api/admin';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { CheckCircle, XCircle, RefreshCw, Search, Eye, X, ChevronDown, ChevronUp } from 'lucide-react';
 
 const STATUS_COLORS = {

@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
-import { toast } from "sonner";
+import { toast } from '@/lib/toast';
 import {
   ShieldCheck, ShieldAlert, ShieldX, Clock, Upload, ChevronRight,
   ChevronLeft, CheckCircle2, Loader2, FileText, Camera, User,
