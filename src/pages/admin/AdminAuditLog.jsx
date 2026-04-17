@@ -3,17 +3,25 @@ import { getAuditLog } from '@/lib/api/admin';
 import { RefreshCw, Search, Shield, AlertTriangle, ChevronDown, ChevronUp, X } from 'lucide-react';
 
 const ACTION_META = {
-  withdrawal_approved:       { label: 'Withdrawal Approved',    color: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' },
-  withdrawal_rejected:       { label: 'Withdrawal Rejected',    color: 'bg-red-500/15 text-red-600 dark:text-red-400' },
-  kyc_approved:              { label: 'KYC Approved',           color: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' },
-  kyc_rejected:              { label: 'KYC Rejected',           color: 'bg-red-500/15 text-red-600 dark:text-red-400' },
-  balance_adjusted:          { label: 'Balance Adjusted',       color: 'bg-blue-500/15 text-blue-600 dark:text-blue-400' },
-  balance_locked:            { label: 'Balance Locked',         color: 'bg-orange-500/15 text-orange-600 dark:text-orange-400' },
-  balance_unlocked:          { label: 'Balance Unlocked',       color: 'bg-teal-500/15 text-teal-600 dark:text-teal-400' },
-  user_status_changed:       { label: 'User Status Changed',    color: 'bg-yellow-500/15 text-yellow-600 dark:text-yellow-400' },
-  user_promoted_to_admin:    { label: 'Promoted to Admin',      color: 'bg-purple-500/15 text-purple-600 dark:text-purple-400' },
-  user_demoted_from_admin:   { label: 'Demoted from Admin',     color: 'bg-gray-500/15 text-gray-600 dark:text-gray-400' },
-  setting_updated:           { label: 'Setting Updated',        color: 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400' },
+  withdrawal_approved:         { label: 'Withdrawal Approved',       color: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' },
+  withdrawal_rejected:         { label: 'Withdrawal Rejected',       color: 'bg-red-500/15 text-red-600 dark:text-red-400' },
+  approve_deposit:             { label: 'Deposit Approved',          color: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' },
+  reject_deposit:              { label: 'Deposit Rejected',          color: 'bg-red-500/15 text-red-600 dark:text-red-400' },
+  set_deposit_under_review:    { label: 'Deposit Under Review',      color: 'bg-blue-500/15 text-blue-600 dark:text-blue-400' },
+  kyc_approved:                { label: 'KYC Approved',              color: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' },
+  kyc_rejected:                { label: 'KYC Rejected',              color: 'bg-red-500/15 text-red-600 dark:text-red-400' },
+  kyc_more_info_needed:        { label: 'KYC More Info Requested',   color: 'bg-orange-500/15 text-orange-600 dark:text-orange-400' },
+  balance_adjusted:            { label: 'Balance Adjusted',          color: 'bg-blue-500/15 text-blue-600 dark:text-blue-400' },
+  balance_locked:              { label: 'Balance Locked',            color: 'bg-orange-500/15 text-orange-600 dark:text-orange-400' },
+  balance_unlocked:            { label: 'Balance Unlocked',          color: 'bg-teal-500/15 text-teal-600 dark:text-teal-400' },
+  crypto_balance_adjusted:     { label: 'Crypto Balance Adjusted',   color: 'bg-blue-500/15 text-blue-600 dark:text-blue-400' },
+  crypto_balance_created:      { label: 'Crypto Balance Added',      color: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' },
+  crypto_balance_deleted:      { label: 'Crypto Balance Removed',    color: 'bg-red-500/15 text-red-600 dark:text-red-400' },
+  user_status_changed:         { label: 'User Status Changed',       color: 'bg-yellow-500/15 text-yellow-600 dark:text-yellow-400' },
+  user_promoted_to_admin:      { label: 'Promoted to Admin',         color: 'bg-purple-500/15 text-purple-600 dark:text-purple-400' },
+  user_demoted_from_admin:     { label: 'Demoted from Admin',        color: 'bg-gray-500/15 text-gray-600 dark:text-gray-400' },
+  investment_catalog_updated:  { label: 'Investment Catalog Updated', color: 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400' },
+  setting_updated:             { label: 'Setting Updated',           color: 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400' },
 };
 
 const PAGE_SIZE = 25;
@@ -198,20 +206,19 @@ export default function AdminAuditLog() {
         </button>
       </div>
 
-      {/* SQL migration notice */}
-      <div className="flex gap-3 p-4 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl">
-        <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
-        <p className="text-xs text-amber-600 dark:text-amber-500">
-          Run <code className="font-mono bg-amber-100 dark:bg-amber-900/40 px-1 rounded">sql/admin-features-migration.sql</code> in Supabase SQL Editor to create the <code className="font-mono bg-amber-100 dark:bg-amber-900/40 px-1 rounded">admin_audit_log</code> table.
-          Actions will start logging immediately after that.
-        </p>
-      </div>
-
       {error && (
-        <div className="p-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-xl text-red-600 dark:text-red-400 text-sm">
-          {error}
+        <div className="flex gap-3 p-4 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl">
+          <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-xs font-medium text-amber-700 dark:text-amber-400">Database table not found</p>
+            <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">
+              Run <code className="font-mono bg-amber-100 dark:bg-amber-900/40 px-1 rounded">sql/admin-features-migration.sql</code> in Supabase SQL Editor to create the <code className="font-mono bg-amber-100 dark:bg-amber-900/40 px-1 rounded">admin_audit_log</code> table.
+              Actions will start logging immediately after that.
+            </p>
+          </div>
         </div>
       )}
+
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
