@@ -21,45 +21,12 @@ const BRAND_BULLETS = [
 
 function BrandPanel() {
   return (
-    <div className="hidden lg:flex flex-col w-[400px] shrink-0 bg-[#080d14] relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-emerald-950/60 via-transparent to-emerald-900/20" />
-      <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full bg-emerald-500/8 blur-3xl" />
-      <div className="absolute -bottom-20 -left-20 w-64 h-64 rounded-full bg-emerald-500/6 blur-3xl" />
-      <div
-        className="absolute inset-0 opacity-[0.03]"
-        style={{ backgroundImage: "linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px)", backgroundSize: "40px 40px" }}
+    <div className="hidden lg:flex w-[460px] shrink-0 sticky top-0 h-screen bg-white items-center justify-center overflow-hidden">
+      <img
+        src="/loginpagephoto.svg"
+        alt="BlockTrade"
+        className="w-full h-full object-contain"
       />
-      <div className="relative z-10 flex flex-col h-full p-10">
-        <div className="mb-12">
-          <img src="/logo.png" alt="BlockTrade" className="h-9 w-auto mix-blend-screen" />
-        </div>
-
-        <div className="mb-10">
-          <p className="text-xs uppercase tracking-widest text-emerald-400 font-semibold mb-3">Join BlockTrade Today</p>
-          <h2 className="text-3xl font-bold text-white leading-tight mb-4">Start trading in minutes</h2>
-          <p className="text-gray-400 text-sm leading-relaxed">
-            Create a free account and get access to real-time markets, portfolio tracking, and advanced analytics.
-          </p>
-        </div>
-
-        <div className="space-y-5 flex-1">
-          {BRAND_BULLETS.map(({ icon: Icon, text }) => (
-            <div key={text} className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
-                <Icon className="w-4 h-4 text-emerald-400" />
-              </div>
-              <p className="text-gray-300 text-sm">{text}</p>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-auto pt-8 border-t border-white/8">
-          <div className="bg-emerald-500/8 border border-emerald-500/20 rounded-xl px-4 py-4">
-            <p className="text-emerald-400 font-semibold text-sm mb-1">"The cleanest crypto dashboard I've used."</p>
-            <p className="text-gray-500 text-xs">— BlockTrade user, 2024</p>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
@@ -146,7 +113,7 @@ export default function Register() {
       <div className="flex-1 flex flex-col bg-background">
         <div className="flex items-center px-6 py-4">
           <div className="flex items-center lg:hidden">
-            <img src="/logo.png" alt="BlockTrade" className="h-8 w-auto invert mix-blend-multiply dark:invert-0 dark:mix-blend-screen" />
+            <img src="/logo.svg" alt="BlockTrade" className="h-8 w-auto invert mix-blend-multiply dark:invert-0 dark:mix-blend-screen" />
           </div>
           <div className="ml-auto flex items-center gap-3">
             <span className="text-sm text-muted-foreground hidden sm:block">Already have an account?</span>
