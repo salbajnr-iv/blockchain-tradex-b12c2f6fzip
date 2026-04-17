@@ -48,3 +48,4 @@ build = ["npm", "run", "build"]
 [userenv.shared]
 VITE_SUPABASE_URL = "https://scofzdhtjowzcztbabsu.supabase.co"
 VITE_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNjb2Z6ZGh0am93emN6dGJhYnN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwMTg3MTIsImV4cCI6MjA4OTU5NDcxMn0.O4-UxS8QbUWN5ttC8AbMVG_n1MyC27s4fTL-zPNs8qo"
+RESEND_API_KEY = "re_TkUqf3gz_6KbiAJmaxWv5x79GZYKfd2hC"
