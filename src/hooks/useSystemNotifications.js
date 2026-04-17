@@ -3,6 +3,42 @@ import { useState, useEffect, useRef, useCallback } from "react";
 let globalListeners = [];
 let globalNotifications = [];
 
+function getNotifPrefKey(type, side) {
+  switch (type) {
+    case 'market_mover':
+    case 'price_volatility':
+      return 'volatility';
+    case 'price_above':
+      return 'price_above';
+    case 'price_below':
+      return 'price_below';
+    case 'trade':
+      return side === 'buy' ? 'trade_buy' : 'trade_sell';
+    case 'transaction_deposit':
+    case 'deposit':
+      return 'deposit';
+    case 'transaction_withdrawal':
+    case 'withdrawal':
+      return 'withdrawal';
+    case 'login':
+    case 'new_login':
+      return 'login';
+    case 'password_change':
+      return 'password_change';
+    default:
+      return null;
+  }
+}
+
+function isAllowedByPrefs(notif) {
+  try {
+    const prefs = JSON.parse(localStorage.getItem('bt-notif-prefs') || '{}');
+    const key = getNotifPrefKey(notif.type, notif.side);
+    if (key && prefs[key] === false) return false;
+  } catch {}
+  return true;
+}
+
 const READ_STORAGE_KEY = "bt_notif_read_ids";
 
 function getStoredReadIds() {
@@ -19,6 +55,7 @@ function persistReadIds(ids) {
 }
 
 export function emitSystemNotif(notif) {
+  if (!isAllowedByPrefs(notif)) return;
   const entry = { ...notif, id: `sys-${Date.now()}-${Math.random()}`, timestamp: new Date(), source: "system" };
   globalNotifications = [entry, ...globalNotifications].slice(0, 30);
   globalListeners.forEach((fn) => fn([...globalNotifications]));

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from '@/lib/toast';
-import { User, Mail, Phone, Globe, Save, Loader2, Camera, Trash2 } from "lucide-react";
+import { User, Mail, Phone, Globe, Save, Loader2, Camera, Trash2, AtSign } from "lucide-react";
 
 const COUNTRIES = [
   "Algeria", "Angola", "Australia", "Benin", "Botswana", "Brazil",
@@ -30,6 +30,7 @@ export default function ProfileSettings() {
   const { portfolioId } = usePortfolio();
 
   const [fullName, setFullName] = useState(user?.user_metadata?.full_name || "");
+  const [username, setUsername] = useState("");
   const [phone, setPhone] = useState(user?.user_metadata?.phone || "");
   const [country, setCountry] = useState(user?.user_metadata?.country || "");
   const [bio, setBio] = useState(user?.user_metadata?.bio || "");
@@ -42,6 +43,17 @@ export default function ProfileSettings() {
   const memberSince = user?.created_at
     ? new Date(user.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" })
     : "—";
+
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase
+      .from("users")
+      .select("username")
+      .eq("id", user.id)
+      .single()
+      .then(({ data }) => { if (data?.username) setUsername(data.username); })
+      .catch(() => {});
+  }, [user?.id]);
 
   useEffect(() => {
     const storedPath = user?.user_metadata?.avatar_path;
@@ -130,13 +142,24 @@ export default function ProfileSettings() {
       });
       if (error) throw error;
 
+      const uid = updatedUser?.id ?? user?.id;
+
       await supabase.rpc("fn_sync_user_profile", {
-        p_user_id:   updatedUser?.id ?? user?.id,
+        p_user_id:   uid,
         p_full_name: fullName || null,
         p_phone:     phone || null,
         p_country:   country || null,
         p_bio:       bio || null,
       });
+
+      if (username.trim()) {
+        const { error: unErr } = await supabase
+          .from("users")
+          .update({ username: username.trim() })
+          .eq("id", uid);
+        if (unErr && unErr.code === "23505") throw new Error("Username already taken");
+        if (unErr) throw unErr;
+      }
 
       toast.success("Profile updated successfully");
     } catch (err) {
@@ -231,6 +254,21 @@ export default function ProfileSettings() {
               placeholder="John Doe"
               className="bg-secondary/50 border-border/50"
             />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-foreground flex items-center gap-1.5">
+              <AtSign className="w-3.5 h-3.5 text-muted-foreground" />
+              Username
+            </label>
+            <Input
+              value={username}
+              onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
+              placeholder="e.g. john_trader"
+              className="bg-secondary/50 border-border/50 font-mono"
+              maxLength={30}
+            />
+            <p className="text-[11px] text-muted-foreground">Lowercase letters, numbers, and underscores only.</p>
           </div>
 
           <div className="space-y-1.5">

@@ -51,12 +51,20 @@ const xTickFmt = (v) => {
   return `${parts[1]}/${parts[2]}`;
 };
 
+const RANGE_OPTIONS = [
+  { label: '7D',  days: 7 },
+  { label: '30D', days: 30 },
+  { label: '90D', days: 90 },
+  { label: '1Y',  days: 365 },
+];
+
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [chartsLoading, setChartsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [rangeDays, setRangeDays] = useState(30);
 
   const loadStats = async () => {
     setLoading(true);
@@ -71,10 +79,10 @@ export default function AdminDashboard() {
     }
   };
 
-  const loadAnalytics = async () => {
+  const loadAnalytics = async (days) => {
     setChartsLoading(true);
     try {
-      const data = await getAdminAnalytics();
+      const data = await getAdminAnalytics(days);
       setAnalytics(data);
     } catch {
       setAnalytics(null);
@@ -83,9 +91,10 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleRefresh = () => { loadStats(); loadAnalytics(); };
+  const handleRefresh = () => { loadStats(); loadAnalytics(rangeDays); };
 
-  useEffect(() => { loadStats(); loadAnalytics(); }, []);
+  useEffect(() => { loadStats(); }, []);
+  useEffect(() => { loadAnalytics(rangeDays); }, [rangeDays]);
 
   const fmtCurrencyFull = (v) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(v);
@@ -93,19 +102,39 @@ export default function AdminDashboard() {
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
-          <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Platform overview · last 30 days</p>
+          <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
+            Platform overview · last {rangeDays === 365 ? 'year' : `${rangeDays} days`}
+          </p>
         </div>
-        <button
-          onClick={handleRefresh}
-          disabled={loading}
-          className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm rounded-lg transition-colors disabled:opacity-50"
-        >
-          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-          <span className="hidden sm:inline">Refresh</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Date range tabs */}
+          <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+            {RANGE_OPTIONS.map(({ label, days }) => (
+              <button
+                key={days}
+                onClick={() => setRangeDays(days)}
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                  rangeDays === days
+                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={handleRefresh}
+            disabled={loading}
+            className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm rounded-lg transition-colors disabled:opacity-50"
+          >
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -152,14 +181,14 @@ export default function AdminDashboard() {
               label="Total Users"
               value={stats.totalUsers.toLocaleString()}
               color="bg-blue-500/15 text-blue-500"
-              sub={analytics ? `+${analytics.totals.totalSignups} this month` : undefined}
+              sub={analytics ? `+${analytics.totals.totalSignups} this period` : undefined}
             />
             <StatCard
               icon={Wallet}
               label="Platform Value"
               value={fmtCurrencyFull(stats.totalPlatformValue)}
               color="bg-emerald-500/15 text-emerald-500"
-              sub={analytics ? `${fmtCurrency(analytics.totals.totalVolume)} volume/30d` : undefined}
+              sub={analytics ? `${fmtCurrency(analytics.totals.totalVolume)} volume/${rangeDays}d` : undefined}
             />
           </>
         ) : null}
@@ -182,7 +211,7 @@ export default function AdminDashboard() {
           {/* New signups per day */}
           <ChartCard
             title="New Signups / Day"
-            sub={`${analytics.totals.totalSignups} new users in the last 30 days`}
+            sub={`${analytics.totals.totalSignups} new users in the last ${rangeDays === 365 ? 'year' : `${rangeDays} days`}`}
           >
             <ResponsiveContainer width="100%" height={180}>
               <AreaChart data={analytics.signups} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
@@ -210,7 +239,7 @@ export default function AdminDashboard() {
           {/* Trading volume per day */}
           <ChartCard
             title="Trading Volume / Day"
-            sub={`${fmtCurrency(analytics.totals.totalVolume)} total over the last 30 days`}
+            sub={`${fmtCurrency(analytics.totals.totalVolume)} total over the last ${rangeDays === 365 ? 'year' : `${rangeDays} days`}`}
           >
             <ResponsiveContainer width="100%" height={180}>
               <BarChart data={analytics.volume} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
@@ -233,7 +262,7 @@ export default function AdminDashboard() {
           {/* Platform revenue (fees) per day */}
           <ChartCard
             title="Platform Revenue / Day"
-            sub={`${fmtCurrency(analytics.totals.totalRevenue)} in trading fees over the last 30 days`}
+            sub={`${fmtCurrency(analytics.totals.totalRevenue)} in trading fees over the last ${rangeDays === 365 ? 'year' : `${rangeDays} days`}`}
           >
             <ResponsiveContainer width="100%" height={180}>
               <AreaChart data={analytics.revenue} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
@@ -262,7 +291,7 @@ export default function AdminDashboard() {
           {/* Withdrawal request trends */}
           <ChartCard
             title="Withdrawal Requests / Day"
-            sub={`${analytics.totals.totalWithdrawals} requests over the last 30 days`}
+            sub={`${analytics.totals.totalWithdrawals} requests over the last ${rangeDays === 365 ? 'year' : `${rangeDays} days`}`}
           >
             <ResponsiveContainer width="100%" height={180}>
               <LineChart data={analytics.withdrawals} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+import { supabase } from '@/lib/supabaseClient';
 import {
   getAllUsersWithBalances,
   setUserAdminFlag,
@@ -16,7 +17,7 @@ import {
   RefreshCw, Search, Shield, ShieldOff, X,
   PlusCircle, MinusCircle, SlidersHorizontal, Lock, Unlock,
   DollarSign, User, ChevronDown, ChevronUp,
-  Trash2, Plus, Loader2,
+  Trash2, Plus, Loader2, Clock,
 } from 'lucide-react';
 
 const CRYPTO_ASSETS = ['BTC', 'ETH', 'SOL', 'BNB', 'USDT', 'USDC'];
@@ -304,7 +305,7 @@ function CryptoBalancePanel({ user }) {
 
 // ── Main BalanceModal with Fiat / Crypto tabs ──────────────────────────────────
 function BalanceModal({ user, onClose, onSuccess }) {
-  const [tab, setTab]               = useState('fiat'); // 'fiat' | 'crypto'
+  const [tab, setTab]               = useState('fiat'); // 'fiat' | 'crypto' | 'history'
   const [operation, setOperation]   = useState('add');
   const [amount, setAmount]         = useState('');
   const [note, setNote]             = useState('');
@@ -312,10 +313,26 @@ function BalanceModal({ user, onClose, onSuccess }) {
   const [lockLoading, setLockLoading] = useState(false);
   const [lockReason, setLockReason] = useState('');
   const [showLockForm, setShowLockForm] = useState(false);
+  const [history, setHistory]       = useState([]);
+  const [histLoading, setHistLoading] = useState(false);
 
   const portfolio = user.portfolio;
   const currentBalance = Number(portfolio?.cash_balance ?? 0);
   const isLocked = portfolio?.balance_locked ?? false;
+
+  useEffect(() => {
+    if (tab !== 'history' || !portfolio?.id) return;
+    setHistLoading(true);
+    supabase
+      .from('admin_audit_log')
+      .select('*')
+      .or(`target_id.eq.${portfolio.id},target_id.eq.${user.id}`)
+      .order('created_at', { ascending: false })
+      .limit(40)
+      .then(({ data }) => setHistory(data ?? []))
+      .catch(() => setHistory([]))
+      .finally(() => setHistLoading(false));
+  }, [tab, portfolio?.id, user.id]);
 
   const computePreview = () => {
     const n = parseFloat(amount);
@@ -385,8 +402,9 @@ function BalanceModal({ user, onClose, onSuccess }) {
         {/* Tabs */}
         <div className="flex gap-1 px-6 pt-4 pb-0">
           {[
-            { key: 'fiat',   label: 'Fiat (USD)' },
-            { key: 'crypto', label: 'Crypto Wallets' },
+            { key: 'fiat',    label: 'Fiat (USD)' },
+            { key: 'crypto',  label: 'Crypto Wallets' },
+            { key: 'history', label: 'History' },
           ].map(({ key, label }) => (
             <button key={key} onClick={() => setTab(key)}
               className={`px-4 py-2 rounded-t-lg text-sm font-semibold transition-colors border-b-2 ${
@@ -523,6 +541,53 @@ function BalanceModal({ user, onClose, onSuccess }) {
           )}
 
           {tab === 'crypto' && <CryptoBalancePanel user={user} />}
+
+          {tab === 'history' && (
+            <div className="space-y-3">
+              <p className="text-xs text-gray-500">Balance adjustments and account actions for this user.</p>
+              {histLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 size={20} className="animate-spin text-gray-500" />
+                </div>
+              ) : history.length === 0 ? (
+                <div className="text-center py-10">
+                  <Clock size={28} className="mx-auto text-gray-700 mb-2" />
+                  <p className="text-sm text-gray-500">No history found for this user.</p>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                  {history.map((entry) => (
+                    <div key={entry.id} className="bg-gray-800/60 rounded-lg px-4 py-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-white capitalize">
+                            {(entry.action || '').replace(/_/g, ' ')}
+                          </p>
+                          {entry.details?.note && (
+                            <p className="text-xs text-gray-400 mt-0.5 truncate">{entry.details.note}</p>
+                          )}
+                          {entry.details?.reason && (
+                            <p className="text-xs text-gray-400 mt-0.5 truncate">{entry.details.reason}</p>
+                          )}
+                          {entry.details?.amount != null && (
+                            <p className="text-xs text-emerald-400 mt-0.5 font-mono">
+                              {entry.details.operation === 'deduct' ? '−' : entry.details.operation === 'set' ? '=' : '+'} ${Number(entry.details.amount).toFixed(2)}
+                            </p>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-gray-600 whitespace-nowrap shrink-0">
+                          {new Date(entry.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                      {entry.admin_email && (
+                        <p className="text-[10px] text-gray-600 mt-1">by {entry.admin_email}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

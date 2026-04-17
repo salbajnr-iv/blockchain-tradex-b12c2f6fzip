@@ -56,6 +56,7 @@ import Leaderboard from './pages/Leaderboard';
 import AdminLeaderboard from './pages/admin/AdminLeaderboard';
 import Investments from './pages/Investments';
 import AdminInvestments from './pages/admin/AdminInvestments';
+import AdminDepositAddresses from './pages/admin/AdminDepositAddresses';
 import Alerts from './pages/Alerts';
 
 function App() {
@@ -144,6 +145,7 @@ function App() {
                     <Route path="support" element={<AdminSupport />} />
                     <Route path="leaderboard" element={<AdminLeaderboard />} />
                     <Route path="investments" element={<AdminInvestments />} />
+                    <Route path="deposit-addresses" element={<AdminDepositAddresses />} />
                   </Route>
                 </Route>
 

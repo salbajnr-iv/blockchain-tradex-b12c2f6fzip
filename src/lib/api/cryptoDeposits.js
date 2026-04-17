@@ -12,6 +12,58 @@ export const getMasterWallets = async () => {
   return data ?? [];
 };
 
+export const getAllMasterWallets = async () => {
+  const { data, error } = await supabase
+    .from('master_wallets')
+    .select('*')
+    .order('asset');
+  if (error) throw error;
+  return data ?? [];
+};
+
+export const addMasterWallet = async ({ asset, network, address, label }) => {
+  const { data, error } = await supabase
+    .from('master_wallets')
+    .insert({
+      asset:     asset.trim().toUpperCase(),
+      network:   network.trim(),
+      address:   address.trim(),
+      label:     label?.trim() || null,
+      is_active: true,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+};
+
+export const updateMasterWallet = async (id, { address, label }) => {
+  const { data, error } = await supabase
+    .from('master_wallets')
+    .update({ address: address?.trim(), label: label?.trim() || null })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+};
+
+export const toggleMasterWalletActive = async (id, is_active) => {
+  const { error } = await supabase
+    .from('master_wallets')
+    .update({ is_active })
+    .eq('id', id);
+  if (error) throw error;
+};
+
+export const deleteMasterWallet = async (id) => {
+  const { error } = await supabase
+    .from('master_wallets')
+    .delete()
+    .eq('id', id);
+  if (error) throw error;
+};
+
 // ── User Balances ────────────────────────────────────────────────────────────
 
 export const getUserCryptoBalances = async (userId) => {

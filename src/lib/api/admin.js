@@ -565,10 +565,10 @@ const fillDays = (dataMap, days = 30) => {
   return result
 }
 
-export const getAdminAnalytics = async () => {
-  const thirtyDaysAgo = new Date()
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-  const since = thirtyDaysAgo.toISOString()
+export const getAdminAnalytics = async (days = 30) => {
+  const sinceDate = new Date()
+  sinceDate.setDate(sinceDate.getDate() - days)
+  const since = sinceDate.toISOString()
 
   const safe = async (fn) => {
     try { return await fn() } catch { return [] }
@@ -615,10 +615,10 @@ export const getAdminAnalytics = async () => {
     }
   })
 
-  const signupsSeries      = fillDays(signupsByDay)
-  const volumeSeries       = fillDays(volumeByDay)
-  const revenueSeries      = fillDays(revenueByDay)
-  const withdrawalsSeries  = fillDays(withdrawalsByDay).map((d, i) => ({
+  const signupsSeries      = fillDays(signupsByDay, days)
+  const volumeSeries       = fillDays(volumeByDay, days)
+  const revenueSeries      = fillDays(revenueByDay, days)
+  const withdrawalsSeries  = fillDays(withdrawalsByDay, days).map((d, i) => ({
     ...d,
     pending: withdrawalsPendingByDay[d.date] || 0,
   }))
