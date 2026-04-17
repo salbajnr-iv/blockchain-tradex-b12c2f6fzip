@@ -5,6 +5,8 @@ import { listTrades } from "@/lib/api/portfolio";
 import { writePortfolioSnapshot, getPortfolioHistory } from "@/lib/api/portfolioSnapshots";
 import { usePortfolio } from "@/contexts/PortfolioContext";
 import { useLivePrices } from "@/hooks/useLivePrices";
+import { useTheme } from "@/contexts/ThemeContext";
+import { fmtUsd } from "@/lib/formatters";
 import { format, parseISO, startOfMonth } from "date-fns";
 import { groupBy, sumBy } from "lodash";
 import {
@@ -78,6 +80,9 @@ const PieTooltip = ({ active, payload }) => {
 export default function Analytics() {
   const { portfolioId, cashBalance, holdings, holdingsMap } = usePortfolio();
   const { cryptoList, isLoading: pricesLoading, portfolioTotal, cryptoPortfolioValue } = useLivePrices();
+  const { displayPrefs } = useTheme();
+  const compact  = displayPrefs?.compactNumbers  ?? true;
+  const animated = displayPrefs?.animatedCharts  ?? true;
   const [historyRange, setHistoryRange] = useState("1M");
   const [snapshotWritten, setSnapshotWritten] = useState(false);
 
@@ -265,9 +270,9 @@ export default function Analytics() {
         {/* Summary stats */}
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
           {[
-            { label: "Portfolio Value", value: `$${portfolioTotal.toLocaleString(undefined, { maximumFractionDigits: 2 })}`, icon: Wallet, color: "text-primary" },
-            { label: "Total Withdrawals", value: `$${totalWithdrawals.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, icon: ArrowUpRight, color: "text-yellow-400" },
-            { label: "Trading Volume", value: `$${totalTradingVolume.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, icon: TrendingUp, color: "text-cyan-400" },
+            { label: "Portfolio Value", value: fmtUsd(portfolioTotal, compact), icon: Wallet, color: "text-primary" },
+            { label: "Total Withdrawals", value: fmtUsd(totalWithdrawals, compact), icon: ArrowUpRight, color: "text-yellow-400" },
+            { label: "Trading Volume", value: fmtUsd(totalTradingVolume, compact), icon: TrendingUp, color: "text-cyan-400" },
             { label: "Total Activity", value: totalTxCount, icon: BarChart3, color: "text-violet-400" },
           ].map((stat, i) => (
             <motion.div
@@ -319,8 +324,8 @@ export default function Analytics() {
 
           {historyData.length < 2 ? (
             <div className="text-center py-12 text-muted-foreground text-sm">
-              <p>Portfolio history builds up over time.</p>
-              <p className="mt-1 text-xs">Run <code className="bg-secondary/50 px-1.5 py-0.5 rounded text-[10px]">sql/recurring-dca-migration.sql</code> in Supabase to enable persistent snapshots.</p>
+              <p>Portfolio history builds up over time as you use the app.</p>
+              <p className="mt-1 text-xs opacity-70">Visit this page daily — each visit records a snapshot that populates this chart.</p>
             </div>
           ) : (
             <div className="mt-4">
@@ -334,9 +339,9 @@ export default function Analytics() {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                   <XAxis dataKey="date" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v >= 1000 ? (v / 1000).toFixed(0) + "k" : v}`} />
+                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => compact ? fmtUsd(v, true) : `$${v >= 1000 ? (v / 1000).toFixed(0) + "k" : v}`} />
                   <Tooltip content={<HistoryTooltip />} />
-                  <Area type="monotone" dataKey="Value" stroke="hsl(var(--primary))" strokeWidth={2.5} fill="url(#histGrad)" name="Portfolio Value" dot={false} />
+                  <Area isAnimationActive={animated} type="monotone" dataKey="Value" stroke="hsl(var(--primary))" strokeWidth={2.5} fill="url(#histGrad)" name="Portfolio Value" dot={false} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -502,8 +507,8 @@ export default function Analytics() {
                 <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v >= 1000 ? (v / 1000).toFixed(0) + "k" : v}`} />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ fontSize: 12, color: "hsl(var(--muted-foreground))" }} />
-                <Bar dataKey="Withdrawals" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="Trading" fill="hsl(var(--chart-4))" radius={[4, 4, 0, 0]} />
+                <Bar isAnimationActive={animated} dataKey="Withdrawals" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                <Bar isAnimationActive={animated} dataKey="Trading" fill="hsl(var(--chart-4))" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}

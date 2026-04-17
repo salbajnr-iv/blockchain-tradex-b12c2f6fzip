@@ -2,9 +2,15 @@ import React from "react";
 import { TrendingUp, TrendingDown, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
+import { useTheme } from "@/contexts/ThemeContext";
+import { fmtUsd, fmtPrice } from "@/lib/formatters";
 
 export default function MarketTable({ cryptoList, isLoading }) {
   const navigate = useNavigate();
+  const { displayPrefs } = useTheme();
+  const compact    = displayPrefs?.compactNumbers   ?? true;
+  const showBadges = displayPrefs?.percentageBadges ?? true;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -31,6 +37,7 @@ export default function MarketTable({ cryptoList, isLoading }) {
           <tbody>
             {cryptoList.map((coin) => {
               const holdingsValue = coin.holdings * coin.price;
+              const isUp = coin.change24h >= 0;
               return (
                 <tr
                   key={coin.symbol}
@@ -50,23 +57,27 @@ export default function MarketTable({ cryptoList, isLoading }) {
                   </td>
                   <td className="text-right px-5 py-4">
                     <span className="font-semibold text-sm tabular-nums">
-                      ${coin.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {fmtPrice(coin.price, compact)}
                     </span>
                   </td>
                   <td className="text-right px-5 py-4 hidden sm:table-cell">
-                    <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium ${
-                      coin.change24h >= 0
-                        ? "bg-primary/10 text-primary"
-                        : "bg-destructive/10 text-destructive"
-                    }`}>
-                      {coin.change24h >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                      {coin.change24h >= 0 ? "+" : ""}{coin.change24h}%
-                    </div>
+                    {showBadges ? (
+                      <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium ${
+                        isUp ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive"
+                      }`}>
+                        {isUp ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                        {isUp ? "+" : ""}{coin.change24h}%
+                      </div>
+                    ) : (
+                      <span className={`text-xs font-semibold tabular-nums ${isUp ? "text-primary" : "text-destructive"}`}>
+                        {isUp ? "+" : ""}{coin.change24h}%
+                      </span>
+                    )}
                   </td>
                   <td className="text-right px-5 py-4 text-sm text-muted-foreground hidden md:table-cell">${coin.volume}</td>
                   <td className="text-right px-5 py-4 text-sm text-muted-foreground hidden lg:table-cell">${coin.marketCap}</td>
                   <td className="text-right px-5 py-4">
-                    <p className="font-semibold text-sm tabular-nums">${holdingsValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+                    <p className="font-semibold text-sm tabular-nums">{fmtUsd(holdingsValue, compact)}</p>
                     <p className="text-xs text-muted-foreground">{coin.holdings} {coin.symbol}</p>
                   </td>
                 </tr>
