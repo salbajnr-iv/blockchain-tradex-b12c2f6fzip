@@ -70,9 +70,8 @@ export default function AppearanceSettings() {
                 onClick={() => setAccentColor(id)}
                 title={label}
                 className={`relative w-10 h-10 rounded-full ${bg} transition-all focus:outline-none ${
-                  isSelected ? "ring-2 ring-offset-2 ring-offset-card scale-110" : "hover:scale-105 opacity-70 hover:opacity-100"
+                  isSelected ? "ring-2 ring-offset-2 ring-offset-background ring-white/80 scale-110" : "hover:scale-105 opacity-70 hover:opacity-100"
                 }`}
-                style={isSelected ? { ringColor: `var(--primary)` } : {}}
               >
                 {isSelected && (
                   <span className="absolute inset-0 flex items-center justify-center">

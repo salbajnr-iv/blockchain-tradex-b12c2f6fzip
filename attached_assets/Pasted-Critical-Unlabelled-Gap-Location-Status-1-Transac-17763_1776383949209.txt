@@ -1,0 +1,44 @@
+Critical / Unlabelled
+
+| # | Gap | Location | Status |
+|---|-----|----------|--------|
+| 1 | Transaction CSV export not implemented — Download button renders but does nothing | Transactions.jsx | 🔜 Next |
+| 2 | Appearance settings completely dead — accent colour swatches and display toggles have no onChange handler | settings/Appearance.jsx | 🔜 Next |
+| 3 | Duplicate nav items — "My Portfolio" and "Transactions" both link to /transactions | Layout.jsx | 🔜 Next |
+
+---
+
+## High — Significant Functional Gaps
+
+| # | Gap | Location | Status |
+|---|-----|----------|--------|
+| 4 | Notification preferences only saved to localStorage | settings/NotificationPrefs.jsx | ✅ Done |
+| 5 | currentPassword field collected but never verified | settings/Security.jsx | ✅ Done |
+| 6 | "Sign Out All Sessions" only signs out current session | settings/Security.jsx | ✅ Done |
+| 7 | "Delete Account" is permanently disabled | settings/Security.jsx | ✅ Done |
+| 8 | 2FA/MFA is a "coming soon" stub | settings/Security.jsx | ✅ Done |
+
+---
+
+## Medium — UX Holes and Feature Stubs
+
+| # | Gap | Location | Status |
+|---|-----|----------|--------|
+| 9  | Virtual card details unstable across devices, no CVV | Card.jsx | ✅ Done |
+| 10 | No bulk cancel / no edit for limit orders | Orders.jsx | ✅ Done |
+| 11 | KYC hardcoded to Intermediate tier only | settings/Kyc.jsx | ✅ Done (was already correct) |
+| 12 | No saved withdrawal destinations across devices | Withdrawal.jsx | ✅ Done |
+| 13 | DCA and limit orders only fire while browser is open | useRecurringOrderEngine / usePendingOrderEngine | ✅ Done (notice added; server-side is architectural) |
+| 14 | PayPal payment method is just a text field, no validation | settings/Payments.jsx | ✅ Done |
+
+---
+
+## Low — Polish and Validation
+
+| # | Gap | Location | Status |
+|---|-----|----------|--------|
+| 15 | Password strength shown but not enforced on register | auth/Register.jsx | ⬜ Backlog |
+| 16 | Reset Password page accessible to anyone | auth/ResetPassword.jsx | ⬜ Backlog |
+| 17 | No social login (Google / GitHub) | auth/Login.jsx, Register.jsx | ⬜ Backlog |
+| 18 | Portfolio History chart requires SQL migration | Analytics.jsx | ⬜ Backlog |
+| 19 | Admin "Sign Out All" doesn't use global scope | settings/Security.jsx | ⬜ Backlog |
