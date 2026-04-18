@@ -57,7 +57,7 @@ function Sidebar({ onClose }) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <img
-              src="/logo.png"
+              src="/logo.svg"
               alt="BlockTrade"
               width="auto"
               height="36"
@@ -158,7 +158,7 @@ export default function AdminLayout() {
           </button>
           <div className="flex items-center gap-2">
             <img
-              src="/logo.png"
+              src="/logo.svg"
               alt="BlockTrade"
               width="auto"
               height="36"

@@ -405,7 +405,7 @@ export default function Layout() {
         <div className="flex items-center justify-between px-5 py-4 border-b border-border/50">
           <Link to="/" className="flex items-center">
             <img
-              src="/logo.png"
+              src="/logo.svg"
               alt="BlockTrade"
               width="auto"
               height="36"

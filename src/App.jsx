@@ -1,6 +1,8 @@
+import React, { useState, useCallback } from 'react';
 import { Toaster } from "@/components/ui/toaster"
 import { Toaster as SonnerToaster } from "@/components/ui/sonner"
 import AppErrors from "@/components/AppErrors"
+import SplashScreen from '@/components/SplashScreen';
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
@@ -60,7 +62,12 @@ import AdminDepositAddresses from './pages/admin/AdminDepositAddresses';
 import Alerts from './pages/Alerts';
 
 function App() {
+  const [splashDone, setSplashDone] = useState(false);
+  const handleSplashDone = useCallback(() => setSplashDone(true), []);
+
   return (
+    <>
+      {!splashDone && <SplashScreen onDone={handleSplashDone} />}
     <ThemeProvider>
       <AuthProvider>
         <PortfolioProvider>
@@ -160,6 +167,7 @@ function App() {
         </PortfolioProvider>
       </AuthProvider>
     </ThemeProvider>
+    </>
   );
 }
 
