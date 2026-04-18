@@ -1,39 +1,33 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, {
+  useState, useEffect, useRef, useCallback, useMemo,
+} from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  MessageSquare, ChevronDown, ChevronRight, Send, Clock, CheckCircle2,
-  AlertCircle, XCircle, Loader2, Plus, Search, LifeBuoy, BookOpen,
-  Zap, Shield, CreditCard, ArrowUpDown, Settings, HelpCircle,
-  ChevronLeft, MessageCircle, Inbox, Star,
+  MessageSquare, Send, Loader2, Paperclip, X, Image as ImageIcon,
+  FileText, Download, LifeBuoy, ChevronDown, ChevronRight,
+  BookOpen, Shield, CreditCard, ArrowUpDown, Settings, HelpCircle,
+  Zap, CheckCircle2, Clock, XCircle, RefreshCw, Plus, Search,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { toast } from '@/lib/toast';
-import { submitSupportTicket, fetchMyTickets } from "@/lib/api/support";
+import { useAuth } from "@/lib/AuthContext";
+import { supabase } from "@/lib/supabaseClient";
+import {
+  getOrCreateConversation,
+  fetchMessages,
+  sendMessage,
+  uploadSupportFile,
+  markReadByUser,
+  closeConversation,
+  reopenConversation,
+} from "@/lib/api/support";
+import { toast } from "sonner";
 
-const CATEGORIES = [
-  { value: "account",      label: "Account & Profile",     icon: Settings },
-  { value: "deposit",      label: "Deposits",              icon: CreditCard },
-  { value: "withdrawal",   label: "Withdrawals",           icon: CreditCard },
-  { value: "trading",      label: "Trading & Orders",      icon: ArrowUpDown },
-  { value: "kyc",          label: "KYC Verification",      icon: Shield },
-  { value: "security",     label: "Security",              icon: Shield },
-  { value: "technical",    label: "Technical Issue",       icon: Zap },
-  { value: "general",      label: "General Enquiry",       icon: HelpCircle },
-];
-
-const PRIORITIES = [
-  { value: "low",      label: "Low",      color: "text-muted-foreground" },
-  { value: "normal",   label: "Normal",   color: "text-blue-400" },
-  { value: "high",     label: "High",     color: "text-orange-400" },
-  { value: "urgent",   label: "Urgent",   color: "text-red-500" },
-];
+// ── Constants ─────────────────────────────────────────────────────────────────
 
 const STATUS_CFG = {
-  open:     { icon: Clock,         color: "text-yellow-500 bg-yellow-500/10 border-yellow-500/20",   label: "Open" },
-  answered: { icon: CheckCircle2,  color: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20", label: "Answered" },
-  closed:   { icon: XCircle,       color: "text-muted-foreground bg-secondary border-border",         label: "Closed" },
-  pending:  { icon: AlertCircle,   color: "text-blue-400 bg-blue-400/10 border-blue-400/20",          label: "In Progress" },
+  open:        { label: "Open",        color: "text-yellow-500",  bg: "bg-yellow-500/10 border-yellow-500/20",  icon: Clock },
+  in_progress: { label: "In Progress", color: "text-blue-400",    bg: "bg-blue-400/10 border-blue-400/20",      icon: RefreshCw },
+  resolved:    { label: "Resolved",    color: "text-emerald-500", bg: "bg-emerald-500/10 border-emerald-500/20", icon: CheckCircle2 },
+  closed:      { label: "Closed",      color: "text-muted-foreground", bg: "bg-secondary border-border",        icon: XCircle },
 };
 
 const FAQS = [
@@ -41,8 +35,7 @@ const FAQS = [
     category: "Getting Started",
     icon: BookOpen,
     items: [
-      { q: "How do I verify my account (KYC)?", a: "Go to Settings → KYC Verification. You'll need a government-issued ID (passport, national ID, or driver's licence), a selfie, and proof of address. Verification typically takes 1–3 business days." },
-      { q: "What countries are supported?", a: "BlockTrade is available in 100+ countries across Europe, North America, Asia, Africa, and beyond. Check our full list during registration." },
+      { q: "How do I verify my account (KYC)?", a: "Go to Settings → KYC Verification. You'll need a government-issued ID, a selfie, and proof of address. Verification typically takes 1–3 business days." },
       { q: "How do I change my password?", a: "Go to Settings → Security → Change Password. You'll receive a verification email before the change is confirmed." },
     ],
   },
@@ -50,30 +43,260 @@ const FAQS = [
     category: "Deposits & Withdrawals",
     icon: CreditCard,
     items: [
-      { q: "How long do crypto deposits take?", a: "Crypto deposits require network confirmations: BTC ~30 min (3 confirmations), ETH ~5 min (12 confirmations), USDT/USDC ~2 min. Upload your transaction proof after sending for faster processing." },
-      { q: "What are the withdrawal fees?", a: "Withdrawal fees vary by asset and method. Crypto withdrawals incur network fees. Fiat withdrawals via bank transfer are typically free for premium accounts; standard accounts pay a small fee." },
-      { q: "How do I deposit fiat currency?", a: "Go to Assets → select your currency → Deposit. Choose Bank Transfer or Wire Transfer, then send funds to the displayed bank account using your reference code. Funds appear within 1–3 business days." },
-      { q: "Why is my withdrawal pending?", a: "Withdrawals are reviewed for security. Large withdrawals may take up to 24 hours. If your withdrawal has been pending more than 48 hours, please submit a support ticket." },
+      { q: "How long do crypto deposits take?", a: "Crypto deposits require network confirmations: BTC ~30 min, ETH ~5 min, USDT/USDC ~2 min. Upload your transaction proof for faster processing." },
+      { q: "Why is my withdrawal pending?", a: "Withdrawals are reviewed for security. Large withdrawals may take up to 24 hours. If pending for more than 48 hours, please chat with us." },
     ],
   },
   {
     category: "Trading",
     icon: ArrowUpDown,
     items: [
-      { q: "What order types are available?", a: "BlockTrade supports Market Orders (instant execution at current price), Limit Orders (execute at your set price), and Stop-Limit Orders (trigger price + limit price for risk management)." },
-      { q: "What are the trading fees?", a: "Trading fees start at 0.1% per trade for standard accounts. Premium members get reduced fees from 0.05%. Market makers and high-volume traders can negotiate custom rates." },
-      { q: "How does the Recurring/DCA feature work?", a: "Dollar-Cost Averaging lets you buy a fixed amount of crypto on a regular schedule (daily, weekly, monthly). Go to Markets → Recurring/DCA to set up your plan." },
+      { q: "What order types are available?", a: "BlockTrade supports Market Orders (instant execution at current price) and Limit Orders (execute at your set price)." },
+      { q: "What are the trading fees?", a: "Trading fees are 0.1% per trade for standard accounts. Market makers and high-volume traders can negotiate custom rates." },
     ],
   },
   {
     category: "Security",
     icon: Shield,
     items: [
-      { q: "How is my money kept safe?", a: "BlockTrade uses institutional-grade cold storage for 95% of all crypto assets. Remaining funds are held in hot wallets secured with multi-signature technology. All accounts are protected by 256-bit SSL encryption." },
-      { q: "I suspect unauthorised account access — what should I do?", a: "Immediately change your password and contact our support team with 'URGENT - Security' as the subject. We'll lock your account and investigate within 1 hour." },
+      { q: "How is my money kept safe?", a: "BlockTrade uses institutional-grade cold storage for 95% of all assets. Accounts are protected by 256-bit SSL encryption." },
+      { q: "I suspect unauthorised account access — what do I do?", a: "Immediately change your password and contact our support team. We'll lock your account and investigate within 1 hour." },
     ],
   },
 ];
+
+// ── Helper: format time ───────────────────────────────────────────────────────
+
+function fmtTime(dateStr) {
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diff = now - d;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  if (hrs < 48) return `Yesterday ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+  return d.toLocaleDateString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function fmtFileSize(bytes) {
+  if (!bytes) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1048576).toFixed(1)} MB`;
+}
+
+// ── Message bubble ────────────────────────────────────────────────────────────
+
+function MessageBubble({ msg, isOwn }) {
+  const isImage = msg.file_type?.startsWith("image/");
+  const hasFile = !!msg.file_url;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.2 }}
+      className={`flex items-end gap-2 ${isOwn ? "flex-row-reverse" : "flex-row"}`}
+    >
+      {/* Avatar */}
+      {!isOwn && (
+        <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center shrink-0 mb-0.5">
+          <LifeBuoy className="w-3.5 h-3.5 text-primary-foreground" />
+        </div>
+      )}
+
+      <div className={`max-w-[75%] sm:max-w-[60%] space-y-1 ${isOwn ? "items-end" : "items-start"} flex flex-col`}>
+        {/* Sender label */}
+        <p className="text-[10px] text-muted-foreground px-1">
+          {isOwn ? "You" : "BlockTrade Support"} · {fmtTime(msg.created_at)}
+        </p>
+
+        {/* Bubble */}
+        <div
+          className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm ${
+            isOwn
+              ? "bg-primary text-primary-foreground rounded-br-sm"
+              : "bg-card border border-border/60 text-foreground rounded-bl-sm"
+          }`}
+        >
+          {msg.content && <p className="whitespace-pre-wrap break-words">{msg.content}</p>}
+
+          {hasFile && (
+            <div className={`mt-2 ${msg.content ? "pt-2 border-t border-white/20" : ""}`}>
+              {isImage ? (
+                <a href={msg.file_url} target="_blank" rel="noreferrer">
+                  <img
+                    src={msg.file_url}
+                    alt={msg.file_name}
+                    className="max-w-full rounded-lg max-h-48 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                  />
+                </a>
+              ) : (
+                <a
+                  href={msg.file_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={`flex items-center gap-2 text-xs rounded-lg px-3 py-2 ${
+                    isOwn ? "bg-white/15 hover:bg-white/25" : "bg-secondary hover:bg-secondary/80"
+                  } transition-colors`}
+                >
+                  <FileText className="w-4 h-4 shrink-0" />
+                  <span className="truncate flex-1">{msg.file_name}</span>
+                  <span className="shrink-0 opacity-70">{fmtFileSize(msg.file_size)}</span>
+                  <Download className="w-3.5 h-3.5 shrink-0" />
+                </a>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// ── File preview pill ─────────────────────────────────────────────────────────
+
+function FilePill({ file, onRemove }) {
+  const isImage = file.type.startsWith("image/");
+  const previewUrl = isImage ? URL.createObjectURL(file) : null;
+
+  return (
+    <div className="flex items-center gap-2 bg-secondary/80 border border-border/60 rounded-xl px-3 py-2 max-w-xs">
+      {isImage && previewUrl ? (
+        <img src={previewUrl} alt={file.name} className="w-8 h-8 rounded-md object-cover shrink-0" />
+      ) : (
+        <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+          <FileText className="w-4 h-4 text-primary" />
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-medium text-foreground truncate">{file.name}</p>
+        <p className="text-[10px] text-muted-foreground">{fmtFileSize(file.size)}</p>
+      </div>
+      <button
+        onClick={onRemove}
+        className="shrink-0 text-muted-foreground hover:text-destructive transition-colors"
+      >
+        <X className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+}
+
+// ── Chat input ────────────────────────────────────────────────────────────────
+
+function ChatInput({ onSend, disabled, placeholder = "Type a message…" }) {
+  const [text, setText] = useState("");
+  const [file, setFile] = useState(null);
+  const [sending, setSending] = useState(false);
+  const textareaRef = useRef(null);
+  const fileInputRef = useRef(null);
+
+  const handleSend = async () => {
+    if ((!text.trim() && !file) || sending || disabled) return;
+    setSending(true);
+    try {
+      await onSend(text, file);
+      setText("");
+      setFile(null);
+      if (textareaRef.current) textareaRef.current.style.height = "auto";
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  const handleFileChange = (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    if (f.size > 10 * 1024 * 1024) {
+      toast.error("File must be under 10 MB");
+      return;
+    }
+    setFile(f);
+    e.target.value = "";
+  };
+
+  const autoResize = () => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 160) + "px";
+  };
+
+  const canSend = (text.trim().length > 0 || !!file) && !sending && !disabled;
+
+  return (
+    <div className="space-y-2">
+      {file && <FilePill file={file} onRemove={() => setFile(null)} />}
+
+      <div className={`flex items-end gap-2 bg-secondary/40 border rounded-2xl px-3 py-2.5 transition-colors ${
+        disabled ? "border-border/30 opacity-60" : "border-border/60 focus-within:border-primary/50 focus-within:bg-background"
+      }`}>
+        {/* File attach */}
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={disabled}
+          className="shrink-0 text-muted-foreground hover:text-primary transition-colors p-1 rounded-lg hover:bg-primary/10"
+          title="Attach file or image"
+        >
+          <Paperclip className="w-4.5 h-4.5 w-[18px] h-[18px]" />
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,.pdf,.doc,.docx,.txt"
+          className="hidden"
+          onChange={handleFileChange}
+        />
+
+        {/* Text area */}
+        <textarea
+          ref={textareaRef}
+          value={text}
+          onChange={(e) => { setText(e.target.value); autoResize(); }}
+          onKeyDown={handleKeyDown}
+          disabled={disabled}
+          placeholder={placeholder}
+          rows={1}
+          className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground resize-none outline-none min-h-[24px] max-h-[160px] py-0.5 leading-relaxed"
+        />
+
+        {/* Send button */}
+        <button
+          onClick={handleSend}
+          disabled={!canSend}
+          className={`shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
+            canSend
+              ? "bg-primary text-primary-foreground hover:bg-primary/90 scale-100"
+              : "bg-secondary text-muted-foreground scale-95"
+          }`}
+        >
+          {sending ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Send className="w-4 h-4" />
+          )}
+        </button>
+      </div>
+
+      <p className="text-[10px] text-muted-foreground px-1">
+        Press Enter to send · Shift + Enter for new line · Max 10 MB per file
+      </p>
+    </div>
+  );
+}
+
+// ── FAQ item ──────────────────────────────────────────────────────────────────
 
 function FAQItem({ item }) {
   const [open, setOpen] = useState(false);
@@ -84,19 +307,20 @@ function FAQItem({ item }) {
         className="w-full flex items-center justify-between px-4 py-3.5 text-left hover:bg-secondary/30 transition-colors"
       >
         <span className="text-sm font-medium text-foreground pr-4">{item.q}</span>
-        <motion.div animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.2 }}>
+        <motion.div animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.18 }}>
           <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
         </motion.div>
       </button>
       <AnimatePresence initial={false}>
         {open && (
           <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            initial={{ height: 0 }}
+            animate={{ height: "auto" }}
+            exit={{ height: 0 }}
+            transition={{ duration: 0.18 }}
+            className="overflow-hidden"
           >
-            <div className="px-4 pb-4 text-sm text-muted-foreground leading-relaxed border-t border-border/30 pt-3">
+            <div className="px-4 pb-4 pt-2.5 text-sm text-muted-foreground leading-relaxed border-t border-border/30">
               {item.a}
             </div>
           </motion.div>
@@ -106,220 +330,197 @@ function FAQItem({ item }) {
   );
 }
 
-function TicketCard({ ticket, onClick }) {
-  const cfg = STATUS_CFG[ticket.status] || STATUS_CFG.open;
-  const StatusIcon = cfg.icon;
-  const cat = CATEGORIES.find((c) => c.value === ticket.category);
-  const CatIcon = cat?.icon || HelpCircle;
-  return (
-    <button
-      onClick={onClick}
-      className="w-full text-left p-4 bg-card border border-border/40 rounded-xl hover:border-primary/30 hover:bg-secondary/20 transition-all group"
-    >
-      <div className="flex items-start gap-3">
-        <div className="w-9 h-9 rounded-xl bg-secondary/60 flex items-center justify-center shrink-0">
-          <CatIcon className="w-4 h-4 text-muted-foreground" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-2">
-            <p className="text-sm font-semibold text-foreground truncate">{ticket.subject}</p>
-            <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full border shrink-0 ${cfg.color}`}>
-              <StatusIcon className="w-2.5 h-2.5" />
-              {cfg.label}
-            </span>
-          </div>
-          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{ticket.message}</p>
-          <p className="text-[10px] text-muted-foreground/60 mt-1.5">
-            {new Date(ticket.created_at).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}
-            {ticket.admin_reply && <span className="ml-2 text-emerald-500">· Reply received</span>}
-          </p>
-        </div>
-        <ChevronRight className="w-4 h-4 text-muted-foreground/40 group-hover:text-muted-foreground shrink-0 mt-0.5 transition-colors" />
-      </div>
-    </button>
-  );
-}
+// ── Date divider ──────────────────────────────────────────────────────────────
 
-function TicketDetail({ ticket, onBack }) {
-  const cfg = STATUS_CFG[ticket.status] || STATUS_CFG.open;
-  const StatusIcon = cfg.icon;
+function DateDivider({ date }) {
+  const d = new Date(date);
+  const now = new Date();
+  const diff = Math.floor((now - d) / 86400000);
+  const label = diff === 0 ? "Today" : diff === 1 ? "Yesterday"
+    : d.toLocaleDateString([], { month: "long", day: "numeric", year: "numeric" });
+
   return (
-    <div className="space-y-4">
-      <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
-        <ChevronLeft className="w-4 h-4" /> Back to tickets
-      </button>
-      <div className="bg-card border border-border/40 rounded-xl p-5 space-y-4">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="font-semibold text-foreground">{ticket.subject}</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Submitted {new Date(ticket.created_at).toLocaleDateString([], { month: "long", day: "numeric", year: "numeric" })}
-            </p>
-          </div>
-          <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${cfg.color}`}>
-            <StatusIcon className="w-3 h-3" />
-            {cfg.label}
-          </span>
-        </div>
-        <div className="flex flex-wrap gap-2 text-xs">
-          <span className="bg-secondary px-2.5 py-1 rounded-full text-muted-foreground capitalize">
-            {CATEGORIES.find((c) => c.value === ticket.category)?.label || ticket.category}
-          </span>
-          <span className={`px-2.5 py-1 rounded-full border capitalize ${
-            ticket.priority === "urgent" ? "border-red-500/30 text-red-500 bg-red-500/5" :
-            ticket.priority === "high" ? "border-orange-400/30 text-orange-400 bg-orange-400/5" :
-            "border-border/40 text-muted-foreground bg-secondary"
-          }`}>
-            {ticket.priority} priority
-          </span>
-        </div>
-        <div>
-          <p className="text-xs font-medium text-muted-foreground mb-1.5">Your message</p>
-          <div className="bg-secondary/40 rounded-lg p-3 text-sm text-foreground leading-relaxed">
-            {ticket.message}
-          </div>
-        </div>
-        {ticket.admin_reply && (
-          <div className="border border-primary/20 rounded-xl p-4 bg-primary/5 space-y-2">
-            <div className="flex items-center gap-2">
-              <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center">
-                <Star className="w-2.5 h-2.5 text-primary-foreground" />
-              </div>
-              <span className="text-xs font-semibold text-primary">BlockTrade Support</span>
-              {ticket.replied_at && (
-                <span className="text-[10px] text-muted-foreground ml-auto">
-                  {new Date(ticket.replied_at).toLocaleDateString([], { month: "short", day: "numeric" })}
-                </span>
-              )}
-            </div>
-            <p className="text-sm text-foreground leading-relaxed">{ticket.admin_reply}</p>
-          </div>
-        )}
-        {!ticket.admin_reply && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground bg-secondary/30 rounded-lg p-3">
-            <Clock className="w-3.5 h-3.5 shrink-0" />
-            Our team typically responds within 4–24 hours. You'll receive a notification when we reply.
-          </div>
-        )}
-      </div>
+    <div className="flex items-center gap-3 py-2">
+      <div className="flex-1 h-px bg-border/40" />
+      <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{label}</span>
+      <div className="flex-1 h-px bg-border/40" />
     </div>
   );
 }
 
-function NewTicketForm({ onSubmit, onCancel }) {
-  const [form, setForm] = useState({ subject: "", category: "general", priority: "normal", message: "" });
-  const [submitting, setSubmitting] = useState(false);
-  const upd = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!form.subject.trim() || !form.message.trim()) {
-      toast.error("Please fill in all required fields");
-      return;
-    }
-    setSubmitting(true);
-    try {
-      await onSubmit(form);
-      toast.success("Support ticket submitted! We'll respond within 24 hours.");
-    } catch (err) {
-      toast.error(err?.message || "Failed to submit ticket");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <button onClick={onCancel} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
-        <ChevronLeft className="w-4 h-4" /> Back
-      </button>
-      <div className="bg-card border border-border/40 rounded-xl p-5">
-        <h2 className="font-semibold text-foreground mb-4">New Support Ticket</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">Subject *</label>
-            <Input
-              value={form.subject}
-              onChange={(e) => upd("subject", e.target.value)}
-              placeholder="Brief description of your issue"
-              className="mt-1.5"
-              required
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-medium text-muted-foreground">Category *</label>
-              <select
-                value={form.category}
-                onChange={(e) => upd("category", e.target.value)}
-                className="mt-1.5 w-full h-10 rounded-lg border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-              >
-                {CATEGORIES.map((c) => (
-                  <option key={c.value} value={c.value}>{c.label}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-medium text-muted-foreground">Priority</label>
-              <select
-                value={form.priority}
-                onChange={(e) => upd("priority", e.target.value)}
-                className="mt-1.5 w-full h-10 rounded-lg border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-              >
-                {PRIORITIES.map((p) => (
-                  <option key={p.value} value={p.value}>{p.label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">Message *</label>
-            <textarea
-              value={form.message}
-              onChange={(e) => upd("message", e.target.value)}
-              placeholder="Describe your issue in detail. Include any relevant transaction IDs, dates, or error messages."
-              rows={6}
-              required
-              className="mt-1.5 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
-            />
-          </div>
-          <div className="flex gap-3 pt-1">
-            <Button type="button" variant="outline" onClick={onCancel} className="flex-1">
-              Cancel
-            </Button>
-            <Button type="submit" disabled={submitting} className="flex-1 gap-2">
-              {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-              Submit Ticket
-            </Button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
+// ── Main Support page ─────────────────────────────────────────────────────────
 
 const TABS = [
-  { id: "faq",     label: "FAQ",           icon: BookOpen },
-  { id: "tickets", label: "My Tickets",    icon: Inbox },
-  { id: "contact", label: "Contact Us",    icon: MessageCircle },
+  { id: "chat", label: "Live Chat", icon: MessageSquare },
+  { id: "faq",  label: "FAQ",       icon: BookOpen },
 ];
 
 export default function Support() {
-  const [tab, setTab] = useState("faq");
+  const { user } = useAuth();
+  const [tab, setTab] = useState("chat");
+  const [conv, setConv] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [convLoading, setConvLoading] = useState(true);
   const [faqSearch, setFaqSearch] = useState("");
-  const [tickets, setTickets] = useState([]);
-  const [ticketsLoading, setTicketsLoading] = useState(false);
-  const [view, setView] = useState("list"); // 'list' | 'new' | 'detail'
-  const [selectedTicket, setSelectedTicket] = useState(null);
-  const [expandedFaqCat, setExpandedFaqCat] = useState(null);
+  const messagesEndRef = useRef(null);
+  const channelRef = useRef(null);
 
-  const loadTickets = useCallback(async () => {
-    setTicketsLoading(true);
-    try { setTickets(await fetchMyTickets()); } catch { /* ignore */ }
-    finally { setTicketsLoading(false); }
+  const scrollToBottom = useCallback((smooth = true) => {
+    messagesEndRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "instant" });
   }, []);
 
-  useEffect(() => { if (tab === "tickets") loadTickets(); }, [tab, loadTickets]);
+  // Load or create conversation
+  const initConversation = useCallback(async () => {
+    if (!user) return;
+    setConvLoading(true);
+    try {
+      const { data: profile } = await supabase
+        .from("users")
+        .select("full_name, email")
+        .eq("id", user.id)
+        .single();
+
+      const conversation = await getOrCreateConversation(
+        user.id,
+        profile?.email || user.email,
+        profile?.full_name || user.email
+      );
+      setConv(conversation);
+
+      const msgs = await fetchMessages(conversation.id);
+      setMessages(msgs);
+      await markReadByUser(conversation.id);
+    } catch (err) {
+      toast.error("Could not load support chat");
+    } finally {
+      setConvLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => { initConversation(); }, [initConversation]);
+
+  // Scroll to bottom when messages load
+  useEffect(() => {
+    if (messages.length > 0) scrollToBottom(false);
+  }, [conv?.id]);
+
+  // Real-time subscription
+  useEffect(() => {
+    if (!conv?.id) return;
+
+    if (channelRef.current) supabase.removeChannel(channelRef.current);
+
+    channelRef.current = supabase
+      .channel(`support-msgs:${conv.id}`)
+      .on("postgres_changes", {
+        event: "INSERT",
+        schema: "public",
+        table: "support_messages",
+        filter: `conversation_id=eq.${conv.id}`,
+      }, (payload) => {
+        setMessages((prev) => {
+          if (prev.find((m) => m.id === payload.new.id)) return prev;
+          return [...prev, payload.new];
+        });
+        markReadByUser(conv.id);
+        setTimeout(() => scrollToBottom(), 80);
+      })
+      .on("postgres_changes", {
+        event: "UPDATE",
+        schema: "public",
+        table: "support_conversations",
+        filter: `id=eq.${conv.id}`,
+      }, (payload) => {
+        setConv((c) => ({ ...c, ...payload.new }));
+      })
+      .subscribe();
+
+    return () => {
+      if (channelRef.current) supabase.removeChannel(channelRef.current);
+    };
+  }, [conv?.id, scrollToBottom]);
+
+  // Auto-scroll on new messages (only if near bottom)
+  useEffect(() => {
+    const el = messagesEndRef.current?.parentElement;
+    if (!el) return;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+    if (nearBottom) scrollToBottom();
+  }, [messages]);
+
+  const handleSend = async (text, file) => {
+    if (!conv) return;
+    try {
+      let fileData = null;
+      if (file) {
+        fileData = await uploadSupportFile(file, user.id);
+      }
+      const msg = await sendMessage(conv.id, user.id, "user", text, fileData);
+      setMessages((prev) => [...prev, msg]);
+      setTimeout(() => scrollToBottom(), 80);
+    } catch (err) {
+      toast.error(err?.message || "Failed to send message");
+    }
+  };
+
+  const handleCloseChat = async () => {
+    if (!conv) return;
+    try {
+      await closeConversation(conv.id);
+      setConv((c) => ({ ...c, status: "closed" }));
+      toast.success("Chat closed. Start a new one anytime.");
+    } catch {
+      toast.error("Failed to close chat");
+    }
+  };
+
+  const handleNewChat = async () => {
+    if (!user) return;
+    setConvLoading(true);
+    try {
+      const { data: profile } = await supabase
+        .from("users")
+        .select("full_name, email")
+        .eq("id", user.id)
+        .single();
+
+      const { data, error } = await supabase
+        .from("support_conversations")
+        .insert({
+          user_id: user.id,
+          user_email: profile?.email || user.email,
+          user_name: profile?.full_name || user.email,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      setConv(data);
+      setMessages([]);
+    } catch {
+      toast.error("Failed to start new chat");
+    } finally {
+      setConvLoading(false);
+    }
+  };
+
+  const statusCfg = STATUS_CFG[conv?.status] || STATUS_CFG.open;
+  const StatusIcon = statusCfg.icon;
+
+  // Group messages by date for dividers
+  const groupedMessages = useMemo(() => {
+    const groups = [];
+    let lastDate = null;
+    for (const msg of messages) {
+      const day = new Date(msg.created_at).toDateString();
+      if (day !== lastDate) {
+        groups.push({ type: "date", date: msg.created_at, id: `date-${msg.id}` });
+        lastDate = day;
+      }
+      groups.push({ type: "message", ...msg });
+    }
+    return groups;
+  }, [messages]);
 
   const filteredFaqs = FAQS.map((cat) => ({
     ...cat,
@@ -329,40 +530,30 @@ export default function Support() {
           i.a.toLowerCase().includes(faqSearch.toLowerCase())
         )
       : cat.items,
-  })).filter((cat) => cat.items.length > 0);
-
-  const handleSubmitTicket = async (form) => {
-    await submitSupportTicket(form);
-    await loadTickets();
-    setTab("tickets");
-    setView("list");
-  };
+  })).filter((c) => c.items.length > 0);
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+    <div className="max-w-2xl mx-auto space-y-4">
       {/* Header */}
-      <div className="text-center py-6 bg-gradient-to-b from-primary/5 to-transparent rounded-2xl border border-primary/10">
-        <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
-          <LifeBuoy className="w-7 h-7 text-primary" />
-        </div>
-        <h1 className="text-2xl font-bold text-foreground">Support Centre</h1>
-        <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
-          Find answers instantly or reach our team. We typically respond within 4–24 hours.
-        </p>
-        <div className="flex items-center justify-center gap-6 mt-4 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1.5">
-            <div className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span>Support online</span>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <LifeBuoy className="w-5 h-5 text-primary" />
           </div>
-          <div className="flex items-center gap-1.5">
-            <Clock className="w-3 h-3" />
-            <span>Mon–Fri, 9am–6pm GMT</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <MessageSquare className="w-3 h-3" />
-            <span>Avg. response: &lt; 4h</span>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground">Support</h1>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              <p className="text-xs text-muted-foreground">Team online · Mon–Fri 9am–6pm GMT</p>
+            </div>
           </div>
         </div>
+        {conv && conv.status !== "closed" && (
+          <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${statusCfg.bg} ${statusCfg.color}`}>
+            <StatusIcon className="w-3 h-3" />
+            {statusCfg.label}
+          </span>
+        )}
       </div>
 
       {/* Tabs */}
@@ -372,176 +563,204 @@ export default function Support() {
           return (
             <button
               key={t.id}
-              onClick={() => { setTab(t.id); setView("list"); }}
+              onClick={() => setTab(t.id)}
               className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all ${
-                tab === t.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                tab === t.id
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <Icon className="w-3.5 h-3.5" />
+              <Icon className="w-4 h-4" />
               {t.label}
-              {t.id === "tickets" && tickets.some((t) => t.status === "answered" && !t.admin_reply_seen) && (
-                <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-              )}
             </button>
           );
         })}
       </div>
 
-      {/* FAQ Tab */}
+      {/* ── Chat Tab ─────────────────────────────────────────────────────────── */}
+      {tab === "chat" && (
+        <div className="bg-card border border-border/50 rounded-2xl overflow-hidden flex flex-col" style={{ height: "calc(100vh - 260px)", minHeight: 400 }}>
+          {/* Chat header */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border/40 bg-secondary/20 shrink-0">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                <LifeBuoy className="w-4 h-4 text-primary-foreground" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">BlockTrade Support</p>
+                <p className="text-[10px] text-muted-foreground">Typically replies within 4 hours</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {conv && conv.status !== "closed" && (
+                <button
+                  onClick={handleCloseChat}
+                  className="text-xs text-muted-foreground hover:text-destructive border border-border/50 hover:border-destructive/40 rounded-lg px-2.5 py-1.5 transition-colors"
+                >
+                  Close chat
+                </button>
+              )}
+              {conv && conv.status === "closed" && (
+                <button
+                  onClick={handleNewChat}
+                  className="flex items-center gap-1.5 text-xs text-primary border border-primary/30 hover:bg-primary/5 rounded-lg px-2.5 py-1.5 transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  New chat
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Messages area */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {convLoading ? (
+              <div className="flex items-center justify-center h-full">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              </div>
+            ) : messages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center space-y-4 px-6">
+                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+                  <MessageSquare className="w-8 h-8 text-primary" />
+                </div>
+                <div>
+                  <p className="font-semibold text-foreground">Start a conversation</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Send us a message and our team will get back to you as soon as possible.
+                  </p>
+                </div>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {["I have a deposit issue", "Help with withdrawal", "Account question"].map((q) => (
+                    <button
+                      key={q}
+                      onClick={() => handleSend(q, null)}
+                      className="text-xs px-3 py-1.5 rounded-full bg-secondary hover:bg-secondary/80 border border-border/50 text-foreground transition-colors"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Welcome message */}
+                <div className="flex items-center gap-3 bg-primary/5 border border-primary/15 rounded-xl px-4 py-3">
+                  <LifeBuoy className="w-4 h-4 text-primary shrink-0" />
+                  <p className="text-xs text-muted-foreground">
+                    Welcome to BlockTrade Support. Our team typically responds within 4 hours (Mon–Fri, 9am–6pm GMT).
+                  </p>
+                </div>
+
+                {groupedMessages.map((item) =>
+                  item.type === "date" ? (
+                    <DateDivider key={item.id} date={item.date} />
+                  ) : (
+                    <MessageBubble
+                      key={item.id}
+                      msg={item}
+                      isOwn={item.sender_role === "user"}
+                    />
+                  )
+                )}
+              </>
+            )}
+
+            {/* Closed notice */}
+            {conv?.status === "closed" && !convLoading && (
+              <div className="flex items-center justify-center">
+                <span className="text-xs text-muted-foreground bg-secondary/60 px-3 py-1.5 rounded-full border border-border/40">
+                  This chat is closed · Start a new one above
+                </span>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Input area */}
+          <div className="px-4 pb-4 pt-2 border-t border-border/40 shrink-0">
+            {conv?.status === "closed" ? (
+              <div className="flex items-center justify-center py-3">
+                <button
+                  onClick={handleNewChat}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-primary/10 hover:bg-primary/15 border border-primary/25 rounded-xl text-sm font-medium text-primary transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  Start a new conversation
+                </button>
+              </div>
+            ) : (
+              <ChatInput
+                onSend={handleSend}
+                disabled={convLoading || !conv}
+                placeholder="Message BlockTrade Support…"
+              />
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── FAQ Tab ──────────────────────────────────────────────────────────── */}
       {tab === "faq" && (
         <div className="space-y-5">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <input
               value={faqSearch}
               onChange={(e) => setFaqSearch(e.target.value)}
-              placeholder="Search frequently asked questions..."
-              className="pl-9"
+              placeholder="Search frequently asked questions…"
+              className="w-full bg-card border border-border/50 rounded-xl pl-9 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/40 transition-colors"
             />
+            {faqSearch && (
+              <button
+                onClick={() => setFaqSearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
           {filteredFaqs.length === 0 ? (
-            <div className="text-center py-12">
-              <HelpCircle className="w-10 h-10 text-muted-foreground/20 mx-auto mb-2" />
-              <p className="text-muted-foreground">No results for "{faqSearch}"</p>
-              <Button variant="outline" size="sm" className="mt-3" onClick={() => { setFaqSearch(""); setTab("tickets"); setView("new"); }}>
-                Submit a ticket instead
-              </Button>
+            <div className="text-center py-12 text-muted-foreground">
+              <HelpCircle className="w-8 h-8 mx-auto mb-3 opacity-40" />
+              <p className="text-sm">No results for "{faqSearch}"</p>
+              <button
+                onClick={() => { setFaqSearch(""); setTab("chat"); }}
+                className="mt-3 text-sm text-primary hover:underline"
+              >
+                Ask our support team →
+              </button>
             </div>
           ) : (
             filteredFaqs.map((cat) => {
               const CatIcon = cat.icon;
-              const isExpanded = expandedFaqCat === cat.category || faqSearch.trim();
               return (
                 <div key={cat.category} className="space-y-2">
-                  <button
-                    onClick={() => setExpandedFaqCat(isExpanded && !faqSearch.trim() ? null : cat.category)}
-                    className="flex items-center gap-2 text-sm font-semibold text-foreground hover:text-primary transition-colors"
-                  >
+                  <div className="flex items-center gap-2 mb-2">
                     <CatIcon className="w-4 h-4 text-primary" />
-                    {cat.category}
-                    <span className="text-muted-foreground font-normal">({cat.items.length})</span>
-                    {!faqSearch.trim() && (
-                      <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} transition={{ duration: 0.15 }} className="ml-auto">
-                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                      </motion.div>
-                    )}
-                  </button>
-                  <AnimatePresence initial={false}>
-                    {isExpanded && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="space-y-2 overflow-hidden"
-                      >
-                        {cat.items.map((item) => <FAQItem key={item.q} item={item} />)}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                    <h2 className="text-sm font-semibold text-foreground">{cat.category}</h2>
+                  </div>
+                  {cat.items.map((item) => (
+                    <FAQItem key={item.q} item={item} />
+                  ))}
                 </div>
               );
             })
           )}
 
-          <div className="text-center pt-2">
-            <p className="text-sm text-muted-foreground mb-3">Can't find what you're looking for?</p>
-            <Button onClick={() => { setTab("tickets"); setView("new"); }} className="gap-2">
-              <MessageSquare className="w-4 h-4" />
-              Contact Support
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Tickets Tab */}
-      {tab === "tickets" && (
-        <div>
-          {view === "list" && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h2 className="font-semibold text-foreground">
-                  Your Tickets
-                  {tickets.length > 0 && <span className="text-muted-foreground font-normal ml-1.5">({tickets.length})</span>}
-                </h2>
-                <Button size="sm" onClick={() => setView("new")} className="gap-1.5 h-8">
-                  <Plus className="w-3.5 h-3.5" />
-                  New Ticket
-                </Button>
-              </div>
-              {ticketsLoading ? (
-                <div className="py-12 flex items-center justify-center">
-                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-                </div>
-              ) : tickets.length === 0 ? (
-                <div className="text-center py-16 bg-card border border-border/40 rounded-xl">
-                  <Inbox className="w-10 h-10 text-muted-foreground/20 mx-auto mb-3" />
-                  <p className="text-muted-foreground font-medium">No tickets yet</p>
-                  <p className="text-sm text-muted-foreground/60 mt-1 mb-4">Submit a ticket and we'll get back to you shortly</p>
-                  <Button size="sm" onClick={() => setView("new")} className="gap-1.5">
-                    <Plus className="w-3.5 h-3.5" />
-                    New Ticket
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {tickets.map((t) => (
-                    <TicketCard key={t.id} ticket={t} onClick={() => { setSelectedTicket(t); setView("detail"); }} />
-                  ))}
-                </div>
-              )}
+          <div className="bg-primary/5 border border-primary/20 rounded-xl px-4 py-4 flex items-center gap-4">
+            <MessageSquare className="w-5 h-5 text-primary shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-foreground">Didn't find your answer?</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Chat with our support team directly</p>
             </div>
-          )}
-          {view === "new" && (
-            <NewTicketForm onSubmit={handleSubmitTicket} onCancel={() => setView("list")} />
-          )}
-          {view === "detail" && selectedTicket && (
-            <TicketDetail ticket={selectedTicket} onBack={() => { setView("list"); setSelectedTicket(null); }} />
-          )}
-        </div>
-      )}
-
-      {/* Contact Tab */}
-      {tab === "contact" && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {[
-              { icon: MessageSquare, title: "Submit a Ticket", desc: "Get help from our support team. We respond within 4–24 hours.", action: "Open Ticket", onClick: () => { setTab("tickets"); setView("new"); }, primary: true },
-              { icon: BookOpen, title: "Knowledge Base", desc: "Browse our FAQ for instant answers to common questions.", action: "Browse FAQ", onClick: () => setTab("faq"), primary: false },
-              { icon: Shield, title: "Security Issues", desc: "Report suspected unauthorised access or account security problems.", action: "Report Now", onClick: () => { setTab("tickets"); setView("new"); }, primary: false },
-              { icon: Zap, title: "Live Status", desc: "Check if there are any known platform outages or maintenance windows.", action: "View Status", onClick: () => window.open("https://status.blocktrade.com", "_blank"), primary: false },
-            ].map((card) => (
-              <div key={card.title} className="bg-card border border-border/40 rounded-xl p-5 space-y-3">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${card.primary ? "bg-primary/10" : "bg-secondary/60"}`}>
-                  <card.icon className={`w-5 h-5 ${card.primary ? "text-primary" : "text-muted-foreground"}`} />
-                </div>
-                <div>
-                  <p className="font-semibold text-foreground">{card.title}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{card.desc}</p>
-                </div>
-                <Button variant={card.primary ? "default" : "outline"} size="sm" onClick={card.onClick} className="gap-1.5 w-full">
-                  {card.action}
-                </Button>
-              </div>
-            ))}
-          </div>
-
-          <div className="bg-card border border-border/40 rounded-xl p-5">
-            <h3 className="font-semibold text-foreground mb-3">Direct Contact</h3>
-            <div className="space-y-2">
-              {[
-                { label: "General Support", value: "support@blocktrade.com" },
-                { label: "Compliance / KYC", value: "compliance@blocktrade.com" },
-                { label: "Security",         value: "security@blocktrade.com" },
-                { label: "Business / PR",    value: "business@blocktrade.com" },
-              ].map((row) => (
-                <div key={row.label} className="flex items-center justify-between py-2 border-b border-border/20 last:border-0">
-                  <span className="text-xs text-muted-foreground">{row.label}</span>
-                  <a href={`mailto:${row.value}`} className="text-xs text-primary hover:underline">{row.value}</a>
-                </div>
-              ))}
-            </div>
+            <button
+              onClick={() => setTab("chat")}
+              className="shrink-0 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              Open Chat
+            </button>
           </div>
         </div>
       )}
