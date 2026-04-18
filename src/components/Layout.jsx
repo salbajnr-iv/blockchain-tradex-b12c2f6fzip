@@ -407,7 +407,9 @@ export default function Layout() {
             <img
               src="/logo.png"
               alt="BlockTrade"
-              className="h-8 w-auto invert mix-blend-multiply dark:invert-0 dark:mix-blend-screen"
+              width="auto"
+              height="36"
+              className="h-9 w-auto invert mix-blend-multiply dark:invert-0 dark:mix-blend-screen"
             />
           </Link>
           <button className="lg:hidden text-muted-foreground" onClick={() => setSidebarOpen(false)}>

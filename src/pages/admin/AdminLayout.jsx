@@ -59,7 +59,9 @@ function Sidebar({ onClose }) {
             <img
               src="/logo.png"
               alt="BlockTrade"
-              className="h-7 w-auto invert mix-blend-multiply dark:invert-0 dark:mix-blend-screen"
+              width="auto"
+              height="36"
+              className="h-9 w-auto invert mix-blend-multiply dark:invert-0 dark:mix-blend-screen"
             />
             <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium tracking-wide border-l border-border pl-2">Admin</p>
           </div>
@@ -158,7 +160,9 @@ export default function AdminLayout() {
             <img
               src="/logo.png"
               alt="BlockTrade"
-              className="h-7 w-auto invert mix-blend-multiply dark:invert-0 dark:mix-blend-screen"
+              width="auto"
+              height="36"
+              className="h-9 w-auto invert mix-blend-multiply dark:invert-0 dark:mix-blend-screen"
             />
             <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 border-l border-border pl-2">Admin</span>
           </div>
