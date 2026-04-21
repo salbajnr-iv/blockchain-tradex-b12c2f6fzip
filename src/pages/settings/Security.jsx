@@ -9,6 +9,8 @@ import {
   Loader2, LogOut, Smartphone, QrCode, Trash2, X,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import WhitelistManager from "@/components/settings/WhitelistManager";
+import { getUserPolicy } from "@/lib/api/userPolicy";
 
 // ── Delete Account Confirmation Modal ─────────────────────────────────────────
 function DeleteAccountModal({ onClose, onConfirm, loading }) {
@@ -197,6 +199,14 @@ export default function SecuritySettings() {
   const [showMfaModal, setShowMfaModal] = useState(false);
   const [mfaEnabled, setMfaEnabled] = useState(false);
   const [loadingSignOutAll, setLoadingSignOutAll] = useState(false);
+  const [whitelistOnly, setWhitelistOnly] = useState(false);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    getUserPolicy(user.id)
+      .then((p) => setWhitelistOnly(!!p?.withdrawal_whitelist_only))
+      .catch(() => {});
+  }, [user?.id]);
 
   // Check current MFA status
   useEffect(() => {
@@ -423,6 +433,9 @@ export default function SecuritySettings() {
             </Button>
           </div>
         </form>
+
+        {/* Withdrawal whitelist */}
+        <WhitelistManager whitelistOnly={whitelistOnly} />
 
         {/* Active sessions */}
         <div className="bg-card border border-border/50 rounded-xl p-6">

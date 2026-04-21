@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
 import { COUNTRIES } from "@/lib/countries";
+import ForcedActionNotice from "@/components/ForcedActionNotice";
+import AccountStatusCard from "@/components/settings/AccountStatusCard";
 import {
   getLatestKycSubmission,
   uploadKycFile,
@@ -407,6 +409,8 @@ export default function KycSettings() {
 
   return (
     <div className="space-y-6">
+      <ForcedActionNotice kind="kyc" />
+      <AccountStatusCard />
       {/* Page header */}
       <div className="bg-card border border-border/50 rounded-xl p-6">
         <div className="flex items-start gap-4">

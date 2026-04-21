@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Loader2, Eye, EyeOff, CheckCircle2, AlertCircle, Lock } from 'lucide-react';
 import { toast } from '@/lib/toast';
 import ThemeToggle from '@/components/ThemeToggle';
+import ForcedActionNotice from '@/components/ForcedActionNotice';
 
 function BrandPanel() {
   return (
@@ -137,7 +138,8 @@ export default function ResetPassword() {
         </div>
 
         <div className="flex-1 flex items-center justify-center px-6 py-10">
-          <div className="w-full max-w-sm">
+          <div className="w-full max-w-sm space-y-4">
+            <ForcedActionNotice kind="password" />
             {done ? (
               <div className="text-center space-y-6">
                 <div className="w-16 h-16 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto">
