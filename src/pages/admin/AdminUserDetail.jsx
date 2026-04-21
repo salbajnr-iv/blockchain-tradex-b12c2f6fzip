@@ -7,14 +7,19 @@ import {
   setKycTier,
   getUserNotes, addUserNote, deleteUserNote,
   getUserTags, addUserTag, removeUserTag,
-  startImpersonation, endImpersonation,
+  startImpersonation,
   sendAdminMessage,
 } from '@/lib/api/userControls';
+import {
+  adminFreezeUser, adminUnfreezeUser,
+  adminForceLogout, adminRequirePasswordReset,
+  adminRequireKycRenewal,
+} from '@/lib/api/admin';
 import { useAdmin } from '@/contexts/AdminContext';
 import { toast } from '@/lib/toast';
 import {
   ArrowLeft, Mail, Tag as TagIcon, FileText, Eye, Coins, Shield,
-  Plus, Trash2, Send, ListChecks,
+  Plus, Trash2, Send, ListChecks, AlertTriangle, LogOut, Key, RefreshCw, Snowflake,
 } from 'lucide-react';
 
 const KYC_TIERS = [
@@ -66,6 +71,7 @@ export default function AdminUserDetail() {
       const sid = await startImpersonation(userId, reason);
       sessionStorage.setItem('impersonationSession', sid);
       sessionStorage.setItem('impersonationTarget', userId);
+      window.dispatchEvent(new Event('impersonation:changed'));
       toast.success('Impersonation logged. Use admin views to inspect this user.');
     } catch (e) { toast.error(e.message || 'Failed'); }
   };
@@ -203,6 +209,11 @@ export default function AdminUserDetail() {
         )}
       </Card>
 
+      {/* Account controls — danger zone */}
+      {can('users.message') && (
+        <DangerActions u={u} reload={reload} />
+      )}
+
       {/* Direct message */}
       <Card icon={Mail} title="Send Direct Message">
         <form onSubmit={handleSendMessage} className="space-y-2">
@@ -222,6 +233,89 @@ function Card({ icon: Icon, title, children }) {
         <Icon size={16} className="text-emerald-500" /> {title}
       </h2>
       {children}
+    </div>
+  );
+}
+
+function DangerActions({ u, reload }) {
+  const [busy, setBusy] = useState(null);
+  const isFrozen = u.status === 'frozen' || u.status === 'suspended';
+
+  const run = async (key, label, confirmMsg, fn) => {
+    if (confirmMsg && !window.confirm(confirmMsg)) return;
+    setBusy(key);
+    try { await fn(); toast.success(label); await reload(); }
+    catch (e) { toast.error(e.message || `${label} failed`); }
+    finally { setBusy(null); }
+  };
+
+  const Action = ({ k, icon: Icon, label, danger, onClick, disabled }) => (
+    <button
+      onClick={onClick}
+      disabled={!!busy || disabled}
+      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm border transition disabled:opacity-50 ${
+        danger
+          ? 'border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20'
+          : 'border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20'
+      }`}
+    >
+      <Icon size={14} />
+      {busy === k ? 'Working…' : label}
+    </button>
+  );
+
+  return (
+    <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-5">
+      <h2 className="flex items-center gap-2 text-sm font-semibold mb-1 text-red-400">
+        <AlertTriangle size={16} /> Account Controls
+      </h2>
+      <p className="text-xs text-gray-500 mb-4">
+        These actions are audited and take effect immediately. Use them when an account needs to be re-verified, locked, or re-authenticated.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Action
+          k="logout"
+          icon={LogOut}
+          label="Force Logout"
+          onClick={() => run('logout', 'User signed out of all sessions', `Force ${u.email} to log out of all sessions?`, () => adminForceLogout(u.id))}
+        />
+        <Action
+          k="pwreset"
+          icon={Key}
+          label="Require Password Reset"
+          onClick={() => run('pwreset', 'Password reset required & email sent', `Require ${u.email} to reset their password on next sign-in?`, () => adminRequirePasswordReset(u.id, u.email))}
+        />
+        <Action
+          k="kyc"
+          icon={RefreshCw}
+          label="Require KYC Renewal"
+          onClick={() => run('kyc', 'KYC renewal required', `Require ${u.email} to re-verify KYC? Trades, deposits, and withdrawals will be blocked until they do.`, () => adminRequireKycRenewal(u.id))}
+        />
+        {isFrozen ? (
+          <Action
+            k="unfreeze"
+            icon={Snowflake}
+            label="Unfreeze Account"
+            danger
+            onClick={() => run('unfreeze', 'Account unfrozen', `Unfreeze ${u.email}? They will regain full access.`, () => adminUnfreezeUser(u.id))}
+          />
+        ) : (
+          <Action
+            k="freeze"
+            icon={Snowflake}
+            label="Freeze Account"
+            danger
+            onClick={() => {
+              const reason = window.prompt('Reason for freezing (audited):');
+              if (reason === null) return;
+              run('freeze', 'Account frozen', null, () => adminFreezeUser(u.id, reason || null));
+            }}
+          />
+        )}
+      </div>
+      {u.force_password_reset && <p className="mt-3 text-xs text-amber-400">⚠ Password reset is currently required for this user.</p>}
+      {u.force_kyc_renewal && <p className="mt-1 text-xs text-amber-400">⚠ KYC renewal is currently required for this user.</p>}
+      {isFrozen && <p className="mt-1 text-xs text-red-400">⚠ Account is frozen — all activity is blocked.</p>}
     </div>
   );
 }

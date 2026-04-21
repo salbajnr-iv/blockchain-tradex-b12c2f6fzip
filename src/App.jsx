@@ -13,6 +13,7 @@ import { PortfolioProvider } from '@/contexts/PortfolioContext';
 import { LivePricesProvider } from '@/contexts/LivePricesContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { AdminProvider } from '@/contexts/AdminContext';
+import ImpersonationBanner from '@/components/ImpersonationBanner';
 import { FeatureFlagsProvider } from '@/contexts/FeatureFlagsContext';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -99,6 +100,7 @@ function App() {
               </div>
             )}
             <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+              <ImpersonationBanner />
               <Routes>
                 <Route path="/login" element={
                   <AuthRedirectWrapper>
