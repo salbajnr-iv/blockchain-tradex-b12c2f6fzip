@@ -115,8 +115,9 @@ export const upsertHolding = async (portfolioId, { symbol, name, quantity, price
   }
 }
 
-export const createTrade = async (portfolioId, { symbol, name, type, quantity, unitPrice }) => {
-  const fees = parseFloat((quantity * unitPrice * 0.001).toFixed(2))
+export const createTrade = async (portfolioId, { symbol, name, type, quantity, unitPrice, feeBps = 10 }) => {
+  const feeRate = Math.max(0, Number(feeBps)) / 10_000
+  const fees = parseFloat((quantity * unitPrice * feeRate).toFixed(2))
   const netValue = type === 'BUY'
     ? quantity * unitPrice + fees
     : quantity * unitPrice - fees
@@ -169,15 +170,16 @@ export const updatePortfolioCash = async (portfolioId, newBalance) => {
   return data
 }
 
-export const executeTrade = async (portfolioId, cashBalance, { symbol, name, type, quantity, unitPrice }) => {
-  const fees = parseFloat((quantity * unitPrice * 0.001).toFixed(2))
+export const executeTrade = async (portfolioId, cashBalance, { symbol, name, type, quantity, unitPrice, feeBps = 10 }) => {
+  const feeRate = Math.max(0, Number(feeBps)) / 10_000
+  const fees = parseFloat((quantity * unitPrice * feeRate).toFixed(2))
   const totalCost = type === 'BUY' ? quantity * unitPrice + fees : 0
 
   if (type === 'BUY' && totalCost > cashBalance) {
     throw new Error(`Insufficient cash. Need $${totalCost.toFixed(2)}, have $${cashBalance.toFixed(2)}`)
   }
 
-  const trade = await createTrade(portfolioId, { symbol, name, type, quantity, unitPrice })
+  const trade = await createTrade(portfolioId, { symbol, name, type, quantity, unitPrice, feeBps })
 
   await upsertHolding(portfolioId, {
     symbol,
@@ -187,7 +189,7 @@ export const executeTrade = async (portfolioId, cashBalance, { symbol, name, typ
     isBuy: type === 'BUY',
   })
 
-  const sellProceeds = quantity * unitPrice - parseFloat((quantity * unitPrice * 0.001).toFixed(2))
+  const sellProceeds = quantity * unitPrice - fees
   const newCash = type === 'BUY'
     ? cashBalance - totalCost
     : cashBalance + sellProceeds

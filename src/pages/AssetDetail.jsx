@@ -25,6 +25,9 @@ import {
   Building2, CreditCard, Smartphone, Globe, Wallet,
 } from "lucide-react";
 import { CRYPTO_ASSETS, FIAT_CURRENCIES } from "./Assets";
+import { useActionGuard } from "@/hooks/useActionGuard";
+import { getUserWhitelist, normalizeAddress, getTodayWithdrawalUsd } from "@/lib/api/userPolicy";
+import { checkDepositAmount, checkWithdrawalAmount } from "@/lib/kycTiers";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -62,6 +65,7 @@ function CopyBtn({ value }) {
 // Steps: 1=show address  2=upload proof
 // ─────────────────────────────────────────────────────────────────────────────
 function CryptoDepositFlow({ asset, wallet, userId, onClose, onSuccess }) {
+  const guard = useActionGuard();
   const [step, setStep] = useState(1);
   const [amount, setAmount] = useState("");
   const [txHash, setTxHash] = useState("");
@@ -80,9 +84,18 @@ function CryptoDepositFlow({ asset, wallet, userId, onClose, onSuccess }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!guard.allow('deposit')) return;
     const parsed = parseFloat(amount);
     if (!parsed || parsed <= 0) { toast.error("Enter a valid amount"); return; }
     if (!file && !txHash.trim()) { toast.error("Provide a transaction hash or upload a proof screenshot"); return; }
+    // Approximate USD value for tier check (use 1:1 for stable, otherwise skip if unknown)
+    const usdEst = STABLECOIN_PRICE[asset.symbol] ? parsed * STABLECOIN_PRICE[asset.symbol] : null;
+    if (usdEst != null) {
+      const tierCheck = checkDepositAmount(guard.policy?.kyc_tier ?? 0, usdEst);
+      if (!tierCheck.ok) { toast.error(tierCheck.reason); return; }
+    } else if ((guard.policy?.kyc_tier ?? 0) === 0) {
+      toast.error('Please complete KYC verification before making deposits.'); return;
+    }
     setSubmitting(true);
     try {
       await submitCryptoDeposit({ userId, asset: asset.symbol, network: wallet.network, amount: parsed, txHash: txHash || null, proofFile: file || null });
@@ -233,6 +246,7 @@ function CryptoDepositFlow({ asset, wallet, userId, onClose, onSuccess }) {
 // Steps: 1=enter amount  2=bank details  3=upload proof
 // ─────────────────────────────────────────────────────────────────────────────
 function FiatDepositFlow({ currency, userId, portfolioId, onClose, onSuccess }) {
+  const guard = useActionGuard();
   const [step, setStep] = useState(1);
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState("bank");
@@ -259,8 +273,11 @@ function FiatDepositFlow({ currency, userId, portfolioId, onClose, onSuccess }) 
   };
 
   const handleSubmit = async () => {
+    if (!guard.allow('deposit')) return;
     const parsed = parseFloat(amount);
     if (!parsed || parsed <= 0) { toast.error("Enter a valid amount"); return; }
+    const tierCheck = checkDepositAmount(guard.policy?.kyc_tier ?? 0, parsed);
+    if (!tierCheck.ok) { toast.error(tierCheck.reason); return; }
     setSubmitting(true);
     try {
       await createTransaction(portfolioId, {
@@ -440,6 +457,15 @@ function FiatDepositFlow({ currency, userId, portfolioId, onClose, onSuccess }) 
 // WITHDRAW FLOW — steps: 1=amount+method  2=destination details  3=review
 // ─────────────────────────────────────────────────────────────────────────────
 function WithdrawFlow({ asset, isFiat, balance, portfolioId, onClose, onSuccess }) {
+  const guard = useActionGuard();
+  const { user } = useAuth();
+  const [whitelist, setWhitelist] = React.useState([]);
+  React.useEffect(() => {
+    if (!user?.id || isFiat || !guard.policy?.withdrawal_whitelist_only) { setWhitelist([]); return; }
+    let active = true;
+    getUserWhitelist(user.id).then((d) => { if (active) setWhitelist(d || []); }).catch(() => {});
+    return () => { active = false; };
+  }, [user?.id, isFiat, guard.policy?.withdrawal_whitelist_only]);
   const [step, setStep] = useState(1);
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState(isFiat ? "bank" : "crypto");
@@ -462,10 +488,34 @@ function WithdrawFlow({ asset, isFiat, balance, portfolioId, onClose, onSuccess 
   const youReceive = parsed - fee;
 
   const handleSubmit = async () => {
+    if (!guard.allow('withdraw')) return;
     if (!parsed || parsed <= 0) { toast.error("Enter a valid amount"); return; }
     if (parsed > balance) { toast.error("Insufficient balance"); return; }
     const missingField = selectedMethod.fields.find((f) => !destination[f.k]?.trim());
     if (missingField) { toast.error(`Please enter ${missingField.label}`); return; }
+
+    // For crypto, parsed is in coin units; treat fiat withdrawals as USD-equivalent for tier/limit checks.
+    if (isFiat) {
+      const tierCheck = checkWithdrawalAmount(guard.policy?.kyc_tier ?? 0, parsed);
+      if (!tierCheck.ok) { toast.error(tierCheck.reason); return; }
+      const userDailyLimit = Number(guard.policy?.daily_withdrawal_limit || 0);
+      if (userDailyLimit > 0) {
+        const usedToday = await getTodayWithdrawalUsd(portfolioId);
+        if (usedToday + parsed > userDailyLimit) {
+          toast.error(`Daily withdrawal limit of $${userDailyLimit.toLocaleString()} would be exceeded.`);
+          return;
+        }
+      }
+    } else if (guard.policy?.withdrawal_whitelist_only) {
+      const target = normalizeAddress(asset.symbol, destination.address);
+      const allowed = whitelist
+        .filter((w) => String(w.asset).toUpperCase() === String(asset.symbol).toUpperCase())
+        .map((w) => normalizeAddress(w.asset, w.address));
+      if (!target || !allowed.includes(target)) {
+        toast.error('This destination address is not in your withdrawal whitelist. Add it in Settings → Security to proceed.');
+        return;
+      }
+    }
 
     setSubmitting(true);
     try {

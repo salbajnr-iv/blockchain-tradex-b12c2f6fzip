@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
-import { supabaseMisconfigured } from '@/lib/supabaseClient';
+import { supabaseMisconfigured, supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -71,6 +71,25 @@ export default function Register() {
     if (password.length < 6) { toast.error('Password must be at least 6 characters'); return; }
     if (passwordStrength < 2) { toast.error('Password is too weak — add uppercase letters, numbers, or symbols'); return; }
     if (!agreeTerms) { toast.error('Please agree to the Terms of Service'); return; }
+
+    // Pre-flight: check feature flags & maintenance mode before attempting signup.
+    try {
+      const { data: flags } = await supabase
+        .from('feature_flags')
+        .select('key, enabled')
+        .in('key', ['registrations_enabled', 'maintenance_mode']);
+      const map = {};
+      (flags || []).forEach((f) => { map[f.key] = f.enabled; });
+      if (map.maintenance_mode) {
+        toast.error('BlockTrade is in maintenance mode. New registrations are paused — please try again shortly.');
+        return;
+      }
+      if (map.registrations_enabled === false) {
+        toast.error('Registration is temporarily closed. Please check back soon.');
+        return;
+      }
+    } catch { /* fail-open: don't block on a missing table */ }
+
     setLoading(true);
     try {
       const result = await signUp(email, password, fullName, { phone, country, dateOfBirth });

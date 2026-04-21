@@ -6,6 +6,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { executeTrade, listTrades } from "@/lib/api/portfolio";
 import { createPendingOrder, listPendingOrders, cancelPendingOrder } from "@/lib/api/pendingOrders";
 import { supabase } from "@/lib/supabaseClient";
+import { useActionGuard } from "@/hooks/useActionGuard";
+import { getTodayTradeNotionalUsd } from "@/lib/api/userPolicy";
+import { getTierPolicy } from "@/lib/kycTiers";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from '@/lib/toast';
 import DepositDialog from "@/components/crypto/DepositDialog";
@@ -218,11 +221,14 @@ function TradePanel({ coin, side, setSide, portfolioId, cashBalance, holdingsMap
   const [isPending, setIsPending] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const queryClient = useQueryClient();
+  const guard = useActionGuard();
+  const customFeeBps = guard.policy?.custom_fee_bps;
+  const effectiveFeeBps = (customFeeBps != null ? Number(customFeeBps) : 10);
 
   const price = orderType === "limit" && limitPrice ? parseFloat(limitPrice) : (coin?.price || 0);
   const qty = parseFloat(amount) || 0;
   const total = qty * price;
-  const fee = total * 0.001;
+  const fee = total * (effectiveFeeBps / 10_000);
   const totalCost = total + fee;
   const currentHolding = holdingsMap[coin?.symbol]?.amount || 0;
   const insufficientFunds = side === "buy" && qty > 0 && totalCost > cashBalance;
@@ -244,12 +250,35 @@ function TradePanel({ coin, side, setSide, portfolioId, cashBalance, holdingsMap
     if (!qty || qty <= 0) { toast.error("Enter a valid amount"); return; }
     if (!portfolioId)       { toast.error("Portfolio not loaded"); return; }
     if (!coin)              { toast.error("No coin selected"); return; }
+    if (!guard.allow('trade')) return;
+
+    // KYC tier instrument gate (crypto is always allowed for tier >=1; tier 0 blocked)
+    const tierPolicy = getTierPolicy(guard.policy?.kyc_tier ?? 0);
+    if (!tierPolicy.canTrade) {
+      toast.error('Please complete KYC verification before trading.');
+      return;
+    }
+
     setConfirmOpen(true);
   };
 
   const handleConfirm = async () => {
     setIsPending(true);
     try {
+      // Re-check guards at confirm-time in case state changed
+      if (!guard.allow('trade')) { setIsPending(false); return; }
+
+      // Daily trade limit (notional in USD). 0 / null means "no limit".
+      const dailyLimit = Number(guard.policy?.daily_trade_limit || 0);
+      if (dailyLimit > 0 && orderType !== 'limit') {
+        const todaysUsd = await getTodayTradeNotionalUsd(portfolioId);
+        if (todaysUsd + total > dailyLimit) {
+          toast.error(`Daily trade limit of $${dailyLimit.toLocaleString()} would be exceeded. Used today: $${todaysUsd.toFixed(2)}.`);
+          setIsPending(false);
+          return;
+        }
+      }
+
       if (orderType === "limit") {
         // Queue a real pending limit order — it will be filled automatically
         // by usePendingOrderEngine when the market price reaches the limit.
@@ -270,6 +299,7 @@ function TradePanel({ coin, side, setSide, portfolioId, cashBalance, holdingsMap
           symbol: coin.symbol, name: coin.name,
           type: side === "buy" ? "BUY" : "SELL",
           quantity: qty, unitPrice: price,
+          feeBps: effectiveFeeBps,
         });
         await refetch();
         queryClient.invalidateQueries({ queryKey: ["trades", portfolioId] });

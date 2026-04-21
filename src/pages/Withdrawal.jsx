@@ -20,6 +20,9 @@ import {
   subscribeToWithdrawalStatus,
 } from "@/lib/api/withdrawal";
 import { supabase } from "@/lib/supabaseClient";
+import { useActionGuard } from "@/hooks/useActionGuard";
+import { getUserWhitelist, getTodayWithdrawalUsd, normalizeAddress } from "@/lib/api/userPolicy";
+import { checkWithdrawalAmount } from "@/lib/kycTiers";
 
 const WITHDRAWAL_METHODS = [
   { value: "bank_transfer",  label: "Bank Transfer",  icon: Building2,  desc: "1–3 business days" },
@@ -486,6 +489,17 @@ export default function WithdrawalPage() {
   const [details, setDetails] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [submittedTxn, setSubmittedTxn] = useState(null);
+  const guard = useActionGuard();
+  const [whitelist, setWhitelist] = useState([]);
+
+  useEffect(() => {
+    if (!user?.id || !guard.policy?.withdrawal_whitelist_only) { setWhitelist([]); return; }
+    let active = true;
+    getUserWhitelist(user.id)
+      .then((data) => { if (active) setWhitelist(data || []); })
+      .catch(() => { if (active) setWhitelist([]); });
+    return () => { active = false; };
+  }, [user?.id, guard.policy?.withdrawal_whitelist_only]);
 
   const SAVED_DEST_KEY = `blocktrade_saved_destinations_${user?.id || ""}`;
   const [savedDestinations, setSavedDestinations] = useState(() => {
@@ -631,6 +645,7 @@ export default function WithdrawalPage() {
   }, [userCountry, currencyType]);
 
   const handleSubmit = async () => {
+    if (!guard.allow('withdraw')) return;
     if (!kycApproved) {
       toast.error("KYC verification required before withdrawing funds");
       return;
@@ -655,6 +670,35 @@ export default function WithdrawalPage() {
     if (validationError) {
       toast.error(validationError);
       return;
+    }
+
+    // KYC tier withdrawal limit
+    const tierCheck = checkWithdrawalAmount(guard.policy?.kyc_tier ?? 0, usdEquivalent);
+    if (!tierCheck.ok) {
+      toast.error(tierCheck.reason);
+      return;
+    }
+
+    // Whitelist enforcement (crypto withdrawals only)
+    if (guard.policy?.withdrawal_whitelist_only && method === 'crypto_wallet') {
+      const target = normalizeAddress(currency, details.walletAddress || details.address);
+      const allowed = whitelist
+        .filter((w) => String(w.asset).toUpperCase() === String(currency).toUpperCase())
+        .map((w) => normalizeAddress(w.asset, w.address));
+      if (!target || !allowed.includes(target)) {
+        toast.error('This destination address is not in your withdrawal whitelist. Add it in Settings → Security to proceed.');
+        return;
+      }
+    }
+
+    // Daily withdrawal limit (USD). Combine per-user override and tier policy.
+    const userDailyLimit = Number(guard.policy?.daily_withdrawal_limit || 0);
+    if (userDailyLimit > 0) {
+      const usedToday = await getTodayWithdrawalUsd(portfolioId);
+      if (usedToday + usdEquivalent > userDailyLimit) {
+        toast.error(`Daily withdrawal limit of $${userDailyLimit.toLocaleString()} would be exceeded. Used today: $${usedToday.toFixed(2)}.`);
+        return;
+      }
     }
 
     setSubmitting(true);

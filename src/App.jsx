@@ -16,6 +16,7 @@ import { AdminProvider } from '@/contexts/AdminContext';
 import { FeatureFlagsProvider } from '@/contexts/FeatureFlagsContext';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
+import AccountStateGate from './components/AccountStateGate';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import ForgotPassword from './pages/auth/ForgotPassword';
@@ -115,6 +116,7 @@ function App() {
                 <Route path="/privacy" element={<PrivacyPolicy />} />
 
                 <Route element={<ProtectedRoute />}>
+                  <Route element={<AccountStateGate />}>
                   <Route element={<Layout />}>
                     <Route path="/" element={<Dashboard />} />
                     <Route path="/trade" element={<Trade />} />
@@ -144,6 +146,7 @@ function App() {
                       <Route path="payments" element={<PaymentsSettings />} />
                       <Route path="kyc" element={<KycSettings />} />
                     </Route>
+                  </Route>
                   </Route>
                 </Route>
 
