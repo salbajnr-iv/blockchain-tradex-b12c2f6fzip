@@ -59,6 +59,7 @@ import AdminLeaderboard from './pages/admin/AdminLeaderboard';
 import Investments from './pages/Investments';
 import AdminInvestments from './pages/admin/AdminInvestments';
 import AdminDepositAddresses from './pages/admin/AdminDepositAddresses';
+import AdminDeviceFingerprints from './pages/admin/AdminDeviceFingerprints';
 import Alerts from './pages/Alerts';
 
 function App() {
@@ -153,6 +154,7 @@ function App() {
                     <Route path="leaderboard" element={<AdminLeaderboard />} />
                     <Route path="investments" element={<AdminInvestments />} />
                     <Route path="deposit-addresses" element={<AdminDepositAddresses />} />
+                    <Route path="device-fingerprints" element={<AdminDeviceFingerprints />} />
                   </Route>
                 </Route>
 

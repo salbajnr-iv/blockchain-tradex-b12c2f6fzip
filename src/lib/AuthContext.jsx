@@ -1,5 +1,6 @@
 import { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
+import { captureFingerprint } from '@/lib/fingerprint';
 
 const AuthContext = createContext();
 
@@ -29,6 +30,7 @@ export const AuthProvider = ({ children }) => {
       setUser(session?.user ?? null);
       fetchAvatarUrl(session?.user ?? null);
       setIsLoadingAuth(false);
+      if (session?.user?.id) captureFingerprint(session.user.id);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -36,6 +38,7 @@ export const AuthProvider = ({ children }) => {
       setUser(session?.user ?? null);
       fetchAvatarUrl(session?.user ?? null);
       setIsLoadingAuth(false);
+      if (session?.user?.id) captureFingerprint(session.user.id);
     });
 
     return () => subscription.unsubscribe();

@@ -18,6 +18,7 @@ import {
   Trophy,
   TrendingUp,
   Wallet,
+  Fingerprint,
 } from 'lucide-react';
 import { toast } from '@/lib/toast';
 import ThemeToggle from '@/components/ThemeToggle';
@@ -35,6 +36,7 @@ const navItems = [
   { to: '/admin/notifications',         label: 'Notifications',      icon: Megaphone },
   { to: '/admin/settings',              label: 'Settings',           icon: Settings },
   { to: '/admin/audit-log',             label: 'Audit Log',          icon: ScrollText },
+  { to: '/admin/device-fingerprints',   label: 'Device Fingerprints', icon: Fingerprint },
 ];
 
 function Sidebar({ onClose }) {
