@@ -12,6 +12,8 @@ import { supabaseMisconfigured } from '@/lib/supabaseClient';
 import { PortfolioProvider } from '@/contexts/PortfolioContext';
 import { LivePricesProvider } from '@/contexts/LivePricesContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import { AdminProvider } from '@/contexts/AdminContext';
+import { FeatureFlagsProvider } from '@/contexts/FeatureFlagsContext';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/auth/Login';
@@ -60,7 +62,13 @@ import Investments from './pages/Investments';
 import AdminInvestments from './pages/admin/AdminInvestments';
 import AdminDepositAddresses from './pages/admin/AdminDepositAddresses';
 import AdminDeviceFingerprints from './pages/admin/AdminDeviceFingerprints';
+import AdminMultiAccount from './pages/admin/AdminMultiAccount';
+import AdminPlatformControls from './pages/admin/AdminPlatformControls';
+import AdminUserDetail from './pages/admin/AdminUserDetail';
+import AdminAnnouncements from './pages/admin/AdminAnnouncements';
+import AdminMessages from './pages/AdminMessages';
 import Alerts from './pages/Alerts';
+import AnnouncementBanner from './components/AnnouncementBanner';
 
 function App() {
   const [splashDone, setSplashDone] = useState(false);
@@ -71,6 +79,8 @@ function App() {
       {!splashDone && <SplashScreen onDone={handleSplashDone} />}
     <ThemeProvider>
       <AuthProvider>
+        <AdminProvider>
+        <FeatureFlagsProvider>
         <PortfolioProvider>
           <LivePricesProvider>
           <QueryClientProvider client={queryClientInstance}>
@@ -112,6 +122,7 @@ function App() {
                     <Route path="/asset/:coinId" element={<Asset />} />
                     <Route path="/orders" element={<Orders />} />
                     <Route path="/alerts" element={<Alerts />} />
+                    <Route path="/messages" element={<AdminMessages />} />
                     <Route path="/card" element={<Card />} />
                     <Route path="/transactions" element={<Transactions />} />
                     <Route path="/analytics" element={<Analytics />} />
@@ -155,6 +166,10 @@ function App() {
                     <Route path="investments" element={<AdminInvestments />} />
                     <Route path="deposit-addresses" element={<AdminDepositAddresses />} />
                     <Route path="device-fingerprints" element={<AdminDeviceFingerprints />} />
+                    <Route path="multi-account" element={<AdminMultiAccount />} />
+                    <Route path="platform-controls" element={<AdminPlatformControls />} />
+                    <Route path="users/:userId" element={<AdminUserDetail />} />
+                    <Route path="announcements" element={<AdminAnnouncements />} />
                   </Route>
                 </Route>
 
@@ -167,6 +182,8 @@ function App() {
           </QueryClientProvider>
           </LivePricesProvider>
         </PortfolioProvider>
+        </FeatureFlagsProvider>
+        </AdminProvider>
       </AuthProvider>
     </ThemeProvider>
     </>

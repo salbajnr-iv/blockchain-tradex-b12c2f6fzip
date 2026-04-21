@@ -3,11 +3,19 @@ import { supabase } from '@/lib/supabaseClient';
 import {
   getAllUsersWithBalances,
   setUserAdminFlag,
+  setUserAdminRole,
   setUserStatus,
   adminAdjustBalance,
   adminLockBalance,
   logAdminAction,
+  adminFreezeUser,
+  adminUnfreezeUser,
+  adminForceLogout,
+  adminRequirePasswordReset,
+  adminRequireKycRenewal,
 } from '@/lib/api/admin';
+import { useAdmin } from '@/contexts/AdminContext';
+import { ROLES, roleLabel } from '@/lib/permissions';
 import {
   adminGetUserCryptoBalances,
   adminAdjustCryptoBalance,
@@ -18,6 +26,7 @@ import {
   PlusCircle, MinusCircle, SlidersHorizontal, Lock, Unlock,
   DollarSign, User, ChevronDown, ChevronUp,
   Trash2, Plus, Loader2, Clock,
+  LogOut, KeyRound, FileWarning, Snowflake, Sun,
 } from 'lucide-react';
 
 const CRYPTO_ASSETS = ['BTC', 'ETH', 'SOL', 'BNB', 'USDT', 'USDC'];
@@ -685,6 +694,8 @@ function UserCard({ u, onBalanceClick, onAdminToggle, onStatusToggle, actionLoad
 }
 
 export default function AdminUsers() {
+  const { can } = useAdmin();
+  const canAssignRoles = can('users.role.assign');
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -717,6 +728,91 @@ export default function AdminUsers() {
       );
     } catch (err) {
       toast.error(err.message || 'Failed to update admin flag');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleForceLogout = async (userId) => {
+    if (!window.confirm('Force this user to sign out from all sessions?')) return;
+    setActionLoading(userId + '-logout');
+    try {
+      await adminForceLogout(userId);
+      toast.success('User will be signed out within 60 seconds');
+    } catch (err) {
+      toast.error(err.message || 'Failed to force logout');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleForcePasswordReset = async (userId, email) => {
+    if (!window.confirm('Send a password reset email and force the user to reset?')) return;
+    setActionLoading(userId + '-pwreset');
+    try {
+      await adminRequirePasswordReset(userId, email);
+      toast.success('Password reset email sent and user signed out');
+    } catch (err) {
+      toast.error(err.message || 'Failed to require password reset');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleForceKyc = async (userId) => {
+    if (!window.confirm('Require this user to re-submit KYC?')) return;
+    setActionLoading(userId + '-kyc');
+    try {
+      await adminRequireKycRenewal(userId);
+      toast.success('User must re-verify KYC');
+      setUsers((prev) =>
+        prev.map((u) => (u.id === userId ? { ...u, kyc_verified: false } : u))
+      );
+    } catch (err) {
+      toast.error(err.message || 'Failed to require KYC renewal');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleFreezeToggle = async (u) => {
+    const isFrozen = u.status === 'suspended';
+    const action = isFrozen ? 'Unfreeze' : 'Freeze';
+    let reason = null;
+    if (!isFrozen) {
+      reason = window.prompt('Reason for freezing this account (visible to admins only):');
+      if (reason === null) return;
+    } else if (!window.confirm(`${action} this account?`)) {
+      return;
+    }
+    setActionLoading(u.id + '-freeze');
+    try {
+      if (isFrozen) await adminUnfreezeUser(u.id);
+      else await adminFreezeUser(u.id, reason);
+      toast.success(`Account ${isFrozen ? 'unfrozen' : 'frozen'}`);
+      setUsers((prev) =>
+        prev.map((x) => (x.id === u.id ? { ...x, status: isFrozen ? 'active' : 'suspended' } : x))
+      );
+    } catch (err) {
+      toast.error(err.message || `Failed to ${action.toLowerCase()}`);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRoleChange = async (userId, role) => {
+    setActionLoading(userId + '-role');
+    try {
+      const next = role === '' ? null : role;
+      await setUserAdminRole(userId, next);
+      toast.success(next ? `Role set to ${roleLabel(next)}` : 'Admin access revoked');
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === userId ? { ...u, admin_role: next, is_admin: next !== null } : u
+        )
+      );
+    } catch (err) {
+      toast.error(err.message || 'Failed to update role');
     } finally {
       setActionLoading(null);
     }
@@ -850,8 +946,10 @@ export default function AdminUsers() {
                   return (
                     <tr key={u.id} className="hover:bg-gray-800/40 transition-colors">
                       <td className="px-5 py-4">
-                        <p className="text-white font-medium">{u.full_name || u.username || '—'}</p>
-                        <p className="text-gray-500 text-xs">{u.email}</p>
+                        <a href={`/admin/users/${u.id}`} className="block hover:text-emerald-400">
+                          <p className="text-white font-medium">{u.full_name || u.username || '—'}</p>
+                          <p className="text-gray-500 text-xs">{u.email}</p>
+                        </a>
                       </td>
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-2">
@@ -878,9 +976,21 @@ export default function AdminUsers() {
                         {u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}
                       </td>
                       <td className="px-5 py-4">
-                        {u.is_admin ? (
+                        {canAssignRoles ? (
+                          <select
+                            value={u.admin_role || ''}
+                            onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                            disabled={actionLoading === u.id + '-role'}
+                            className="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:opacity-50"
+                          >
+                            <option value="">— No role —</option>
+                            {Object.entries(ROLES).map(([key, label]) => (
+                              <option key={key} value={key}>{label}</option>
+                            ))}
+                          </select>
+                        ) : u.admin_role ? (
                           <span className="inline-flex items-center gap-1 text-xs text-emerald-400 font-medium">
-                            <Shield size={12} /> Admin
+                            <Shield size={12} /> {roleLabel(u.admin_role)}
                           </span>
                         ) : (
                           <span className="text-xs text-gray-600">—</span>
@@ -911,15 +1021,41 @@ export default function AdminUsers() {
                             {u.is_admin ? 'Revoke' : 'Admin'}
                           </button>
                           <button
-                            onClick={() => handleStatusToggle(u.id, u.status)}
-                            disabled={actionLoading === u.id + '-status'}
-                            className={`px-2.5 py-1.5 rounded-lg text-xs transition-colors disabled:opacity-50 ${
+                            onClick={() => handleFreezeToggle(u)}
+                            disabled={actionLoading === u.id + '-freeze'}
+                            title={u.status === 'suspended' ? 'Unfreeze account' : 'Freeze account'}
+                            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs transition-colors disabled:opacity-50 ${
                               u.status === 'suspended'
                                 ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'
-                                : 'bg-gray-800 text-gray-400 hover:bg-red-500/10 hover:text-red-400'
+                                : 'bg-gray-800 text-gray-400 hover:bg-cyan-500/10 hover:text-cyan-400'
                             }`}
                           >
-                            {u.status === 'suspended' ? 'Reactivate' : 'Suspend'}
+                            {u.status === 'suspended' ? <Sun size={12} /> : <Snowflake size={12} />}
+                            {u.status === 'suspended' ? 'Unfreeze' : 'Freeze'}
+                          </button>
+                          <button
+                            onClick={() => handleForceLogout(u.id)}
+                            disabled={actionLoading === u.id + '-logout'}
+                            title="Force sign-out from all sessions"
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs bg-gray-800 text-gray-400 hover:bg-amber-500/10 hover:text-amber-400 transition-colors disabled:opacity-50"
+                          >
+                            <LogOut size={12} /> Logout
+                          </button>
+                          <button
+                            onClick={() => handleForcePasswordReset(u.id, u.email)}
+                            disabled={actionLoading === u.id + '-pwreset'}
+                            title="Force password reset"
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs bg-gray-800 text-gray-400 hover:bg-amber-500/10 hover:text-amber-400 transition-colors disabled:opacity-50"
+                          >
+                            <KeyRound size={12} /> Reset PW
+                          </button>
+                          <button
+                            onClick={() => handleForceKyc(u.id)}
+                            disabled={actionLoading === u.id + '-kyc'}
+                            title="Require KYC re-verification"
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs bg-gray-800 text-gray-400 hover:bg-purple-500/10 hover:text-purple-400 transition-colors disabled:opacity-50"
+                          >
+                            <FileWarning size={12} /> Re-KYC
                           </button>
                         </div>
                       </td>

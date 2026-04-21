@@ -374,7 +374,7 @@ export const adminReviewKyc = async (submissionId, status, reviewerNotes = null)
 export const getAllUsers = async () => {
   const { data, error } = await supabase
     .from('users')
-    .select('id, email, full_name, username, kyc_tier, kyc_verified, status, is_admin, created_at, last_login')
+    .select('id, email, full_name, username, kyc_tier, kyc_verified, status, is_admin, admin_role, created_at, last_login')
     .order('created_at', { ascending: false })
 
   if (error) throw error
@@ -383,9 +383,14 @@ export const getAllUsers = async () => {
 
 // ── Toggle admin flag on a user ──────────────────────────────────────────────
 export const setUserAdminFlag = async (userId, isAdmin) => {
+  const update = { is_admin: isAdmin }
+  // When revoking admin, also clear the role. When promoting fresh, default to read_only.
+  if (!isAdmin) update.admin_role = null
+  else update.admin_role = 'read_only'
+
   const { error } = await supabase
     .from('users')
-    .update({ is_admin: isAdmin })
+    .update(update)
     .eq('id', userId)
 
   if (error) throw error
@@ -394,8 +399,72 @@ export const setUserAdminFlag = async (userId, isAdmin) => {
     isAdmin ? 'user_promoted_to_admin' : 'user_demoted_from_admin',
     'user',
     userId,
-    { is_admin: isAdmin }
+    { is_admin: isAdmin, admin_role: update.admin_role }
   )
+}
+
+// ── Set the granular admin role for a user ───────────────────────────────────
+const VALID_ADMIN_ROLES = [
+  'super_admin', 'finance', 'compliance', 'support', 'ops', 'read_only',
+]
+
+export const setUserAdminRole = async (userId, role) => {
+  if (role !== null && !VALID_ADMIN_ROLES.includes(role)) {
+    throw new Error(`Invalid admin role: ${role}`)
+  }
+
+  const update = { admin_role: role, is_admin: role !== null }
+  const { error } = await supabase
+    .from('users')
+    .update(update)
+    .eq('id', userId)
+
+  if (error) throw error
+
+  await logAdminAction('user_admin_role_changed', 'user', userId, { admin_role: role })
+}
+
+// ── Account controls (freeze, force-logout, force password reset, force re-KYC)
+export const adminFreezeUser = async (userId, reason = null) => {
+  const { error } = await supabase.rpc('fn_admin_freeze_user', {
+    p_user_id: userId,
+    p_reason:  reason,
+  })
+  if (error) throw error
+  await logAdminAction('user_frozen', 'user', userId, { reason })
+}
+
+export const adminUnfreezeUser = async (userId) => {
+  const { error } = await supabase.rpc('fn_admin_unfreeze_user', { p_user_id: userId })
+  if (error) throw error
+  await logAdminAction('user_unfrozen', 'user', userId)
+}
+
+export const adminForceLogout = async (userId) => {
+  const { error } = await supabase.rpc('fn_admin_force_logout', { p_user_id: userId })
+  if (error) throw error
+  await logAdminAction('user_force_logout', 'user', userId)
+}
+
+export const adminRequirePasswordReset = async (userId, email) => {
+  const { error } = await supabase.rpc('fn_admin_require_password_reset', { p_user_id: userId })
+  if (error) throw error
+  if (email) {
+    try {
+      await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      })
+    } catch {
+      /* best-effort */
+    }
+  }
+  await logAdminAction('user_force_password_reset', 'user', userId, { email })
+}
+
+export const adminRequireKycRenewal = async (userId) => {
+  const { error } = await supabase.rpc('fn_admin_require_kyc_renewal', { p_user_id: userId })
+  if (error) throw error
+  await logAdminAction('user_force_kyc_renewal', 'user', userId)
 }
 
 // ── Update user status (active / suspended) ───────────────────────────────────
@@ -414,7 +483,7 @@ export const setUserStatus = async (userId, status) => {
 export const getAllUsersWithBalances = async () => {
   const { data: users, error: usersError } = await supabase
     .from('users')
-    .select('id, email, full_name, username, kyc_tier, kyc_verified, status, is_admin, created_at, last_login')
+    .select('id, email, full_name, username, kyc_tier, kyc_verified, status, is_admin, admin_role, created_at, last_login')
     .order('created_at', { ascending: false })
 
   if (usersError) throw usersError

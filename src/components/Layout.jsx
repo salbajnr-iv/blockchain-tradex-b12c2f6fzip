@@ -10,9 +10,11 @@ import { Button } from "@/components/ui/button";
 import DepositDialog from "@/components/crypto/DepositDialog";
 import TransferDialog from "@/components/crypto/TransferDialog";
 import NotificationCenter from "@/components/crypto/NotificationCenter";
+import AnnouncementBanner from "@/components/AnnouncementBanner";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useLivePrices } from "@/hooks/useLivePrices";
 import { useAuth } from "@/lib/AuthContext";
+import { useFeatureFlags } from "@/contexts/FeatureFlagsContext";
 import { usePortfolio } from "@/contexts/PortfolioContext";
 import { useQuery } from "@tanstack/react-query";
 import { listAlerts } from "@/lib/api/alerts";
@@ -356,6 +358,7 @@ export default function Layout() {
   const { portfolioTotal, isLoading, lastUpdated, refetch, cryptoList } = useLivePrices();
   const { cashBalance, portfolioId } = usePortfolio();
   const { user, signOut, avatarUrl } = useAuth();
+  const { isMaintenance } = useFeatureFlags();
 
   const { data: alerts = [] } = useQuery({
     queryKey: ["alerts", portfolioId],
@@ -554,6 +557,14 @@ export default function Layout() {
           </div>
         </header>
 
+        <AnnouncementBanner />
+        {isMaintenance && (
+          <div className="px-4 md:px-6 py-2 bg-amber-500/15 border-b border-amber-500/30 text-amber-200 text-xs flex items-center gap-2">
+            <Info size={14} />
+            <strong>Maintenance mode:</strong>
+            <span>trades, deposits, and withdrawals are temporarily disabled.</span>
+          </div>
+        )}
         <main className="flex-1 p-4 md:p-6 overflow-auto">
           <Outlet context={{ onDepositOpen: () => setDepositOpen(true), onWithdrawOpen: () => navigate("/withdrawal"), onTransferOpen: () => setTransferOpen(true) }} />
         </main>

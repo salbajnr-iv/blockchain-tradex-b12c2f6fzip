@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
+import { checkSignInRestrictions } from '@/lib/api/platform';
 import { supabaseMisconfigured } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,6 +44,12 @@ export default function Login() {
     if (!email || !password) { toast.error('Please fill in all fields'); return; }
     setLoading(true);
     try {
+      const gate = await checkSignInRestrictions();
+      if (!gate.allowed) {
+        toast.error(gate.reason);
+        setLoading(false);
+        return;
+      }
       await signIn(email, password);
       navigate(returnTo, { replace: true });
     } catch (err) {

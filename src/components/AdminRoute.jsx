@@ -1,36 +1,12 @@
-import { useEffect, useState } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
-import { getAdminStatus } from '@/lib/api/admin';
-import { toast } from '@/lib/toast';
+import { useAdmin } from '@/contexts/AdminContext';
 
-export default function AdminRoute() {
+export default function AdminRoute({ requirePermission = null }) {
   const { isAuthenticated, isLoadingAuth } = useAuth();
-  const [isAdmin, setIsAdmin] = useState(null);
-  const [isChecking, setIsChecking] = useState(false);
+  const { isAdmin, role, loading, can } = useAdmin();
 
-  useEffect(() => {
-    // Only run the admin check once auth has resolved and the user is logged in
-    if (isLoadingAuth) return;
-    if (!isAuthenticated) return; // redirect handled below
-
-    setIsChecking(true);
-    getAdminStatus()
-      .then((adminFlag) => {
-        setIsAdmin(adminFlag);
-        if (!adminFlag) {
-          toast.error('Not authorised. Admin access required.');
-        }
-      })
-      .catch(() => {
-        setIsAdmin(false);
-        toast.error('Not authorised. Admin access required.');
-      })
-      .finally(() => setIsChecking(false));
-  }, [isAuthenticated, isLoadingAuth]);
-
-  // Still loading auth session
-  if (isLoadingAuth) {
+  if (isLoadingAuth || loading) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-gray-950">
         <div className="w-8 h-8 border-4 border-gray-700 border-t-emerald-500 rounded-full animate-spin" />
@@ -38,23 +14,17 @@ export default function AdminRoute() {
     );
   }
 
-  // Not logged in — send to admin login
-  if (!isAuthenticated) {
-    return <Navigate to="/admin/login" replace />;
-  }
-
-  // Logged in but still checking admin flag
-  if (isChecking || isAdmin === null) {
+  if (!isAuthenticated) return <Navigate to="/admin/login" replace />;
+  if (!isAdmin || !role) return <Navigate to="/" replace />;
+  if (requirePermission && !can(requirePermission)) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-gray-950">
-        <div className="w-8 h-8 border-4 border-gray-700 border-t-emerald-500 rounded-full animate-spin" />
+      <div className="p-10 text-center">
+        <h2 className="text-xl font-semibold mb-2">Access denied</h2>
+        <p className="text-sm text-gray-500">
+          Your role does not have permission to view this page.
+        </p>
       </div>
     );
-  }
-
-  // Logged in but not admin
-  if (!isAdmin) {
-    return <Navigate to="/" replace />;
   }
 
   return <Outlet />;

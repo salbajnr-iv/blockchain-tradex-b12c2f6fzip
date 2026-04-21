@@ -4,6 +4,37 @@
 
 **BlockTrade** is a full-featured cryptocurrency trading dashboard, portfolio management, and multi-asset investment platform built with React 18, Vite, and Tailwind CSS. Uses Supabase for authentication and PostgreSQL database, CoinGecko API for live market data.
 
+## Admin System (9-Phase Expansion)
+
+All migrations live in `sql/`. Apply them in this order in the Supabase SQL Editor:
+
+1. `sql/device-fingerprints-migration.sql` — silent canvas/audio/WebGL fingerprinting
+2. `sql/admin-roles-migration.sql` — granular admin roles + `fn_admin_has_permission` RPC
+3. `sql/account-controls-migration.sql` — freeze, force-logout, force-password-reset, force re-KYC
+4. `sql/ip-geo-restrictions-migration.sql` — IP & ISO-2 country sign-in blocklists
+5. `sql/platform-flags-migration.sql` — feature flags & `maintenance_mode`
+6. `sql/user-controls-migration.sql` — fees/limits, withdrawal whitelist, KYC tiers, notes, tags, impersonation audit, direct messages, announcements
+
+### Permission map
+- Mirrored in JS (`src/lib/permissions.js`) and SQL (`fn_admin_has_permission`).
+- `AdminContext` exposes `can(perm)` and a `<Can perm="…">` wrapper.
+- `AdminRoute` and the sidebar in `AdminLayout.jsx` filter by permission.
+- Roles: `super_admin`, `finance`, `compliance`, `support`, `analyst`, plus the legacy `is_admin` flag.
+
+### Admin pages (under `/admin`)
+- `users` — list, role assignment, balance, freeze/unfreeze, force-logout, force-password-reset, force re-KYC.
+- `users/:userId` — KYC tier, custom fee (bps), daily limits, withdrawal whitelist, tags, internal notes, impersonation (audited), direct message.
+- `multi-account` — clusters of accounts sharing visitor_id or IP.
+- `device-fingerprints` — raw fingerprint records.
+- `platform-controls` — feature flags + IP/country blocklists.
+- `announcements` — banner CRUD with severity (info/success/warning/critical).
+
+### Client-side enforcement
+- `AuthContext` polls `force_logout_at` + `status` every 60s and signs the user out when triggered.
+- `Login` calls `checkSignInRestrictions()` before authenticating.
+- `Layout` renders `<AnnouncementBanner />` and a maintenance-mode banner.
+- Users see admin messages at `/messages`.
+
 ## Error Notification System
 
 ### Architecture

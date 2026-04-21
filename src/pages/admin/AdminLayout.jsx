@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
+import { useAdmin } from '@/contexts/AdminContext';
+import { roleLabel } from '@/lib/permissions';
 import {
   LayoutDashboard,
   ArrowDownToLine,
@@ -19,29 +21,36 @@ import {
   TrendingUp,
   Wallet,
   Fingerprint,
+  Users2,
+  Power,
 } from 'lucide-react';
 import { toast } from '@/lib/toast';
 import ThemeToggle from '@/components/ThemeToggle';
 
 const navItems = [
-  { to: '/admin',                       label: 'Dashboard',          icon: LayoutDashboard, end: true },
-  { to: '/admin/deposits',              label: 'Deposits',           icon: ArrowUpToLine },
-  { to: '/admin/deposit-addresses',     label: 'Deposit Addresses',  icon: Wallet },
-  { to: '/admin/withdrawals',           label: 'Withdrawals',        icon: ArrowDownToLine },
-  { to: '/admin/investments',           label: 'Investments',        icon: TrendingUp },
-  { to: '/admin/kyc',                   label: 'KYC Review',         icon: ShieldCheck },
-  { to: '/admin/users',                 label: 'Users',              icon: Users },
-  { to: '/admin/support',               label: 'Support Tickets',    icon: LifeBuoy },
-  { to: '/admin/leaderboard',           label: 'Leaderboard',        icon: Trophy },
-  { to: '/admin/notifications',         label: 'Notifications',      icon: Megaphone },
-  { to: '/admin/settings',              label: 'Settings',           icon: Settings },
-  { to: '/admin/audit-log',             label: 'Audit Log',          icon: ScrollText },
-  { to: '/admin/device-fingerprints',   label: 'Device Fingerprints', icon: Fingerprint },
+  { to: '/admin',                       label: 'Dashboard',          icon: LayoutDashboard, end: true, perm: 'dashboard.view' },
+  { to: '/admin/deposits',              label: 'Deposits',           icon: ArrowUpToLine,           perm: 'deposits.review' },
+  { to: '/admin/deposit-addresses',     label: 'Deposit Addresses',  icon: Wallet,                  perm: 'deposit_addresses.manage' },
+  { to: '/admin/withdrawals',           label: 'Withdrawals',        icon: ArrowDownToLine,         perm: 'withdrawals.review' },
+  { to: '/admin/investments',           label: 'Investments',        icon: TrendingUp,              perm: 'investments.manage' },
+  { to: '/admin/kyc',                   label: 'KYC Review',         icon: ShieldCheck,             perm: 'kyc.review' },
+  { to: '/admin/users',                 label: 'Users',              icon: Users,                   perm: 'users.view' },
+  { to: '/admin/support',               label: 'Support Tickets',    icon: LifeBuoy,                perm: 'support.manage' },
+  { to: '/admin/leaderboard',           label: 'Leaderboard',        icon: Trophy,                  perm: 'leaderboard.manage' },
+  { to: '/admin/notifications',         label: 'Notifications',      icon: Megaphone,               perm: 'notifications.send' },
+  { to: '/admin/settings',              label: 'Settings',           icon: Settings,                perm: 'platform.settings' },
+  { to: '/admin/audit-log',             label: 'Audit Log',          icon: ScrollText,              perm: 'audit.view' },
+  { to: '/admin/device-fingerprints',   label: 'Device Fingerprints', icon: Fingerprint,            perm: 'fingerprints.view' },
+  { to: '/admin/multi-account',         label: 'Multi-Account',      icon: Users2,                  perm: 'multiaccount.view' },
+  { to: '/admin/platform-controls',     label: 'Platform Controls',  icon: Power,                   perm: 'platform.flags' },
+  { to: '/admin/announcements',         label: 'Announcements',      icon: Megaphone,               perm: 'announcements.manage' },
 ];
 
 function Sidebar({ onClose }) {
   const { signOut } = useAuth();
+  const { can, role, profile } = useAdmin();
   const navigate = useNavigate();
+  const visibleItems = navItems.filter((item) => !item.perm || can(item.perm));
 
   const handleSignOut = async () => {
     try {
@@ -65,7 +74,9 @@ function Sidebar({ onClose }) {
               height="36"
               className="h-9 w-auto invert mix-blend-multiply dark:invert-0 dark:mix-blend-screen"
             />
-            <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium tracking-wide border-l border-border pl-2">Admin</p>
+            <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium tracking-wide border-l border-border pl-2">
+              {role ? roleLabel(role) : 'Admin'}
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle size="sm" />
@@ -83,7 +94,7 @@ function Sidebar({ onClose }) {
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {navItems.map(({ to, label, icon: Icon, end }) => (
+        {visibleItems.map(({ to, label, icon: Icon, end }) => (
           <NavLink
             key={to}
             to={to}
