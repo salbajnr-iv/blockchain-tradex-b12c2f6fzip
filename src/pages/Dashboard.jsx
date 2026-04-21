@@ -126,14 +126,15 @@ function TopMovers({ cryptoList }) {
 
 function QuickActions({ onDeposit, onWithdraw }) {
   const navigate = useNavigate();
+  const cardColor = "bg-primary/10 text-primary border-primary/20";
   const actions = [
-    { label: "Trade Now",    icon: ArrowUpRight,  color: "bg-primary/10 text-primary border-primary/20",      action: () => navigate("/trade") },
-    { label: "Add Funds",    icon: PlusCircle,    color: "bg-blue-500/10 text-blue-400 border-blue-500/20",   action: onDeposit },
-    { label: "Withdraw",     icon: WithdrawIcon,  color: "bg-orange-400/10 text-orange-400 border-orange-400/20", action: onWithdraw },
-    { label: "Set Alert",    icon: Bell,          color: "bg-yellow-400/10 text-yellow-400 border-yellow-400/20", action: () => navigate("/alerts") },
-    { label: "Markets",      icon: BarChart3,     color: "bg-violet-400/10 text-violet-400 border-violet-400/20", action: () => navigate("/markets") },
-    { label: "Analytics",    icon: Activity,      color: "bg-pink-400/10 text-pink-400 border-pink-400/20",    action: () => navigate("/analytics") },
-  ];
+    { label: "Trade Now",    icon: ArrowUpRight,  action: () => navigate("/trade") },
+    { label: "Add Funds",    icon: PlusCircle,    action: onDeposit },
+    { label: "Withdraw",     icon: WithdrawIcon,  action: onWithdraw },
+    { label: "Set Alert",    icon: Bell,          action: () => navigate("/alerts") },
+    { label: "Markets",      icon: BarChart3,     action: () => navigate("/markets") },
+    { label: "Analytics",    icon: Activity,      action: () => navigate("/analytics") },
+  ].map(a => ({ ...a, color: cardColor }));
 
   return (
     <div className="bg-card border border-border/50 rounded-xl p-4">
