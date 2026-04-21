@@ -14,7 +14,33 @@ if (supabaseMisconfigured) {
   )
 }
 
+// Use sessionStorage so the auth token is wiped automatically when the
+// browser (or last tab) is closed — forcing re-authentication next launch.
+// Persists across in-tab reloads but not across browser restarts.
+const browserStorage = typeof window !== 'undefined' ? window.sessionStorage : undefined
+
 export const supabase = createClient(
   supabaseUrl || 'https://placeholder.supabase.co',
-  supabaseKey || 'placeholder-key'
+  supabaseKey || 'placeholder-key',
+  {
+    auth: {
+      storage: browserStorage,
+      storageKey: 'sb-blocktrade-auth',
+      persistSession: true,        // persist within the session
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  }
 )
+
+// One-time migration: clear any legacy localStorage Supabase tokens so
+// returning users with stale persistent sessions are forced to re-authenticate.
+if (typeof window !== 'undefined') {
+  try {
+    Object.keys(window.localStorage)
+      .filter((k) => k.startsWith('sb-') || k.includes('supabase.auth'))
+      .forEach((k) => window.localStorage.removeItem(k))
+  } catch {
+    /* ignore */
+  }
+}
