@@ -11,6 +11,7 @@ import DepositDialog from "@/components/crypto/DepositDialog";
 import TransferDialog from "@/components/crypto/TransferDialog";
 import NotificationCenter from "@/components/crypto/NotificationCenter";
 import AnnouncementBanner from "@/components/AnnouncementBanner";
+import AdminMessageBadge from "@/components/AdminMessageBadge";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useLivePrices } from "@/hooks/useLivePrices";
 import { useAuth } from "@/lib/AuthContext";
@@ -534,6 +535,7 @@ export default function Layout() {
               </span>
             )}
             <ThemeToggle />
+            <AdminMessageBadge />
             <NotificationBell cryptoList={cryptoList} portfolioTotal={portfolioTotal} />
             <Button variant="ghost" size="icon" onClick={refetch} className="text-muted-foreground hover:text-foreground">
               <RefreshCw className="w-4 h-4" />
