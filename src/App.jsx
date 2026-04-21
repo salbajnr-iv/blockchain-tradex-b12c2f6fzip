@@ -14,6 +14,7 @@ import { LivePricesProvider } from '@/contexts/LivePricesContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { AdminProvider } from '@/contexts/AdminContext';
 import ImpersonationBanner from '@/components/ImpersonationBanner';
+import { ConfirmProvider } from '@/components/ui/confirm-dialog';
 import { FeatureFlagsProvider } from '@/contexts/FeatureFlagsContext';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -82,6 +83,7 @@ function App() {
     <ThemeProvider>
       <AuthProvider>
         <AdminProvider>
+        <ConfirmProvider>
         <FeatureFlagsProvider>
         <PortfolioProvider>
           <LivePricesProvider>
@@ -188,6 +190,7 @@ function App() {
           </LivePricesProvider>
         </PortfolioProvider>
         </FeatureFlagsProvider>
+        </ConfirmProvider>
         </AdminProvider>
       </AuthProvider>
     </ThemeProvider>

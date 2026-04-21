@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
+import { devLog, devWarn } from '@/lib/log'
 
 export const useSupabaseConnection = () => {
   const [status, setStatus] = useState('checking')
@@ -24,9 +25,9 @@ export const useSupabaseConnection = () => {
         }
 
         setStatus('connected')
-        console.log('✅ Supabase connection successful')
+        devLog('✅ Supabase connection successful')
       } catch (err) {
-        console.error('❌ Supabase connection failed:', err.message)
+        devWarn('❌ Supabase connection failed:', err.message)
         setError(err.message)
         setStatus('error')
       }

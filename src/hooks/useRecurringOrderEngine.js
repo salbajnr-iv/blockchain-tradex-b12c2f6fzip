@@ -4,6 +4,7 @@ import { listDueRecurringOrders, advanceRecurringOrder } from '@/lib/api/recurri
 import { executeTrade } from '@/lib/api/portfolio';
 import { usePortfolio } from '@/contexts/PortfolioContext';
 import { toast } from '@/lib/toast';
+import { devWarn } from '@/lib/log';
 
 /**
  * useRecurringOrderEngine
@@ -37,7 +38,7 @@ export function useRecurringOrderEngine(livePrices) {
           if (quantity <= 0) continue;
 
           if (cashBalance < order.amount_usd * 1.002) { // include ~0.2% fee buffer
-            console.warn(`[DCAEngine] Insufficient cash for ${order.symbol} — need $${order.amount_usd}, have $${cashBalance}`);
+            devWarn(`[DCAEngine] Insufficient cash for ${order.symbol} — need $${order.amount_usd}, have $${cashBalance}`);
             continue;
           }
 
@@ -61,11 +62,11 @@ export function useRecurringOrderEngine(livePrices) {
               duration: 7000,
             });
           } catch (execErr) {
-            console.warn(`[DCAEngine] failed to execute order ${order.id}:`, execErr.message);
+            devWarn(`[DCAEngine] failed to execute order ${order.id}:`, execErr.message);
           }
         }
       } catch (err) {
-        console.warn('[DCAEngine] check failed:', err.message);
+        devWarn('[DCAEngine] check failed:', err.message);
       } finally {
         processingRef.current = false;
       }

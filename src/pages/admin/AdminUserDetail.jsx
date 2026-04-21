@@ -17,6 +17,7 @@ import {
 } from '@/lib/api/admin';
 import { useAdmin } from '@/contexts/AdminContext';
 import { toast } from '@/lib/toast';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import {
   ArrowLeft, Mail, Tag as TagIcon, FileText, Eye, Coins, Shield,
   Plus, Trash2, Send, ListChecks, AlertTriangle, LogOut, Key, RefreshCw, Snowflake,
@@ -33,6 +34,7 @@ export default function AdminUserDetail() {
   const { userId } = useParams();
   const navigate = useNavigate();
   const { can } = useAdmin();
+  const confirm = useConfirm();
   const [u, setU] = useState(null);
   const [loading, setLoading] = useState(true);
   const [notes, setNotes] = useState([]);
@@ -65,7 +67,13 @@ export default function AdminUserDetail() {
   };
 
   const handleImpersonate = async () => {
-    const reason = window.prompt('Reason for read-only impersonation (audited):');
+    const reason = await confirm({
+      title: 'Start read-only impersonation',
+      description: `You are about to inspect ${u?.email || 'this account'} in read-only mode. Every action you take is audited. Provide a reason.`,
+      confirmText: 'Start impersonation',
+      tone: 'warning',
+      input: { placeholder: 'e.g. customer support ticket #1234', required: true },
+    });
     if (!reason) return;
     try {
       const sid = await startImpersonation(userId, reason);
@@ -239,10 +247,14 @@ function Card({ icon: Icon, title, children }) {
 
 function DangerActions({ u, reload }) {
   const [busy, setBusy] = useState(null);
+  const confirm = useConfirm();
   const isFrozen = u.status === 'frozen' || u.status === 'suspended';
 
-  const run = async (key, label, confirmMsg, fn) => {
-    if (confirmMsg && !window.confirm(confirmMsg)) return;
+  const run = async (key, label, confirmOpts, fn) => {
+    if (confirmOpts) {
+      const ok = await confirm(confirmOpts);
+      if (!ok) return;
+    }
     setBusy(key);
     try { await fn(); toast.success(label); await reload(); }
     catch (e) { toast.error(e.message || `${label} failed`); }
@@ -277,19 +289,34 @@ function DangerActions({ u, reload }) {
           k="logout"
           icon={LogOut}
           label="Force Logout"
-          onClick={() => run('logout', 'User signed out of all sessions', `Force ${u.email} to log out of all sessions?`, () => adminForceLogout(u.id))}
+          onClick={() => run('logout', 'User signed out of all sessions', {
+            title: 'Force sign-out',
+            description: `Sign ${u.email} out of every active session immediately.`,
+            confirmText: 'Force sign-out',
+            tone: 'warning',
+          }, () => adminForceLogout(u.id))}
         />
         <Action
           k="pwreset"
           icon={Key}
           label="Require Password Reset"
-          onClick={() => run('pwreset', 'Password reset required & email sent', `Require ${u.email} to reset their password on next sign-in?`, () => adminRequirePasswordReset(u.id, u.email))}
+          onClick={() => run('pwreset', 'Password reset required & email sent', {
+            title: 'Require password reset',
+            description: `Send a password-reset email to ${u.email} and require them to set a new password before they can sign in again.`,
+            confirmText: 'Send & require reset',
+            tone: 'warning',
+          }, () => adminRequirePasswordReset(u.id, u.email))}
         />
         <Action
           k="kyc"
           icon={RefreshCw}
           label="Require KYC Renewal"
-          onClick={() => run('kyc', 'KYC renewal required', `Require ${u.email} to re-verify KYC? Trades, deposits, and withdrawals will be blocked until they do.`, () => adminRequireKycRenewal(u.id))}
+          onClick={() => run('kyc', 'KYC renewal required', {
+            title: 'Require KYC renewal',
+            description: 'Trades, deposits and withdrawals will be blocked until this user re-verifies their identity.',
+            confirmText: 'Require renewal',
+            tone: 'warning',
+          }, () => adminRequireKycRenewal(u.id))}
         />
         {isFrozen ? (
           <Action
@@ -297,7 +324,11 @@ function DangerActions({ u, reload }) {
             icon={Snowflake}
             label="Unfreeze Account"
             danger
-            onClick={() => run('unfreeze', 'Account unfrozen', `Unfreeze ${u.email}? They will regain full access.`, () => adminUnfreezeUser(u.id))}
+            onClick={() => run('unfreeze', 'Account unfrozen', {
+              title: 'Unfreeze account',
+              description: `${u.email} will regain full access to their account.`,
+              confirmText: 'Unfreeze',
+            }, () => adminUnfreezeUser(u.id))}
           />
         ) : (
           <Action
@@ -305,10 +336,16 @@ function DangerActions({ u, reload }) {
             icon={Snowflake}
             label="Freeze Account"
             danger
-            onClick={() => {
-              const reason = window.prompt('Reason for freezing (audited):');
+            onClick={async () => {
+              const reason = await confirm({
+                title: 'Freeze account',
+                description: `Freezing ${u.email} blocks all activity immediately. Provide a reason for the audit log.`,
+                confirmText: 'Freeze account',
+                tone: 'danger',
+                input: { placeholder: 'e.g. fraud review, chargeback, KYC mismatch', required: true },
+              });
               if (reason === null) return;
-              run('freeze', 'Account frozen', null, () => adminFreezeUser(u.id, reason || null));
+              run('freeze', 'Account frozen', null, () => adminFreezeUser(u.id, reason));
             }}
           />
         )}

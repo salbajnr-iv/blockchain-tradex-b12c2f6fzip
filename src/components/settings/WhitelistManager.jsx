@@ -8,6 +8,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/lib/toast';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { Wallet, Plus, Trash2, Loader2, Lock, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -20,6 +21,7 @@ function shortAddress(addr) {
 
 export default function WhitelistManager({ whitelistOnly }) {
   const { user } = useAuth();
+  const confirm = useConfirm();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
@@ -62,7 +64,13 @@ export default function WhitelistManager({ whitelistOnly }) {
   };
 
   const handleRemove = async (entry) => {
-    if (!window.confirm(`Remove ${entry.label || shortAddress(entry.address)} from your whitelist?`)) return;
+    const ok = await confirm({
+      title: 'Remove whitelisted address',
+      description: `Remove ${entry.label || shortAddress(entry.address)} (${entry.asset}) from your withdrawal whitelist? You will need to re-add it before withdrawing to this address again.`,
+      confirmText: 'Remove address',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setRemovingId(entry.id);
     try {
       await removeWhitelistEntry(entry.id, user.id);

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { supabase, supabaseMisconfigured } from "@/lib/supabaseClient";
+import { devLog } from "@/lib/log";
 import { emitSystemNotif } from "./useSystemNotifications";
 import { enqueueEmail } from "@/lib/emailQueue";
 import { format } from "date-fns";
@@ -362,7 +363,7 @@ export function useRealtimeNotifications({ portfolioId, userId } = {}) {
 
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
-          console.log("[BlockTrade] Realtime notifications active for portfolio", portfolioId);
+          devLog("[BlockTrade] Realtime notifications active for portfolio", portfolioId);
         }
       });
 

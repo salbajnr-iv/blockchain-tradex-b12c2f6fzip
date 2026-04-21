@@ -21,6 +21,7 @@ import {
   adminAdjustCryptoBalance,
 } from '@/lib/api/cryptoDeposits';
 import { toast } from '@/lib/toast';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import {
   RefreshCw, Search, Shield, ShieldOff, X,
   PlusCircle, MinusCircle, SlidersHorizontal, Lock, Unlock,
@@ -696,6 +697,7 @@ function UserCard({ u, onBalanceClick, onAdminToggle, onStatusToggle, actionLoad
 export default function AdminUsers() {
   const { can } = useAdmin();
   const canAssignRoles = can('users.role.assign');
+  const confirm = useConfirm();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -734,7 +736,13 @@ export default function AdminUsers() {
   };
 
   const handleForceLogout = async (userId) => {
-    if (!window.confirm('Force this user to sign out from all sessions?')) return;
+    const ok = await confirm({
+      title: 'Force sign-out',
+      description: 'Sign this user out of every active session immediately. They will need to log in again.',
+      confirmText: 'Force sign-out',
+      tone: 'warning',
+    });
+    if (!ok) return;
     setActionLoading(userId + '-logout');
     try {
       await adminForceLogout(userId);
@@ -747,7 +755,13 @@ export default function AdminUsers() {
   };
 
   const handleForcePasswordReset = async (userId, email) => {
-    if (!window.confirm('Send a password reset email and force the user to reset?')) return;
+    const ok = await confirm({
+      title: 'Require password reset',
+      description: `Send a password-reset email to ${email} and require them to set a new password before they can sign in again.`,
+      confirmText: 'Send & require reset',
+      tone: 'warning',
+    });
+    if (!ok) return;
     setActionLoading(userId + '-pwreset');
     try {
       await adminRequirePasswordReset(userId, email);
@@ -760,7 +774,13 @@ export default function AdminUsers() {
   };
 
   const handleForceKyc = async (userId) => {
-    if (!window.confirm('Require this user to re-submit KYC?')) return;
+    const ok = await confirm({
+      title: 'Require KYC renewal',
+      description: 'Trades, deposits and withdrawals will be blocked until this user re-verifies their identity.',
+      confirmText: 'Require renewal',
+      tone: 'warning',
+    });
+    if (!ok) return;
     setActionLoading(userId + '-kyc');
     try {
       await adminRequireKycRenewal(userId);
@@ -780,10 +800,21 @@ export default function AdminUsers() {
     const action = isFrozen ? 'Unfreeze' : 'Freeze';
     let reason = null;
     if (!isFrozen) {
-      reason = window.prompt('Reason for freezing this account (visible to admins only):');
+      reason = await confirm({
+        title: 'Freeze account',
+        description: `Freezing ${u.email} blocks all activity immediately. Provide a reason for the audit log.`,
+        confirmText: 'Freeze account',
+        tone: 'danger',
+        input: { placeholder: 'e.g. fraud review, chargeback, KYC mismatch', required: true },
+      });
       if (reason === null) return;
-    } else if (!window.confirm(`${action} this account?`)) {
-      return;
+    } else {
+      const ok = await confirm({
+        title: 'Unfreeze account',
+        description: `${u.email} will regain full access to their account.`,
+        confirmText: 'Unfreeze',
+      });
+      if (!ok) return;
     }
     setActionLoading(u.id + '-freeze');
     try {

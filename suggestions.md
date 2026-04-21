@@ -64,3 +64,14 @@ replit.md lists migration order but doesn't document the new env requirements (j
 No rate-limiting on admin actions (freeze, send-message, blocklist add) beyond Supabase defaults.
 Suggestion
 The highest-impact fixes are #1–#5 (so the admin levers you just built actually do something), then #6/#10 (security hygiene), then #8/#16 (UX polish).
+
+# -- TODO 
+A single document covering the five items that got descoped and their server prerequisites:
+
+IP/geo recheck on every authenticated request (Edge Function + cron)
+True scoped impersonation (server-minted JWT with read-only claim + RLS guard)
+Email verification gate (Supabase Auth confirm-email + UI block)
+TOTP enforcement at sign-in (Supabase MFA enroll/challenge flow)
+Deposit confirmation tracking (chain RPC poller + per-asset confirmation depth)
+
+Plus cross-cutting notes (mirror every client guard at the DB level, rate limiting, webhook signing). Each item has schema, server, client, and acceptance sub-sections so any future agent can pick one up and ship it independently.

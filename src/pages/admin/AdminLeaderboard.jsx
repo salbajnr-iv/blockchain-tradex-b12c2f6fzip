@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { toast } from '@/lib/toast';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import {
   Trophy, Pin, Pencil, Trash2, Plus, Save, X, RotateCcw,
   EyeOff, Eye, Users, Crown, Search, AlertTriangle, ChevronUp, ChevronDown,
@@ -254,6 +255,7 @@ function PinInput({ entry, currentPin, onPin, onUnpin }) {
 // ── Main admin page ────────────────────────────────────────────────────────────
 export default function AdminLeaderboard() {
   const qc = useQueryClient();
+  const confirm = useConfirm();
   const [editEntry, setEditEntry]   = useState(null);
   const [showInject, setShowInject] = useState(false);
   const [search, setSearch]         = useState("");
@@ -342,8 +344,14 @@ export default function AdminLeaderboard() {
     saveMutation.mutate({ ...ov, injected: ov.injected.filter(e => e.id !== id), edits, pins });
   };
 
-  const handleReset = () => {
-    if (!confirm("Reset all overrides? This cannot be undone.")) return;
+  const handleReset = async () => {
+    const ok = await confirm({
+      title: 'Reset leaderboard overrides',
+      description: 'All pins, edits, hides and injected entries will be cleared. This cannot be undone.',
+      confirmText: 'Reset everything',
+      tone: 'danger',
+    });
+    if (!ok) return;
     saveMutation.mutate({ pins: {}, edits: {}, hidden: [], injected: [] });
   };
 
