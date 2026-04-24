@@ -24,6 +24,7 @@ import { useAlertEngine } from "@/hooks/useAlertEngine";
 import { usePendingOrderEngine } from "@/hooks/usePendingOrderEngine";
 import { useRecurringOrderEngine } from "@/hooks/useRecurringOrderEngine";
 import { useRealtimeNotifications } from "@/hooks/useRealtimeNotifications";
+import { useIdleTimeout } from "@/hooks/useIdleTimeout";
 import { motion, AnimatePresence } from "framer-motion";
 
 const NAV_SECTIONS = [
@@ -377,6 +378,7 @@ export default function Layout() {
   usePendingOrderEngine(cryptoPrices);
   useRecurringOrderEngine(cryptoPrices);
   useRealtimeNotifications({ portfolioId, userId: user?.id });
+  useIdleTimeout();
 
   const handleLogout = async () => {
     try { await signOut(); } catch (err) { console.error("Logout error:", err); }

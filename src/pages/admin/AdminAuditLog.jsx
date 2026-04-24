@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { getAuditLog } from '@/lib/api/admin';
-import { RefreshCw, Search, Shield, AlertTriangle, ChevronDown, ChevronUp, X } from 'lucide-react';
+import { supabase } from '@/lib/supabaseClient';
+import { toast } from '@/lib/toast';
+import { RefreshCw, Search, Shield, AlertTriangle, ChevronDown, ChevronUp, X, Download } from 'lucide-react';
 
 const ACTION_META = {
   withdrawal_approved:         { label: 'Withdrawal Approved',       color: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' },
@@ -154,6 +156,9 @@ export default function AdminAuditLog() {
   const [search, setSearch] = useState('');
   const [actionFilter, setActionFilter] = useState('all');
   const [page, setPage] = useState(0);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [exporting, setExporting] = useState(false);
 
   const loadLogs = useCallback(async (pg = 0) => {
     setLoading(true);
@@ -172,6 +177,9 @@ export default function AdminAuditLog() {
 
   useEffect(() => { loadLogs(0); }, [loadLogs]);
 
+  const fromMs = dateFrom ? new Date(dateFrom).getTime() : null;
+  const toMs = dateTo ? new Date(dateTo).getTime() + 24 * 60 * 60 * 1000 - 1 : null;
+
   const filtered = logs.filter(log => {
     const matchesSearch =
       !search ||
@@ -180,8 +188,60 @@ export default function AdminAuditLog() {
       (log.action ?? '').toLowerCase().includes(search.toLowerCase()) ||
       (log.target_id ?? '').toLowerCase().includes(search.toLowerCase());
     const matchesAction = actionFilter === 'all' || log.action === actionFilter;
-    return matchesSearch && matchesAction;
+    const ts = log.created_at ? new Date(log.created_at).getTime() : 0;
+    const matchesFrom = !fromMs || ts >= fromMs;
+    const matchesTo = !toMs || ts <= toMs;
+    return matchesSearch && matchesAction && matchesFrom && matchesTo;
   });
+
+  const exportCsv = useCallback(async () => {
+    setExporting(true);
+    try {
+      let query = supabase
+        .from('admin_audit_log')
+        .select('created_at, admin_email, admin_name, action, target_type, target_id, details')
+        .order('created_at', { ascending: false })
+        .limit(5000);
+      if (fromMs) query = query.gte('created_at', new Date(fromMs).toISOString());
+      if (toMs) query = query.lte('created_at', new Date(toMs).toISOString());
+      if (actionFilter !== 'all') query = query.eq('action', actionFilter);
+      const { data, error } = await query;
+      if (error) throw error;
+      const rows = data || [];
+      const escape = (v) => {
+        if (v === null || v === undefined) return '';
+        const s = typeof v === 'string' ? v : JSON.stringify(v);
+        return `"${s.replace(/"/g, '""')}"`;
+      };
+      const header = ['timestamp', 'admin_email', 'admin_name', 'action', 'target_type', 'target_id', 'details'];
+      const lines = [header.join(',')];
+      rows.forEach((r) => {
+        lines.push([
+          escape(r.created_at),
+          escape(r.admin_email),
+          escape(r.admin_name),
+          escape(r.action),
+          escape(r.target_type),
+          escape(r.target_id),
+          escape(r.details),
+        ].join(','));
+      });
+      const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `audit-log-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success(`Exported ${rows.length} entries`);
+    } catch (err) {
+      toast.error(err.message || 'Failed to export audit log');
+    } finally {
+      setExporting(false);
+    }
+  }, [fromMs, toMs, actionFilter]);
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
   const uniqueActions = [...new Set(logs.map(l => l.action))].sort();
@@ -196,14 +256,24 @@ export default function AdminAuditLog() {
             {total > 0 ? `${total.toLocaleString()} admin actions recorded` : 'All admin actions are recorded here'}
           </p>
         </div>
-        <button
-          onClick={() => loadLogs(page)}
-          disabled={loading}
-          className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm rounded-lg transition-colors disabled:opacity-50"
-        >
-          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-          <span className="hidden sm:inline">Refresh</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={exportCsv}
+            disabled={exporting}
+            className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-sm rounded-lg transition-colors disabled:opacity-50"
+          >
+            <Download size={14} className={exporting ? 'animate-pulse' : ''} />
+            <span className="hidden sm:inline">{exporting ? 'Exporting…' : 'Export CSV'}</span>
+          </button>
+          <button
+            onClick={() => loadLogs(page)}
+            disabled={loading}
+            className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm rounded-lg transition-colors disabled:opacity-50"
+          >
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -249,6 +319,32 @@ export default function AdminAuditLog() {
             ))}
           </select>
           <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            aria-label="From date"
+          />
+          <span className="text-xs text-gray-400">→</span>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            aria-label="To date"
+          />
+          {(dateFrom || dateTo) && (
+            <button
+              onClick={() => { setDateFrom(''); setDateTo(''); }}
+              className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              title="Clear date range"
+            >
+              <X size={14} />
+            </button>
+          )}
         </div>
       </div>
 

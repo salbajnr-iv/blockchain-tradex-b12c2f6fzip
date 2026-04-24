@@ -1,13 +1,38 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { Fingerprint, RefreshCw, Search, Monitor, Globe, Clock } from 'lucide-react';
+import { Fingerprint, RefreshCw, Search, Monitor, Globe, Clock, Trash2, Loader2 } from 'lucide-react';
 import { toast } from '@/lib/toast';
+import { logAdminAction } from '@/lib/api/admin';
 
 export default function AdminDeviceFingerprints() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
   const [expanded, setExpanded] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
+
+  const handleRevoke = async (row, e) => {
+    e?.stopPropagation();
+    const ok = window.confirm(
+      `Revoke this device fingerprint for ${row.users?.email || row.user_id?.slice(0, 8)}? The next time they visit, a new fingerprint record will be created.`
+    );
+    if (!ok) return;
+    setDeletingId(row.id);
+    try {
+      const { error } = await supabase.from('device_fingerprints').delete().eq('id', row.id);
+      if (error) throw error;
+      await logAdminAction('device_fingerprint_revoked', 'device_fingerprint', row.id, {
+        user_id: row.user_id,
+        visitor_id: row.visitor_id,
+      });
+      setRows((prev) => prev.filter((r) => r.id !== row.id));
+      toast.success('Device fingerprint revoked');
+    } catch (err) {
+      toast.error(err.message || 'Failed to revoke device');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const load = async () => {
     setLoading(true);
@@ -115,6 +140,7 @@ export default function AdminDeviceFingerprints() {
                   <th className="text-left px-4 py-3 font-medium">IP</th>
                   <th className="text-left px-4 py-3 font-medium">Seen</th>
                   <th className="text-left px-4 py-3 font-medium">Last Seen</th>
+                  <th className="text-right px-4 py-3 font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -167,10 +193,21 @@ export default function AdminDeviceFingerprints() {
                             {new Date(r.last_seen_at).toLocaleString()}
                           </div>
                         </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            onClick={(e) => handleRevoke(r, e)}
+                            disabled={deletingId === r.id}
+                            className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md text-red-500 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                            title="Revoke this device fingerprint"
+                          >
+                            {deletingId === r.id ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
+                            Revoke
+                          </button>
+                        </td>
                       </tr>
                       {isOpen && (
                         <tr key={r.id + ':d'} className="bg-gray-50 dark:bg-gray-800/30">
-                          <td colSpan={6} className="px-4 py-4">
+                          <td colSpan={7} className="px-4 py-4">
                             <div className="grid sm:grid-cols-2 gap-4 text-xs">
                               <Field label="Visitor ID" value={r.visitor_id} mono />
                               <Field label="Canvas Hash" value={r.canvas_hash} mono />

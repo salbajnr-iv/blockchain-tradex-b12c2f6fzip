@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { toast } from '@/lib/toast';
 import {
   Shield, Lock, Key, AlertTriangle, CheckCircle2, Eye, EyeOff,
-  Loader2, LogOut, Smartphone, QrCode, Trash2, X,
+  Loader2, LogOut, Smartphone, QrCode, Trash2, X, Monitor, Globe, Clock,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import WhitelistManager from "@/components/settings/WhitelistManager";
@@ -200,6 +200,71 @@ export default function SecuritySettings() {
   const [mfaEnabled, setMfaEnabled] = useState(false);
   const [loadingSignOutAll, setLoadingSignOutAll] = useState(false);
   const [whitelistOnly, setWhitelistOnly] = useState(false);
+
+  const [devices, setDevices] = useState([]);
+  const [devicesLoading, setDevicesLoading] = useState(true);
+  const [revokingDeviceId, setRevokingDeviceId] = useState(null);
+  const currentVisitorId = (() => {
+    try { return sessionStorage.getItem('bt_visitor_id'); } catch { return null; }
+  })();
+
+  const loadDevices = async (uid) => {
+    setDevicesLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('device_fingerprints')
+        .select('id, visitor_id, ip_address, user_agent, platform, language, timezone, last_seen_at, first_seen_at, seen_count')
+        .eq('user_id', uid)
+        .order('last_seen_at', { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      setDevices(data || []);
+    } catch {
+      setDevices([]);
+    } finally {
+      setDevicesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!user?.id) return;
+    loadDevices(user.id);
+  }, [user?.id]);
+
+  const handleRevokeDevice = async (device) => {
+    if (device.visitor_id === currentVisitorId) {
+      toast.error('You cannot revoke the device you are currently signed in from. Use "Sign Out All Sessions" instead.');
+      return;
+    }
+    if (!window.confirm('Revoke this device? Trading and withdrawals from it will require a fresh sign-in.')) return;
+    setRevokingDeviceId(device.id);
+    try {
+      const { error } = await supabase
+        .from('device_fingerprints')
+        .delete()
+        .eq('id', device.id)
+        .eq('user_id', user.id);
+      if (error) throw error;
+      setDevices((prev) => prev.filter((d) => d.id !== device.id));
+      toast.success('Device revoked');
+    } catch (err) {
+      toast.error(err.message || 'Failed to revoke device');
+    } finally {
+      setRevokingDeviceId(null);
+    }
+  };
+
+  const formatDeviceLabel = (d) => {
+    const ua = d.user_agent || '';
+    let browser = 'Unknown browser';
+    if (/Edg\//.test(ua)) browser = 'Edge';
+    else if (/OPR\//.test(ua)) browser = 'Opera';
+    else if (/Chrome\//.test(ua)) browser = 'Chrome';
+    else if (/Firefox\//.test(ua)) browser = 'Firefox';
+    else if (/Safari\//.test(ua)) browser = 'Safari';
+    const platform = d.platform || 'Unknown OS';
+    return `${browser} on ${platform}`;
+  };
 
   useEffect(() => {
     if (!user?.id) return;
@@ -436,6 +501,79 @@ export default function SecuritySettings() {
 
         {/* Withdrawal whitelist */}
         <WhitelistManager whitelistOnly={whitelistOnly} />
+
+        {/* My Devices */}
+        <div className="bg-card border border-border/50 rounded-xl p-6">
+          <div className="flex items-center gap-2 mb-2">
+            <Monitor className="w-4 h-4 text-primary" />
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">My Devices</h2>
+          </div>
+          <p className="text-sm text-muted-foreground mb-4">
+            Browsers and devices we've seen sign in to your account. Revoke any you don't recognize.
+          </p>
+
+          {devicesLoading ? (
+            <div className="py-6 flex justify-center">
+              <Loader2 className="w-5 h-5 animate-spin text-primary" />
+            </div>
+          ) : devices.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">No device records yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {devices.map((d) => {
+                const isCurrent = d.visitor_id === currentVisitorId;
+                return (
+                  <div
+                    key={d.id}
+                    className={`flex items-center justify-between gap-3 px-4 py-3 rounded-xl border ${
+                      isCurrent ? 'border-primary/30 bg-primary/5' : 'border-border/40 bg-secondary/20'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className="w-9 h-9 rounded-lg bg-secondary/60 flex items-center justify-center shrink-0">
+                        <Monitor className="w-4 h-4 text-muted-foreground" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {formatDeviceLabel(d)}
+                          {isCurrent && (
+                            <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-primary/15 text-primary font-semibold uppercase">
+                              This device
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate flex items-center gap-2 mt-0.5">
+                          {d.ip_address && (
+                            <span className="inline-flex items-center gap-1">
+                              <Globe className="w-3 h-3" /> {d.ip_address}
+                            </span>
+                          )}
+                          {d.timezone && <span>· {d.timezone}</span>}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground/70 mt-0.5 inline-flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          Last active {new Date(d.last_seen_at).toLocaleString()} · seen {d.seen_count}×
+                        </p>
+                      </div>
+                    </div>
+                    {!isCurrent && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleRevokeDevice(d)}
+                        disabled={revokingDeviceId === d.id}
+                        className="border-destructive/30 text-destructive hover:bg-destructive/5 gap-1.5 shrink-0"
+                      >
+                        {revokingDeviceId === d.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                        Revoke
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
         {/* Active sessions */}
         <div className="bg-card border border-border/50 rounded-xl p-6">

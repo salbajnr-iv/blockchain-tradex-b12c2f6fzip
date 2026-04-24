@@ -587,9 +587,41 @@ npm run dev   # Runs on port 5000
   - `fn_admin_lock_balance(portfolio_id, locked, reason)` — SECURITY DEFINER RPC
   - Admin RLS policies for `portfolios` UPDATE and `transactions` INSERT
 
+## Client-side Security Hardening (April 24, 2026)
+
+These were added without schema changes — purely client behavior + reuse of existing tables.
+
+### New Files
+- `src/hooks/useIdleTimeout.js` — auto sign-out after 15 min of inactivity (toast warning at 14 min). Mounted once globally in `Layout.jsx` so it only runs while authenticated.
+- `src/lib/api/multiAccountReview.js` — read/mark/unmark cluster review state. Uses `platform_settings` row with key `multi_account_reviewed_clusters` (JSON array of `{id, kind, key, reviewed_at, reviewed_by, note}`). No new table required.
+
+### Updated Pages
+- `src/pages/auth/Login.jsx` — after `signIn` succeeds, if Supabase returns `user` without `email_confirmed_at` / `confirmed_at`, the session is signed out and the user is shown a "verify your email" toast. Works whether Supabase Auth has email confirmation on or off.
+- `src/pages/admin/AdminAuditLog.jsx` — added date-range filter (From / To inputs) and **Export CSV** button. CSV export queries up to 5000 rows from `admin_audit_log` honoring the same date range + action filter, then downloads via `Blob` (no server roundtrip).
+- `src/pages/admin/AdminMultiAccount.jsx` — each cluster now has **Mark reviewed** / **Unmark** and **Bulk freeze** buttons. Reviewed state persists in `platform_settings`; bulk freeze calls `setUserStatus(userId, 'suspended')` for every non-frozen user in the cluster (logged via `admin_audit_log`).
+- `src/pages/admin/AdminDeviceFingerprints.jsx` — added per-row **Revoke** action that deletes the `device_fingerprints` row and writes a `device_fingerprint_revoked` audit entry.
+- `src/pages/settings/Security.jsx` — new **My Devices** panel: lists the current user's last 20 `device_fingerprints` rows (browser, OS, IP, timezone, last seen, sighting count). The current device is tagged "This device" (matched via `sessionStorage['bt_visitor_id']`) and cannot be revoked from itself; all other rows can be deleted by the user via row-scoped RLS.
+
+### Required `device_fingerprints` RLS for "My Devices"
+For the user-facing revoke to work, the table needs a self-scoped delete policy:
+```sql
+create policy "users can delete own device fingerprints"
+on device_fingerprints for delete
+using (auth.uid() = user_id);
+create policy "users can read own device fingerprints"
+on device_fingerprints for select
+using (auth.uid() = user_id);
+```
+If only an admin policy currently exists, add the two above so the Security panel loads and revokes for normal users.
+
+### Environment Variables (recap)
+- `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` — Supabase project connection (vite-prefixed so they're exposed to the browser).
+- `VITE_COINGECKO_API_KEY` (optional) — only needed if you hit CoinGecko's rate limits during development.
+- `DATABASE_URL` — Replit-managed Postgres URL; not used by the Vite client, only by any server tooling.
+
 ## Last Updated
-April 6, 2026
+April 24, 2026
   # next major priority
   - implementation of real time purchase of crypto using external api
   - implementation of live chat functionality between user and admin
-  - 
+  - server-side: IP/geo recheck on sensitive actions, scoped impersonation tokens, TOTP MFA enforcement at sign-in, deposit chain-confirmation tracking (see `suggestions.md`)

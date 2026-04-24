@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { checkSignInRestrictions } from '@/lib/api/platform';
-import { supabaseMisconfigured } from '@/lib/supabaseClient';
+import { supabase, supabaseMisconfigured } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader2, Eye, EyeOff, TrendingUp, ShieldCheck, Zap, BarChart2, AlertTriangle } from 'lucide-react';
@@ -50,7 +50,14 @@ export default function Login() {
         setLoading(false);
         return;
       }
-      await signIn(email, password);
+      const result = await signIn(email, password);
+      const signedInUser = result?.user;
+      if (signedInUser && !signedInUser.email_confirmed_at && !signedInUser.confirmed_at) {
+        await supabase.auth.signOut();
+        toast.error('Please verify your email address before signing in. Check your inbox for the confirmation link.');
+        setLoading(false);
+        return;
+      }
       navigate(returnTo, { replace: true });
     } catch (err) {
       toast.error(err.message || 'Invalid email or password');

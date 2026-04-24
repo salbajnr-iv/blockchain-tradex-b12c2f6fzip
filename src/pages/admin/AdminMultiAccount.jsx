@@ -1,28 +1,41 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { Users2, Globe, Fingerprint, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Users2, Globe, Fingerprint, RefreshCw, AlertTriangle, CheckCircle2, ShieldAlert, Loader2 } from 'lucide-react';
 import { toast } from '@/lib/toast';
+import { setUserStatus } from '@/lib/api/admin';
+import {
+  getReviewedClusters,
+  markClusterReviewed,
+  unmarkClusterReviewed,
+  clusterId,
+} from '@/lib/api/multiAccountReview';
 
 export default function AdminMultiAccount() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('device');
+  const [reviewed, setReviewed] = useState([]);
+  const [busyKey, setBusyKey] = useState(null);
 
   const load = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('device_fingerprints')
-      .select(
-        'user_id, visitor_id, ip_address, user_agent, last_seen_at, users:user_id ( email, full_name, status )'
-      )
-      .order('last_seen_at', { ascending: false })
-      .limit(2000);
+    const [{ data, error }, reviewedList] = await Promise.all([
+      supabase
+        .from('device_fingerprints')
+        .select(
+          'user_id, visitor_id, ip_address, user_agent, last_seen_at, users:user_id ( email, full_name, status )'
+        )
+        .order('last_seen_at', { ascending: false })
+        .limit(2000),
+      getReviewedClusters(),
+    ]);
     if (error) {
       toast.error('Failed to load data');
       setRows([]);
     } else {
       setRows(data || []);
     }
+    setReviewed(reviewedList);
     setLoading(false);
   };
 
@@ -32,6 +45,61 @@ export default function AdminMultiAccount() {
   const sharedIps     = useMemo(() => groupBy(rows, 'ip_address'), [rows]);
 
   const data = tab === 'device' ? sharedDevices : sharedIps;
+  const reviewedSet = useMemo(() => new Set(reviewed.map((r) => r.id)), [reviewed]);
+
+  const handleMarkReviewed = async (cluster) => {
+    const id = clusterId(tab, cluster.key);
+    setBusyKey(id);
+    try {
+      const next = await markClusterReviewed(tab, cluster.key);
+      setReviewed(next);
+      toast.success('Cluster marked as reviewed');
+    } catch (err) {
+      toast.error(err.message || 'Failed to mark cluster');
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  const handleUnmarkReviewed = async (cluster) => {
+    const id = clusterId(tab, cluster.key);
+    setBusyKey(id);
+    try {
+      const next = await unmarkClusterReviewed(tab, cluster.key);
+      setReviewed(next);
+      toast.success('Review flag removed');
+    } catch (err) {
+      toast.error(err.message || 'Failed to update cluster');
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  const handleBulkFreeze = async (cluster) => {
+    const targets = cluster.users.filter((u) => u.status !== 'suspended' && u.status !== 'frozen');
+    if (targets.length === 0) {
+      toast.info('All users in this cluster are already frozen.');
+      return;
+    }
+    const ok = window.confirm(
+      `Freeze ${targets.length} user${targets.length === 1 ? '' : 's'} in this cluster? They will be unable to sign in or trade.`
+    );
+    if (!ok) return;
+    const id = clusterId(tab, cluster.key);
+    setBusyKey(id);
+    try {
+      const results = await Promise.allSettled(targets.map((u) => setUserStatus(u.user_id, 'suspended')));
+      const succeeded = results.filter((r) => r.status === 'fulfilled').length;
+      const failed = results.length - succeeded;
+      if (succeeded > 0) toast.success(`Froze ${succeeded} account${succeeded === 1 ? '' : 's'}`);
+      if (failed > 0) toast.error(`${failed} freeze action${failed === 1 ? '' : 's'} failed`);
+      await load();
+    } catch (err) {
+      toast.error(err.message || 'Bulk freeze failed');
+    } finally {
+      setBusyKey(null);
+    }
+  };
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
@@ -75,7 +143,16 @@ export default function AdminMultiAccount() {
       ) : (
         <div className="space-y-3">
           {data.map((cluster) => (
-            <ClusterCard key={cluster.key} cluster={cluster} kind={tab} />
+            <ClusterCard
+              key={cluster.key}
+              cluster={cluster}
+              kind={tab}
+              isReviewed={reviewedSet.has(clusterId(tab, cluster.key))}
+              busy={busyKey === clusterId(tab, cluster.key)}
+              onMarkReviewed={() => handleMarkReviewed(cluster)}
+              onUnmarkReviewed={() => handleUnmarkReviewed(cluster)}
+              onBulkFreeze={() => handleBulkFreeze(cluster)}
+            />
           ))}
         </div>
       )}
@@ -98,19 +175,55 @@ function TabBtn({ active, onClick, icon: Icon, children }) {
   );
 }
 
-function ClusterCard({ cluster, kind }) {
+function ClusterCard({ cluster, kind, isReviewed, busy, onMarkReviewed, onUnmarkReviewed, onBulkFreeze }) {
+  const allFrozen = cluster.users.every((u) => u.status === 'suspended' || u.status === 'frozen');
   return (
-    <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden">
+    <div className={`rounded-xl border bg-white dark:bg-gray-900 overflow-hidden ${isReviewed ? 'border-emerald-300 dark:border-emerald-800/50' : 'border-gray-200 dark:border-gray-800'}`}>
       <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <Users2 size={16} className="text-amber-500 shrink-0" />
           <code className="text-xs font-mono text-gray-700 dark:text-gray-300 truncate">
             {kind === 'device' ? `${cluster.key.slice(0, 16)}…` : cluster.key}
           </code>
+          {isReviewed && (
+            <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-medium">
+              <CheckCircle2 size={10} /> Reviewed
+            </span>
+          )}
         </div>
-        <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 font-medium">
-          {cluster.users.length} users
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 font-medium">
+            {cluster.users.length} users
+          </span>
+          {!allFrozen && (
+            <button
+              onClick={onBulkFreeze}
+              disabled={busy}
+              className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+            >
+              {busy ? <Loader2 size={11} className="animate-spin" /> : <ShieldAlert size={11} />}
+              Bulk freeze
+            </button>
+          )}
+          {isReviewed ? (
+            <button
+              onClick={onUnmarkReviewed}
+              disabled={busy}
+              className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
+            >
+              Unmark
+            </button>
+          ) : (
+            <button
+              onClick={onMarkReviewed}
+              disabled={busy}
+              className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
+            >
+              {busy ? <Loader2 size={11} className="animate-spin" /> : <CheckCircle2 size={11} />}
+              Mark reviewed
+            </button>
+          )}
+        </div>
       </div>
       <div className="divide-y divide-gray-100 dark:divide-gray-800">
         {cluster.users.map((u) => (
@@ -125,6 +238,11 @@ function ClusterCard({ cluster, kind }) {
               {u.status === 'suspended' && (
                 <span className="text-xs px-1.5 py-0.5 rounded bg-red-500/10 text-red-500 mr-2">
                   Suspended
+                </span>
+              )}
+              {u.status === 'frozen' && (
+                <span className="text-xs px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-500 mr-2">
+                  Frozen
                 </span>
               )}
               <span className="text-xs text-gray-500">
