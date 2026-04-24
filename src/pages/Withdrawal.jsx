@@ -672,6 +672,15 @@ export default function WithdrawalPage() {
       return;
     }
 
+    // SERVER TODO (suggestions.md §6b, §6c): the three checks below — KYC tier,
+    // whitelist, daily limit — all run only in the browser. A user calling
+    // `POST /rest/v1/withdrawals` directly bypasses them. Real enforcement requires
+    // RLS + BEFORE INSERT trigger on `withdrawals`:
+    //   §6b — `withdrawals_whitelist` RLS policy
+    //   §6c — `fn_check_withdrawal_limit` trigger that aggregates 24h history
+    //         server-side using `kyc_tiers` table values
+    // Until that ships, these are convenience UX, not security boundaries.
+
     // KYC tier withdrawal limit
     const tierCheck = checkWithdrawalAmount(guard.policy?.kyc_tier ?? 0, usdEquivalent);
     if (!tierCheck.ok) {

@@ -52,6 +52,12 @@ export default function Login() {
       }
       const result = await signIn(email, password);
       const signedInUser = result?.user;
+      // SERVER TODO (suggestions.md §1, §2): this client-side gate is bypassable by
+      // anyone calling supabase.auth.signInWithPassword directly. Real enforcement
+      // requires:
+      //   §1 — Supabase Auth → "Confirm email" turned on
+      //   §2 — MFA challenge step here when getAuthenticatorAssuranceLevel() returns
+      //         { currentLevel: 'aal1', nextLevel: 'aal2' }
       if (signedInUser && !signedInUser.email_confirmed_at && !signedInUser.confirmed_at) {
         await supabase.auth.signOut();
         toast.error('Please verify your email address before signing in. Check your inbox for the confirmation link.');

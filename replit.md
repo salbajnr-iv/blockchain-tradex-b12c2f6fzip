@@ -614,6 +614,30 @@ using (auth.uid() = user_id);
 ```
 If only an admin policy currently exists, add the two above so the Security panel loads and revokes for normal users.
 
+### Server-side TODO (single source of truth)
+**`suggestions.md`** is the authoritative spec for every server-side gap that the
+client cannot close on its own. Each item lists schema, server code (RPC / Edge
+Function / RLS), the existing client integration, and acceptance criteria.
+
+The client files that have a corresponding server gap each carry a
+`// SERVER TODO (suggestions.md §N)` pointer at the top or next to the relevant
+guard. Search the codebase for `SERVER TODO` to find them all:
+
+| Client file                          | Server gap                              | Spec |
+|--------------------------------------|------------------------------------------|------|
+| `src/pages/auth/Login.jsx`           | Email-confirm gate, MFA challenge step   | §1, §2 |
+| `src/hooks/useIdleTimeout.js`        | JWT TTL must mirror idle window         | §7 |
+| `src/hooks/useActionGuard.js`        | Feature-flag triggers on write tables    | §6a |
+| `src/pages/Withdrawal.jsx`           | Whitelist RLS + tier-limit trigger      | §6b, §6c |
+| `src/pages/Trade.jsx`                | Trade RPC + tier-limit trigger           | §6c, §6d |
+| `src/components/AccountStateGate.jsx`| Force-flag write blocks at DB level     | §6e |
+| `src/lib/fingerprint.js`             | Self-scoped RLS on `device_fingerprints`| §9 |
+| `src/lib/api/multiAccountReview.js`  | Admin status-change RLS + audit trigger | §8 |
+| (no client file yet)                 | Deposit chain-confirmation poller       | §5 |
+| (no client file yet)                 | Scoped impersonation JWT                 | §4 |
+| (no client file yet)                 | Geo-recheck trigger + JWT revocation    | §3 |
+| (no client file yet)                 | Engines on pg_cron (alerts, DCA, orders)| §10 |
+
 ### Environment Variables (recap)
 - `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` — Supabase project connection (vite-prefixed so they're exposed to the browser).
 - `VITE_COINGECKO_API_KEY` (optional) — only needed if you hit CoinGecko's rate limits during development.

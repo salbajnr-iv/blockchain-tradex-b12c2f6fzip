@@ -1,3 +1,9 @@
+// SERVER TODO (suggestions.md §6a): the feature-flag checks in this hook are
+// advisory UX only. A user calling Supabase REST directly bypasses every one.
+// To make `maintenance_mode`, `trading_enabled`, `withdrawals_enabled`,
+// `deposits_enabled`, `registrations_enabled` real boundaries, install
+// `fn_check_feature_flag` BEFORE INSERT triggers on `trades`, `withdrawals`,
+// `transactions`, and `users` (see §6a for the SQL).
 import { useCallback, useEffect, useState } from 'react';
 import { useFeatureFlags } from '@/contexts/FeatureFlagsContext';
 import { useAuth } from '@/lib/AuthContext';

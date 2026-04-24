@@ -252,6 +252,12 @@ function TradePanel({ coin, side, setSide, portfolioId, cashBalance, holdingsMap
     if (!coin)              { toast.error("No coin selected"); return; }
     if (!guard.allow('trade')) return;
 
+    // SERVER TODO (suggestions.md §6c, §6d): the tier check below + the per-trade
+    // fee shown to the user are computed in the browser. To enforce server-side:
+    //   §6c — add `fn_check_trade_limit` BEFORE INSERT trigger on `trades`
+    //   §6d — move all trade creation behind `fn_create_trade` RPC, revoke direct
+    //         INSERT on `trades`, and compute fee using `users.custom_fee_bps`
+    //         inside the SECURITY DEFINER function
     // KYC tier instrument gate (crypto is always allowed for tier >=1; tier 0 blocked)
     const tierPolicy = getTierPolicy(guard.policy?.kyc_tier ?? 0);
     if (!tierPolicy.canTrade) {

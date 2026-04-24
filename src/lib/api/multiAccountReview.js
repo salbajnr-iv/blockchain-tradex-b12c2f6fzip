@@ -1,3 +1,8 @@
+// SERVER TODO (suggestions.md §8): Bulk-freeze relies on the existing admin RLS for
+// `users.update`. Add the explicit `admins_can_set_status` policy + status-change
+// audit trigger from §8 so a freeze can never be issued by a non-admin and every
+// status change is recorded at the DB level (not just in the client-side audit
+// helper).
 import { supabase } from '@/lib/supabaseClient';
 import { logAdminAction } from '@/lib/api/admin';
 

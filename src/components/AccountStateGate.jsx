@@ -43,6 +43,11 @@ export default function AccountStateGate() {
     const allowed = ALWAYS_ALLOW.some((p) => path.startsWith(p));
     if (allowed) return;
 
+    // SERVER TODO (suggestions.md §6e): this redirect is the only thing stopping a
+    // flagged user from acting. A user who navigates with the browser back button
+    // or hits Supabase REST directly is unaffected. Add the
+    // `block_writes_when_password_reset_required` RLS policy on every write table
+    // so the DB rejects writes until the flag clears.
     if (policy.force_password_reset) {
       navigate('/reset-password?forced=1', { replace: true });
     } else if (policy.force_kyc_renewal) {

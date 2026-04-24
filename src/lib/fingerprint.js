@@ -1,3 +1,8 @@
+// SERVER TODO (suggestions.md §9): the "My Devices" panel in Settings → Security
+// reads/deletes from `device_fingerprints`. It needs the two self-scoped RLS
+// policies (`users_read_own_devices`, `users_delete_own_devices`) added in
+// suggestions.md §9 — without them the panel shows empty for normal users even
+// though the writes from this file (which use the user's own auth) still work.
 import { supabase } from '@/lib/supabaseClient';
 
 const STORAGE_KEY = 'bt_visitor_id';

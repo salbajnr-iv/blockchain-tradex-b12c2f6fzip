@@ -1,3 +1,7 @@
+// SERVER TODO (suggestions.md §7): this hook only protects the open tab. A user who
+// dumps their JWT and uses it from curl is unaffected. To make idle timeout a real
+// security boundary, set Supabase Dashboard → Auth → JWT Expiry to 900 (15 min) so
+// even kept-alive tokens expire within the idle window.
 import { useEffect, useRef } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { toast } from '@/lib/toast';
